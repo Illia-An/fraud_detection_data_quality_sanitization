@@ -13,7 +13,17 @@ notebooks/           EDA → then promote rules into fraud_guard
 scripts/             One-off read-only DB helpers
 tests/               pytest (no live DB in CI)
 frontend/            Angular (pending source choice)
+
 ```
+## Environment
+
+1. Copy the template: `copy .env.example .env` (PowerShell / cmd from repo root).
+2. Edit **`.env` only locally** — set `DB_SERVER`, `DB_DATABASE`, and `DATABASE_URL` for your SQL Server.
+3. **Read-only:** this project uses `SELECT` only; do not write to the source database.
+4. **Never commit `.env`** — it is gitignored; only `.env.example` with placeholders belongs in the repo.
+
+Example local values (not for git): internal server host, experiment database name, Trusted Connection.
+
 
 ## Quick start (backend)
 
