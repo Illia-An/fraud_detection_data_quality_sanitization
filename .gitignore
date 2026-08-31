@@ -1,0 +1,33 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+
+# Virtual environments
+.venv
+.venv-dev
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/Untitled.ipynb
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.angular/
+
+# IDE & OS
+.vscode/
+.idea/
+.cursor/
+Thumbs.db
+.DS_Store
