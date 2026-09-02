@@ -1,0 +1,30 @@
+.chart-card {
+  margin-top: 1rem;
+}
+
+.store-select {
+  width: 220px;
+  margin-bottom: 0.5rem;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 320px;
+}
+
+.empty {
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .charts {
+    grid-template-columns: 1fr;
+  }
+}
