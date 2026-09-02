@@ -1,0 +1,261 @@
+<div class="page">
+  <header class="header">
+    <h1>Fraud Guard — Sanitization PoC</h1>
+    <mat-chip-set>
+      <mat-chip [highlighted]="healthStatus === 'ok'">
+        API: {{ healthStatus ?? 'checking…' }}
+      </mat-chip>
+    </mat-chip-set>
+  </header>
+
+  <mat-card class="help-card">
+    <mat-card-header>
+      <mat-card-title>How it works</mat-card-title>
+    </mat-card-header>
+    <mat-card-content class="help-text">
+      <p>
+        This tool estimates how the <strong>5% KPI</strong> (share of top-box scores)
+        changes when suspicious survey answers are removed.
+      </p>
+      <ul>
+        <li><strong>Tier 1</strong> — staff/non-customer rows and repeat answers (same person, same store, same day).</li>
+        <li><strong>Tier 2</strong> — store×month cells with unusually high scores vs the network.</li>
+        <li><strong>Tier 3</strong> — optional ML (IsolationForest) on entity behaviour.</li>
+      </ul>
+      <p>
+        Load a <strong>synthetic preset</strong> (scenario-based fake data from research),
+        adjust filters, then click <strong>Run pipeline</strong>.
+        Pick a store in the chart to compare actual vs sanitized 5% by month.
+      </p>
+    </mat-card-content>
+  </mat-card>
+
+  <form [formGroup]="form" (ngSubmit)="run()" class="layout">
+    <mat-card class="panel">
+      <mat-card-header>
+        <mat-card-title>Pipeline configuration</mat-card-title>
+        <mat-card-subtitle>Tier 1 / 2 / 3 thresholds</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content class="config-grid">
+        <section>
+          <h3>Tier 1 — deterministic</h3>
+          <mat-slide-toggle formControlName="tier1_blacklist">
+            BlackList filter (keep לא)
+          </mat-slide-toggle>
+          <mat-slide-toggle formControlName="tier1_freq">
+            Freq ≥ N / store×day
+          </mat-slide-toggle>
+          <mat-slide-toggle formControlName="tier1_always5">
+            Always top-box (optional)
+          </mat-slide-toggle>
+          <mat-form-field appearance="outline">
+            <mat-label>Freq threshold</mat-label>
+            <input matInput type="number" formControlName="tier1_freq_min" />
+          </mat-form-field>
+        </section>
+
+        <mat-divider [vertical]="true"></mat-divider>
+
+        <section>
+          <h3>Tier 2 — store×month</h3>
+          <mat-slide-toggle formControlName="tier2_enabled">Enabled</mat-slide-toggle>
+          <mat-form-field appearance="outline">
+            <mat-label>Min volume</mat-label>
+            <input matInput type="number" formControlName="tier2_min_volume" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Z high</mat-label>
+            <input matInput type="number" step="0.1" formControlName="tier2_z_high" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Five % min</mat-label>
+            <input matInput type="number" formControlName="tier2_five_pct" />
+          </mat-form-field>
+        </section>
+
+        <mat-divider [vertical]="true"></mat-divider>
+
+        <section>
+          <h3>Tier 3 — IsolationForest</h3>
+          <mat-slide-toggle formControlName="tier3_enabled">Enabled</mat-slide-toggle>
+          <mat-form-field appearance="outline">
+            <mat-label>Contamination</mat-label>
+            <input
+              matInput
+              type="number"
+              step="0.001"
+              formControlName="tier3_contamination"
+            />
+          </mat-form-field>
+        </section>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="panel">
+      <mat-card-header>
+        <mat-card-title>Survey rows (JSON)</mat-card-title>
+        <mat-card-subtitle>Q10012 answered rows — PascalCase columns</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>rows[]</mat-label>
+          <textarea matInput rows="14" formControlName="rowsJson"></textarea>
+          @if (jsonError) {
+            <mat-error>{{ jsonError }}</mat-error>
+          }
+        </mat-form-field>
+      </mat-card-content>
+      <mat-card-actions align="end" class="preset-actions">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="loadPreset('small')"
+          [disabled]="loadingSample"
+        >
+          Small
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="loadPreset('medium')"
+          [disabled]="loadingSample"
+        >
+          Medium
+        </button>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="loadPreset('stress')"
+          [disabled]="loadingSample"
+        >
+          Stress
+        </button>
+        @if (loadingSample) {
+          <mat-spinner diameter="20"></mat-spinner>
+        }
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          [disabled]="loading || loadingSample || form.invalid"
+        >
+          @if (loading) {
+            <mat-spinner diameter="20"></mat-spinner>
+            <span class="btn-label">Running…</span>
+          } @else {
+            Run pipeline
+          }
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </form>
+
+  @if (result) {
+    <section class="results">
+      <div class="kpi-row">
+        <mat-card class="kpi">
+          <mat-card-title>Baseline 5%</mat-card-title>
+          <p class="kpi-value">
+            {{ result.baseline_top_box_pct ?? '—' }}%
+          </p>
+        </mat-card>
+        <mat-card class="kpi">
+          <mat-card-title>Final 5%</mat-card-title>
+          <p class="kpi-value">{{ result.final_top_box_pct ?? '—' }}%</p>
+        </mat-card>
+        <mat-card class="kpi">
+          <mat-card-title>Network delta</mat-card-title>
+          <p class="kpi-value">{{ result.network_delta_pp ?? '—' }} pp</p>
+        </mat-card>
+        @if (result.entities_flagged_tier3) {
+          <mat-card class="kpi">
+            <mat-card-title>Tier3 entities</mat-card-title>
+            <p class="kpi-value">{{ result.entities_flagged_tier3 }}</p>
+          </mat-card>
+        }
+      </div>
+
+      <app-store-impact-chart
+        [series]="result.store_impact_series"
+        [tier2Enabled]="form.value.tier2_enabled"
+        [tier3Enabled]="form.value.tier3_enabled"
+      />
+
+      <mat-card>
+        <mat-card-header>
+          <mat-card-title>Pipeline steps</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <table mat-table [dataSource]="result.steps" class="full-width">
+            <ng-container matColumnDef="step_name">
+              <th mat-header-cell *matHeaderCellDef>Step</th>
+              <td mat-cell *matCellDef="let row">{{ row.step_name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rows_in">
+              <th mat-header-cell *matHeaderCellDef>In</th>
+              <td mat-cell *matCellDef="let row">{{ row.rows_in }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rows_out">
+              <th mat-header-cell *matHeaderCellDef>Out</th>
+              <td mat-cell *matCellDef="let row">{{ row.rows_out }}</td>
+            </ng-container>
+            <ng-container matColumnDef="rows_dropped">
+              <th mat-header-cell *matHeaderCellDef>Dropped</th>
+              <td mat-cell *matCellDef="let row">{{ row.rows_dropped }}</td>
+            </ng-container>
+            <ng-container matColumnDef="top_box_rate_pct">
+              <th mat-header-cell *matHeaderCellDef>Top-box %</th>
+              <td mat-cell *matCellDef="let row">
+                {{ row.top_box_rate_pct ?? '—' }}
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="stepColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: stepColumns"></tr>
+          </table>
+        </mat-card-content>
+      </mat-card>
+
+      @if (flaggedStoreMonths().length) {
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>Flagged store×months (Tier 2)</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <table mat-table [dataSource]="flaggedStoreMonths()" class="full-width">
+              <ng-container matColumnDef="store_id">
+                <th mat-header-cell *matHeaderCellDef>Store</th>
+                <td mat-cell *matCellDef="let row">{{ row.store_id }}</td>
+              </ng-container>
+              <ng-container matColumnDef="year">
+                <th mat-header-cell *matHeaderCellDef>Year</th>
+                <td mat-cell *matCellDef="let row">{{ row.year }}</td>
+              </ng-container>
+              <ng-container matColumnDef="month">
+                <th mat-header-cell *matHeaderCellDef>Month</th>
+                <td mat-cell *matCellDef="let row">{{ row.month }}</td>
+              </ng-container>
+              <ng-container matColumnDef="volume">
+                <th mat-header-cell *matHeaderCellDef>Volume</th>
+                <td mat-cell *matCellDef="let row">{{ row.volume }}</td>
+              </ng-container>
+              <ng-container matColumnDef="five_pct">
+                <th mat-header-cell *matHeaderCellDef>Five %</th>
+                <td mat-cell *matCellDef="let row">{{ row.five_pct }}</td>
+              </ng-container>
+              <ng-container matColumnDef="z">
+                <th mat-header-cell *matHeaderCellDef>Z</th>
+                <td mat-cell *matCellDef="let row">{{ row.z }}</td>
+              </ng-container>
+              <ng-container matColumnDef="flagged">
+                <th mat-header-cell *matHeaderCellDef>Flagged</th>
+                <td mat-cell *matCellDef="let row">{{ row.flagged }}</td>
+              </ng-container>
+              <tr mat-header-row *matHeaderRowDef="storeColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: storeColumns"></tr>
+            </table>
+          </mat-card-content>
+        </mat-card>
+      }
+    </section>
+  }
+</div>

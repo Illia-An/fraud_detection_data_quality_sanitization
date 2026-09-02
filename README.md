@@ -45,3 +45,27 @@ Notebooks (from repo root):
 ```bash
 uv run jupyter notebook notebooks/
 ```
+
+## Docker (API)
+
+Linux containers cannot use Windows **Trusted Connection**. For Docker, use SQL auth
+(see `.env.docker.example`) and point `SERVER` to a host reachable from the container
+(often `host.docker.internal` on Docker Desktop).
+
+```bash
+copy .env.docker.example .env
+# edit DATABASE_URL / DB_* for SQL auth
+
+docker compose build
+docker compose up -d
+```
+
+- Health: http://127.0.0.1:8000/api/v1/health
+- Logs: `docker compose logs -f api`
+- Stop: `docker compose down`
+
+Build image only:
+
+```bash
+docker build -t fraud-dq-sanitization-api:latest .
+```
