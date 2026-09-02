@@ -44,3 +44,25 @@ git show poc/angular-concept:frontend/src/app/services/api.service.ts
 |----------|---------|-------------------|
 | Angular PoC (tag) | http://localhost:4201 | `http://localhost:4201` |
 | React v2 | http://localhost:5173 | `http://localhost:5173` |
+
+## React v2 — run locally
+
+```powershell
+# Backend (repo root)
+uv run uvicorn backend.main:app --reload --host 127.0.0.1 --port 8001
+
+# Frontend
+cd web
+npm install
+npm run dev
+```
+
+Quality checks:
+
+```powershell
+cd web
+npm run lint
+npm run test -- --run
+```
+
+See `web/README.md` for full script list.
