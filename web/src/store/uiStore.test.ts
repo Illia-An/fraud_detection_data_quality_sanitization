@@ -9,6 +9,7 @@ describe('useUiStore survey data', () => {
       lastPreset: 'small',
       surveyRows: [],
       sampleMeta: null,
+      processResult: null,
     });
   });
 
