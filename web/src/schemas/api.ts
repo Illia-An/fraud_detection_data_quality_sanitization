@@ -134,6 +134,7 @@ export const sampleResponseSchema = z.object({
 });
 
 export type SampleResponse = z.infer<typeof sampleResponseSchema>;
+export type SamplePresetMeta = z.infer<typeof samplePresetMetaSchema>;
 
 export const errorDetailSchema = z.object({
   detail: z.union([z.string(), z.array(z.record(z.string(), z.unknown()))]),
