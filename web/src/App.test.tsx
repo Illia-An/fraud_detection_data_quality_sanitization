@@ -9,4 +9,9 @@ describe('App', () => {
       'Fraud Guard — Sanitization PoC',
     );
   });
+
+  it('renders How it works section', () => {
+    render(<App />);
+    expect(screen.getByText('How it works')).toBeInTheDocument();
+  });
 });
