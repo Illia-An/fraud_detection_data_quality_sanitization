@@ -16,7 +16,7 @@
 | GET    | `/api/v1/sample/{preset}` | preset: small/medium/stress | `SampleResponse` |
 | POST   | `/api/v1/process`  | `ProcessRequest`   | `ProcessResponse` |
 
-CORS: `http://localhost:4201` (override via `API_CORS_ORIGINS`).
+CORS: `http://localhost:5173` (React v2; override via `API_CORS_ORIGINS`).
 
 Default API port: **8001** (`API_PORT` in `.env`).
 
