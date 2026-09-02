@@ -24,6 +24,11 @@ notebooks/Untitled.ipynb
 node_modules/
 frontend/dist/
 frontend/.angular/
+web/dist/
+web/playwright-report/
+web/test-results/
+web/.npm-cache/
+web/.npmrc
 
 # IDE & OS
 .vscode/
