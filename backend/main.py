@@ -33,7 +33,10 @@ API_PREFIX = "/api/v1"
 
 
 def _cors_origins() -> list[str]:
-    raw = os.environ.get("API_CORS_ORIGINS", "http://localhost:4201")
+    raw = os.environ.get(
+        "API_CORS_ORIGINS",
+        "http://localhost:5173,http://localhost:4201",
+    )
     return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
 
