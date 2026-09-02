@@ -14,6 +14,7 @@ import { useProcess } from '../api/hooks';
 import type { PipelineConfig } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import { KpiCards } from './KpiCards';
+import { StoreImpactChart } from './StoreImpactChart';
 
 interface PipelineRunPanelProps {
   config: PipelineConfig;
@@ -69,7 +70,15 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
             </Alert>
           )}
 
-          {displayResult && !isPending && <KpiCards result={displayResult} />}
+          {displayResult && !isPending && (
+            <>
+              <KpiCards result={displayResult} />
+              <StoreImpactChart
+                series={displayResult.store_impact_series}
+                config={config}
+              />
+            </>
+          )}
         </Stack>
       </CardContent>
     </Card>
