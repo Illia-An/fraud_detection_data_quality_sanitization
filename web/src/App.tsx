@@ -1,9 +1,17 @@
-import { Typography } from '@mui/material';
+import { Route, Routes } from 'react-router-dom';
+
+import { AppLayout } from './components/layout/AppLayout';
+import { AppProviders } from './providers/AppProviders';
+import { SanitizationPage } from './pages/SanitizationPage';
 
 export default function App() {
   return (
-    <Typography variant="h4" component="h1" sx={{ p: 3 }}>
-      Fraud Guard — Sanitization PoC
-    </Typography>
+    <AppProviders>
+      <Routes>
+        <Route element={<AppLayout />}>
+          <Route index element={<SanitizationPage />} />
+        </Route>
+      </Routes>
+    </AppProviders>
   );
 }
