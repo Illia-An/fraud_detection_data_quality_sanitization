@@ -28,8 +28,27 @@ const processResult = {
   baseline_top_box_pct: 85.5,
   final_top_box_pct: 82.1,
   network_delta_pp: -3.4,
-  steps: [],
-  high_store_months: [],
+  steps: [
+    {
+      step_name: '1_tier1',
+      rows_in: 95,
+      rows_out: 90,
+      rows_dropped: 5,
+      top_box_rate_pct: 84.0,
+      drop_reasons: {},
+    },
+  ],
+  high_store_months: [
+    {
+      store_id: 1,
+      year: 2025,
+      month: 1,
+      volume: 40,
+      five_pct: 95.0,
+      z: 2.5,
+      flagged: true,
+    },
+  ],
   store_impact_series: [],
   entities_flagged_tier3: 0,
   meta: {},
@@ -93,6 +112,8 @@ describe('PipelineRunPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('85.50%')).toBeInTheDocument();
       expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Pipeline steps/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Flagged store×months/i })).toBeInTheDocument();
     });
   });
 

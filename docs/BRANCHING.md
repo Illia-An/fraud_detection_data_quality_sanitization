@@ -10,6 +10,9 @@
 
 | Tag | Points to |
 |-----|-----------|
+| `v1.0.0` | React UI v2 on FastAPI (synthetic presets, Dashboard shell, docs route) |
+| `v0.1.1` | Research baseline hygiene (`.env.example` placeholders) |
+| `v0.1.0` | Initial research baseline |
 | `poc/angular-concept` | Full Angular PoC snapshot (backend + `frontend/`, ports 8001/4201) |
 
 ## Restore Angular PoC (read-only inspection)

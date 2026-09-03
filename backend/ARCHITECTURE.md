@@ -1,12 +1,14 @@
-# PoC Architecture Contract (Agent 1)
+# PoC Architecture Contract
 
 ## Stack
 
 | Layer    | Technology                          |
 |----------|-------------------------------------|
 | Backend  | FastAPI + Pydantic v2 + pandas      |
-| Frontend | Angular 17+ Standalone + Material   |
+| Frontend | React 19 + Vite + MUI (`web/`)      |
 | Logic    | `src/fraud_guard/tier{1,2,3}.py`    |
+
+Angular 17 PoC reference: git tag `poc/angular-concept` (`frontend/`).
 
 ## Endpoints
 
@@ -28,22 +30,21 @@ uv run uvicorn backend.main:app --reload --host 127.0.0.1 --port 8001
 - Docs: http://127.0.0.1:8001/docs
 
 ```text
-Angular form → ProcessRequest (JSON)
+React form → ProcessRequest (JSON)
   → backend/service.run_pipeline()
     → filter Q10012 answered rows
     → Tier1 flags (blacklist, freq≥3/store/day, optional always-5)
     → Tier2 flags (store-month z>2 or five_pct≥90)
     → Tier3 flags (IsolationForest entity anomalies, optional)
-  → ProcessResponse → Angular result cards / tables
+  → ProcessResponse → KPI cards / tables / Plotly chart
 ```
 
 ## Type parity
 
 - Python: `backend/schemas.py`
-- TypeScript: `frontend/src/app/models/api.interface.ts`
+- TypeScript: `web/src/schemas/api.ts` (Zod mirror)
 
-Field names and nesting MUST match 1:1 (camelCase in TS for idiomatic Angular,
-mapped at HTTP boundary via identical JSON keys — use PascalCase for row columns).
+Field names and nesting MUST match 1:1 at the JSON boundary (PascalCase for survey row columns).
 
 ## Security
 

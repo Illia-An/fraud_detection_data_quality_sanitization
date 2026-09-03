@@ -5,13 +5,11 @@ import App from './App';
 describe('App', () => {
   it('renders the application title', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Fraud Guard — Sanitization PoC',
-    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Survey Sanitization');
   });
 
   it('renders How it works section', () => {
     render(<App />);
-    expect(screen.getByText('How it works')).toBeInTheDocument();
+    expect(screen.getByText(/How it works/)).toBeInTheDocument();
   });
 });

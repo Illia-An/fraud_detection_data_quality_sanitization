@@ -1,4 +1,7 @@
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
@@ -7,14 +10,20 @@ import {
   CardHeader,
   CircularProgress,
   Stack,
+  Typography,
 } from '@mui/material';
 import { useEffect } from 'react';
+
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 import { useProcess } from '../api/hooks';
 import type { PipelineConfig } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
+import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 import { KpiCards } from './KpiCards';
+import { PipelineStepsTable } from './PipelineStepsTable';
 import { StoreImpactChart } from './StoreImpactChart';
+
 
 interface PipelineRunPanelProps {
   config: PipelineConfig;
@@ -77,6 +86,26 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
                 series={displayResult.store_impact_series}
                 config={config}
               />
+              <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Pipeline steps
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0 }}>
+                  <PipelineStepsTable steps={displayResult.steps} />
+                </AccordionDetails>
+              </Accordion>
+              <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="subtitle1" fontWeight={600}>
+                    Flagged store×months
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0 }}>
+                  <FlaggedMonthsTable rows={displayResult.high_store_months} />
+                </AccordionDetails>
+              </Accordion>
             </>
           )}
         </Stack>

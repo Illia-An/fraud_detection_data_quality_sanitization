@@ -1,15 +1,17 @@
 import { Route, Routes } from 'react-router-dom';
 
-import { AppLayout } from './components/layout/AppLayout';
+import { DashboardLayout } from './dashboard/DashboardLayout';
 import { AppProviders } from './providers/AppProviders';
+import { DocumentationPage } from './pages/DocumentationPage';
 import { SanitizationPage } from './pages/SanitizationPage';
 
 export default function App() {
   return (
     <AppProviders>
       <Routes>
-        <Route element={<AppLayout />}>
+        <Route element={<DashboardLayout />}>
           <Route index element={<SanitizationPage />} />
+          <Route path="documentation" element={<DocumentationPage />} />
         </Route>
       </Routes>
     </AppProviders>
