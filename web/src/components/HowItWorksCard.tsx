@@ -1,10 +1,20 @@
-import { Card, CardContent, CardHeader, Typography } from '@mui/material';
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Typography,
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
 export function HowItWorksCard() {
   return (
-    <Card sx={{ mb: 3 }}>
-      <CardHeader title="How it works" />
-      <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+    <Accordion disableGutters sx={{ mb: 2, '&:before': { display: 'none' } }}>
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography variant="subtitle1" fontWeight={600}>
+          How it works ? 🤔
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
         <Typography variant="body1">
           This tool estimates how the <strong>5% KPI</strong> (share of top-box scores) changes when
           suspicious survey answers are removed.
@@ -26,7 +36,7 @@ export function HowItWorksCard() {
           filters, then click <strong>Run pipeline</strong>. Pick a store in the chart to compare
           actual vs sanitized 5% by month.
         </Typography>
-      </CardContent>
-    </Card>
+      </AccordionDetails>
+    </Accordion>
   );
 }

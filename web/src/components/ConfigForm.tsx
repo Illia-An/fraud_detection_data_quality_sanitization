@@ -54,7 +54,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   const tier3Enabled = values?.tier3?.enabled ?? false;
 
   return (
-    <Card sx={{ mb: 3 }}>
+    <Card>
       <CardHeader title="Pipeline configuration" subheader="Tier 1 / 2 / 3 thresholds" />
       <CardContent>
         <Stack

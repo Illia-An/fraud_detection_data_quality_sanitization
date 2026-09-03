@@ -75,7 +75,7 @@ export function SampleDataPanel() {
 
   return (
     <>
-      <Card sx={{ mb: 3 }}>
+      <Card>
         <CardHeader
           title="Survey data"
           subheader="Synthetic presets from research scenarios"
