@@ -28,7 +28,7 @@ test.describe('Sanitization flow', () => {
 
   test('shows API health ok', async ({ page }) => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-      'Fraud Guard — Sanitization PoC',
+      'Survey Sanitization',
     );
     await expect(page.getByText('API: ok')).toBeVisible();
   });
@@ -37,7 +37,7 @@ test.describe('Sanitization flow', () => {
     await runPipeline(page);
 
     await expect(page.getByText('Final 5%')).toBeVisible();
-    await expect(page.getByText('Pipeline steps')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Pipeline steps/i })).toBeVisible();
   });
 
   test('tier 2 off changes network delta on re-run', async ({ page }) => {
