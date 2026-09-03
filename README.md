@@ -55,6 +55,8 @@ npm run test:run
 npm run test:e2e
 ```
 
+CI runs the same checks on push/PR via `.github/workflows/ci.yml` (pytest, web lint/unit/build, Playwright e2e). No live SQL Server in CI.
+
 ## Quick start — legacy API (port 8000)
 
 ```powershell
