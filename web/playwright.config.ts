@@ -22,7 +22,8 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        channel: 'msedge',
+        // Local Windows: Edge channel. CI (Linux): bundled Chromium.
+        ...(process.env.CI ? {} : { channel: 'msedge' as const }),
       },
     },
   ],
