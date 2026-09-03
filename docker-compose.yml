@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fraud-dq-sanitization-api:latest
+    container_name: fraud-dq-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:4200}
+    restart: unless-stopped
+    # Uncomment when SQL Server runs on the Docker host (Windows/macOS):
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
