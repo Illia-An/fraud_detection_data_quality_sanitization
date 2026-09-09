@@ -75,7 +75,7 @@ describe('SampleDataPanel', () => {
     });
     mockUseSample.mockReturnValue({
       ...idleQuery(),
-    } as ReturnType<typeof useSample>);
+    } as unknown as ReturnType<typeof useSample>);
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
       isFetching: true,
@@ -151,7 +151,7 @@ describe('SampleDataPanel', () => {
       error: null,
       isSuccess: true,
       refetch,
-    } as ReturnType<typeof useSample>);
+    } as unknown as ReturnType<typeof useSample>);
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSampleDb>);
@@ -180,7 +180,7 @@ describe('SampleDataPanel', () => {
       error: null,
       isSuccess: true,
       refetch,
-    } as ReturnType<typeof useSample>);
+    } as unknown as ReturnType<typeof useSample>);
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSampleDb>);
@@ -234,7 +234,7 @@ describe('SampleDataPanel', () => {
     useUiStore.setState({ lastPreset: 'small' });
     mockUseSample.mockReturnValue({
       ...idleQuery(),
-    } as ReturnType<typeof useSample>);
+    } as unknown as ReturnType<typeof useSample>);
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSampleDb>);
