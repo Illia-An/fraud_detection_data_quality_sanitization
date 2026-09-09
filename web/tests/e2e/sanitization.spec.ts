@@ -50,15 +50,19 @@ test.describe('Sanitization flow', () => {
     await expect(page.getByRole('button', { name: /Pipeline steps/i })).toBeVisible();
   });
 
-  test('tier 2 off changes network delta on re-run', async ({ page }) => {
+  test('changing tier1 freq threshold changes network delta on re-run', async ({ page }) => {
     await useSmallPreset(page);
     await expect(page.getByText('Baseline 5%')).toBeVisible({ timeout: 30_000 });
-    const deltaWithTier2 = await readNetworkDelta(page);
+    const deltaDefault = await readNetworkDelta(page);
 
-    await page.getByRole('checkbox', { name: 'Tier 2 enabled' }).click();
+    const freq = page.getByLabel('Freq threshold');
+    await freq.fill('10');
+    await freq.blur();
+    await expect(freq).toHaveValue('10');
+
     await runPipeline(page);
-    const deltaWithoutTier2 = await readNetworkDelta(page);
+    const deltaRaisedFreq = await readNetworkDelta(page);
 
-    expect(deltaWithoutTier2).not.toBe(deltaWithTier2);
+    expect(deltaRaisedFreq).not.toBe(deltaDefault);
   });
 });
