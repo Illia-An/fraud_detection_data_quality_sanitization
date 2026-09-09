@@ -119,6 +119,7 @@ export const processResponseSchema = z.object({
   steps: z.array(stepMetricsSchema).default([]),
   high_store_months: z.array(storeMonthCellSchema).default([]),
   store_impact_series: z.array(storeImpactPointSchema).default([]),
+  echo_config: z.record(z.string(), z.unknown()).optional(),
   meta: z.record(z.string(), z.unknown()).default({}),
 });
 
