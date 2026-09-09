@@ -20,7 +20,6 @@ const series = [
     actual_five_pct: 95,
     after_tier1_five_pct: 88,
     after_tier2_five_pct: 85,
-    after_tier3_five_pct: null,
     actual_volume: 40,
     final_volume: 35,
     rows_dropped: 5,

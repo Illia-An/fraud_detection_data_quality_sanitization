@@ -2,19 +2,7 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-import pytest
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from backend.schemas import PipelineConfig, ProcessRequest, SurveyAnswerRow
+from backend.schemas import PipelineConfig, ProcessRequest, SanitizationResponse, SurveyAnswerRow
 from backend.service import run_pipeline
 
 
@@ -70,12 +58,15 @@ def _sample_rows() -> list[SurveyAnswerRow]:
 def test_run_pipeline_tier1_drops_staff_and_freq() -> None:
     req = ProcessRequest(rows=_sample_rows(), config=PipelineConfig())
     res = run_pipeline(req)
+    assert isinstance(res, SanitizationResponse)
     assert res.baseline_top_box_pct is not None
+    assert res.echo_config == req.config
+    assert res.network_delta_pp == round(res.final_top_box_pct - res.baseline_top_box_pct, 4)
     assert len(res.steps) >= 2
-    tier1 = next(s for s in res.steps if s.step_name == "1_tier1")
+    tier1 = next(s for s in res.steps if s.step_name == "tier1")
     assert tier1.rows_dropped >= 2
     assert len(res.store_impact_series) >= 1
-    assert res.store_impact_series[0].actual_five_pct is not None
+    assert res.store_impact_series[0]["actual_five_pct"] is not None
 
 
 def test_empty_answers_returns_zero_out() -> None:
@@ -85,4 +76,26 @@ def test_empty_answers_returns_zero_out() -> None:
         ],
     )
     res = run_pipeline(req)
+    assert res.steps[0].step_name == "actual"
     assert res.steps[0].rows_out == 0
+    assert res.echo_config == req.config
+
+
+def test_pipeline_ignores_legacy_tier3_config_key() -> None:
+    """Clients may still send nested/legacy keys; flat PipelineConfig ignores extras."""
+    req = ProcessRequest.model_validate(
+        {
+            "rows": [r.model_dump(mode="json") for r in _sample_rows()],
+            "config": {
+                "tier1_blacklist_enabled": True,
+                "tier1": {},
+                "tier2": {"enabled": True},
+                "tier3": {"enabled": True, "contamination": 0.02},
+            },
+        }
+    )
+    assert "tier3" not in PipelineConfig.model_fields
+    res = run_pipeline(req)
+    assert all(s.step_name in {"actual", "tier1", "tier2"} for s in res.steps)
+    assert "tier3" not in {s.step_name for s in res.steps}
+    SanitizationResponse.model_validate(res.model_dump())

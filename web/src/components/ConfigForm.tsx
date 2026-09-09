@@ -51,11 +51,10 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   }, [values, isValid, onValidConfigChange]);
 
   const tier2Enabled = values?.tier2?.enabled ?? true;
-  const tier3Enabled = values?.tier3?.enabled ?? false;
 
   return (
     <Card>
-      <CardHeader title="Pipeline configuration" subheader="Tier 1 / 2 / 3 thresholds" />
+      <CardHeader title="Pipeline configuration" subheader="Tier 1 / 2 thresholds" />
       <CardContent>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -175,45 +174,6 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               error={Boolean(errors.tier2?.five_pct_min)}
               helperText={errors.tier2?.five_pct_min?.message}
               slotProps={{ htmlInput: { min: 50, max: 100 } }}
-            />
-          </Box>
-
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" component="h3">
-              Tier 3 — IsolationForest
-            </Typography>
-            <Controller
-              name="tier3.enabled"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={field.value}
-                      onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 3 enabled' }}
-                    />
-                  }
-                  label="Enabled"
-                />
-              )}
-            />
-            <Controller
-              name="tier3.contamination"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label="Contamination"
-                  type="number"
-                  size="small"
-                  disabled={!tier3Enabled}
-                  value={field.value}
-                  onChange={(event) => field.onChange(Number(event.target.value))}
-                  error={Boolean(errors.tier3?.contamination)}
-                  helperText={errors.tier3?.contamination?.message}
-                  slotProps={{ htmlInput: { min: 0.001, max: 0.1, step: 0.001 } }}
-                />
-              )}
             />
           </Box>
         </Stack>

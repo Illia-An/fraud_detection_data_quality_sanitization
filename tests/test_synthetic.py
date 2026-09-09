@@ -2,12 +2,6 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
 from fraud_guard.synthetic import PRESETS, generate_preset
 from backend.service import run_pipeline
 from backend.schemas import PipelineConfig, ProcessRequest, SurveyAnswerRow
@@ -26,6 +20,7 @@ def test_small_has_multiple_stores_and_months() -> None:
     months = {(r["Year"], r["Month"]) for r in rows}
     assert len(stores) >= 2
     assert len(months) >= 2
+    assert all(r["Year"] >= 2026 for r in rows if r.get("Year") is not None)
 
 
 def test_medium_pipeline_runs() -> None:

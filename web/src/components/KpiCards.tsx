@@ -26,13 +26,12 @@ export function KpiCards({ result }: KpiCardsProps) {
     { label: 'Baseline 5%', value: formatPct(result.baseline_top_box_pct) },
     { label: 'Final 5%', value: formatPct(result.final_top_box_pct) },
     { label: 'Network delta', value: formatDelta(result.network_delta_pp) },
-    { label: 'Tier 3 entities', value: String(result.entities_flagged_tier3) },
   ];
 
   return (
     <Grid container spacing={2}>
       {items.map((item) => (
-        <Grid key={item.label} size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid key={item.label} size={{ xs: 12, sm: 4 }}>
           <Card variant="outlined" sx={{ height: '100%' }}>
             <CardContent>
               <Typography variant="body2" color="text.secondary" gutterBottom>

@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
 from fraud_guard.synthetic import PRESETS, PresetName, SyntheticConfig, generate_preset, generate_synthetic_rows
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
