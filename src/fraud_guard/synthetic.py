@@ -25,7 +25,7 @@ class SyntheticConfig:
 
     seed: int = 42
     n_stores: int = 10
-    start_year: int = 2025
+    start_year: int = 2026
     n_months: int = 6
     rows_per_store_month: int = 45
     topbox_rate_normal: float = 0.67

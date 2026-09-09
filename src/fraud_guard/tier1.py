@@ -4,6 +4,11 @@ Experiment-backed rules (SummerCampain.dbo.TargetsByMetrics_RateGetAnswers):
 1. Non-customer BlackList segments (keep only לא)
 2. High frequency: same entity × store × day >= threshold
 3. Optional: always top-box (5) with enough history
+
+SPEC invariants enforced here:
+- Invariant 1: hash UserContact / PhoneFromLog before any entity grouping
+- Invariant 2: entity key = contact → phone → ext_user_id (!= 0) → None
+- Invariant 3: Question_ID = 10012; top-box Answer_Value = 5
 """
 
 from __future__ import annotations
@@ -13,6 +18,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from fraud_guard.features import ColumnMapping
+from fraud_guard.pii import ensure_pii_hashed
 
 FLAG_COL = "fraud_tier1_flag"
 REASON_COL = "fraud_tier1_reasons"
@@ -47,8 +53,6 @@ RATE_GET_ANSWERS_MAPPING = ColumnMapping(
 class Tier1Config:
     """Thresholds and rule toggles for Tier 1."""
 
-    question_id: int = SATISFACTION_QUESTION_ID
-    top_box_value: int = TOP_BOX_VALUE
     customer_blacklist_value: str = CUSTOMER_BLACKLIST_VALUE
     enable_blacklist: bool = True
     enable_freq_store_day: bool = True
@@ -60,15 +64,13 @@ class Tier1Config:
 def filter_answered_metric_rows(
     df: pd.DataFrame,
     mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
-    *,
-    question_id: int = SATISFACTION_QUESTION_ID,
 ) -> pd.DataFrame:
-    """Keep rows for the satisfaction question with a non-null answer."""
+    """Keep Q10012 rows with a non-null answer (SPEC Invariant 3)."""
     q_col = mapping.question_id
     a_col = mapping.answer_value
     if q_col is None or a_col is None:
         raise ValueError("mapping.question_id and mapping.answer_value are required")
-    mask = df[q_col].eq(question_id) & df[a_col].notna()
+    mask = df[q_col].eq(SATISFACTION_QUESTION_ID) & df[a_col].notna()
     return df.loc[mask].copy()
 
 
@@ -76,7 +78,11 @@ def build_entity_key(
     df: pd.DataFrame,
     mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
 ) -> pd.Series:
-    """Resolve customer key: contact → phone log → ext_user_id (skip 0)."""
+    """Resolve identity key (SPEC Invariant 2): contact → phone → ext_user_id → None.
+
+    Expects UserContact / PhoneFromLog to already be hashed (Invariant 1).
+    Call ``ensure_pii_hashed`` first when feeding raw PII.
+    """
     n = len(df)
     keys = pd.Series([None] * n, index=df.index, dtype=object)
 
@@ -184,7 +190,7 @@ def _flag_always_topbox(
     grouped = (
         out.loc[eligible]
         .groupby(ENTITY_COL)[a_col]
-        .agg(n="count", top_rate=lambda s: (s == config.top_box_value).mean())
+        .agg(n="count", top_rate=lambda s: (s == TOP_BOX_VALUE).mean())
     )
     bad_entities = grouped.index[
         (grouped["n"] >= config.always_topbox_min_n) & (grouped["top_rate"] >= 1.0)
@@ -203,7 +209,8 @@ def apply_tier1(
     """Return a copy with Tier-1 flags and reason codes (rows are not dropped)."""
     mapping = mapping or RATE_GET_ANSWERS_MAPPING
     config = config or Tier1Config()
-    out = df.copy()
+    # Invariant 1: hash PII before any in-memory entity grouping.
+    out = ensure_pii_hashed(df, mapping)
     out[FLAG_COL] = False
     out[REASON_COL] = ""
     out[ENTITY_COL] = build_entity_key(out, mapping)
@@ -228,11 +235,9 @@ def keep_clean_rows(df: pd.DataFrame) -> pd.DataFrame:
 def top_box_rate(
     df: pd.DataFrame,
     mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
-    *,
-    top_box_value: int = TOP_BOX_VALUE,
 ) -> float:
-    """Share of top-box answers in ``df`` (assumes answered metric rows)."""
+    """Share of Answer_Value == 5 (SPEC Invariant 3)."""
     a_col = mapping.answer_value
     if not a_col or a_col not in df.columns or len(df) == 0:
         return float("nan")
-    return float((df[a_col] == top_box_value).mean())
+    return float((df[a_col] == TOP_BOX_VALUE).mean())

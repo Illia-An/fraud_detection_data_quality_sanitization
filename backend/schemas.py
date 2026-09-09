@@ -1,19 +1,42 @@
-"""Pydantic v2 contracts for Fraud Guard sanitization PoC API.
+"""Pydantic v2 contracts for the sanitization PoC API.
 
-Architecture contract (Agent 1):
-- POST /api/v1/process accepts ``ProcessRequest`` (survey rows + pipeline config).
-- Returns ``ProcessResponse`` with step metrics, store-month panel, and KPI deltas.
+Architecture contract:
+- POST /api/v1/process accepts ``ProcessRequest`` (inline rows, or ``source=db`` for the 2026+ period).
+- Returns ``SanitizationResponse`` with step metrics, store-month panel, KPI deltas, and ``echo_config``.
 - GET /health returns ``HealthResponse``.
 - Physical column names match ``SummerCampain.dbo.TargetsByMetrics_RateGetAnswers``.
-- Frontend TypeScript mirrors this module in ``frontend/models/api.interface.ts``.
+- Shared pipeline contracts live in ``src/schemas`` (SPEC.md Section 2).
+- Frontend TypeScript mirrors this module in ``web/src/schemas/api.ts``.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from schemas import PipelineConfig, SanitizationResponse, StepMetric
+
+# Transitional aliases for callers not yet migrated off legacy names.
+ProcessResponse = SanitizationResponse
+StepMetrics = StepMetric
+
+__all__ = [
+    "SurveyAnswerRow",
+    "PipelineConfig",
+    "ProcessRequest",
+    "StepMetric",
+    "StepMetrics",
+    "StoreMonthCell",
+    "StoreImpactPoint",
+    "SanitizationResponse",
+    "ProcessResponse",
+    "HealthResponse",
+    "SamplePresetMeta",
+    "SampleResponse",
+    "ErrorDetail",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -41,76 +64,31 @@ class SurveyAnswerRow(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Pipeline configuration (Tier 1 / 2 / 3 toggles & thresholds)
+# Pipeline configuration — see ``schemas.PipelineConfig`` (SPEC Section 2)
 # ---------------------------------------------------------------------------
-
-
-class Tier1Options(BaseModel):
-    """Deterministic rules: blacklist, freq store×day, optional always-topbox."""
-
-    enable_blacklist: bool = True
-    enable_freq_store_day: bool = True
-    enable_always_topbox: bool = False
-    freq_store_day_min: int = Field(default=3, ge=2, le=20)
-    always_topbox_min_n: int = Field(default=10, ge=3, le=100)
-    customer_blacklist_value: str = Field(default="לא")
-
-
-class Tier2Options(BaseModel):
-    """Store×month z-score / high five_pct rule (after Tier 1)."""
-
-    enabled: bool = True
-    min_volume: int = Field(default=30, ge=1, le=10_000)
-    z_high: float = Field(default=2.0, ge=0.5, le=5.0)
-    five_pct_min: float = Field(default=90.0, ge=50.0, le=100.0)
-
-
-class Tier3Options(BaseModel):
-    """IsolationForest on entity profiles (optional, off by default for MVP)."""
-
-    enabled: bool = False
-    contamination: float = Field(default=0.005, ge=0.001, le=0.1)
-    min_entity_n: int = Field(default=3, ge=2, le=50)
-    n_estimators: int = Field(default=200, ge=50, le=500)
-    random_state: int = Field(default=42, ge=0)
-
-
-class PipelineConfig(BaseModel):
-    """Full sanitization pipeline options."""
-
-    tier1: Tier1Options = Field(default_factory=Tier1Options)
-    tier2: Tier2Options = Field(default_factory=Tier2Options)
-    tier3: Tier3Options = Field(default_factory=Tier3Options)
 
 
 class ProcessRequest(BaseModel):
-    """Payload for POST /api/v1/process."""
+    """Payload for POST /api/v1/process.
 
-    rows: list[SurveyAnswerRow] = Field(..., min_length=1, max_length=500_000)
+    ``source=inline`` (default): client sends survey ``rows``.
+    ``source=db``: server loads Q10012 from 2026-01-01 through latest.
+    """
+
+    source: Literal["inline", "db"] = "inline"
+    rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=500_000)
     config: PipelineConfig = Field(default_factory=PipelineConfig)
 
-    @field_validator("rows")
-    @classmethod
-    def require_at_least_one_answer(cls, rows: list[SurveyAnswerRow]) -> list[SurveyAnswerRow]:
-        if not rows:
+    @model_validator(mode="after")
+    def require_rows_for_inline(self) -> ProcessRequest:
+        if self.source == "inline" and not self.rows:
             raise ValueError("rows must not be empty")
-        return rows
+        return self
 
 
 # ---------------------------------------------------------------------------
-# Output: pipeline metrics & panels
+# Output helpers (typed dict shapes used before serialization to list[dict])
 # ---------------------------------------------------------------------------
-
-
-class StepMetrics(BaseModel):
-    """Row accounting and top-box rate after one pipeline stage."""
-
-    step_name: str
-    rows_in: int = Field(ge=0)
-    rows_out: int = Field(ge=0)
-    rows_dropped: int = Field(ge=0)
-    top_box_rate_pct: float | None = None
-    drop_reasons: dict[str, int] = Field(default_factory=dict)
 
 
 class StoreMonthCell(BaseModel):
@@ -135,23 +113,9 @@ class StoreImpactPoint(BaseModel):
     actual_five_pct: float
     after_tier1_five_pct: float | None = None
     after_tier2_five_pct: float | None = None
-    after_tier3_five_pct: float | None = None
     actual_volume: int = Field(ge=0)
     final_volume: int = Field(ge=0)
     rows_dropped: int = Field(ge=0)
-
-
-class ProcessResponse(BaseModel):
-    """Sanitization result returned to the UI."""
-
-    baseline_top_box_pct: float | None = None
-    final_top_box_pct: float | None = None
-    network_delta_pp: float | None = None
-    steps: list[StepMetrics] = Field(default_factory=list)
-    high_store_months: list[StoreMonthCell] = Field(default_factory=list)
-    store_impact_series: list[StoreImpactPoint] = Field(default_factory=list)
-    entities_flagged_tier3: int = Field(default=0, ge=0)
-    meta: dict[str, Any] = Field(default_factory=dict)
 
 
 class HealthResponse(BaseModel):

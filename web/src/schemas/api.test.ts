@@ -75,13 +75,11 @@ const processApiResponse = {
       actual_five_pct: 95.0,
       after_tier1_five_pct: 88.0,
       after_tier2_five_pct: 85.0,
-      after_tier3_five_pct: null,
       actual_volume: 40,
       final_volume: 35,
       rows_dropped: 5,
     },
   ],
-  entities_flagged_tier3: 0,
   meta: { row_count_in: 100 },
 };
 
@@ -112,7 +110,6 @@ describe('processResponseSchema', () => {
     expect(parsed.steps).toHaveLength(2);
     expect(parsed.high_store_months[0].flagged).toBe(true);
     expect(parsed.store_impact_series[0].after_tier1_five_pct).toBe(88.0);
-    expect(parsed.entities_flagged_tier3).toBe(0);
     expect(parsed.meta.row_count_in).toBe(100);
   });
 });
@@ -121,8 +118,6 @@ describe('pipelineConfigSchema', () => {
   it('applies backend defaults', () => {
     expect(defaultPipelineConfig.tier1.freq_store_day_min).toBe(3);
     expect(defaultPipelineConfig.tier2.enabled).toBe(true);
-    expect(defaultPipelineConfig.tier3.enabled).toBe(false);
-    expect(defaultPipelineConfig.tier3.contamination).toBe(0.005);
   });
 
   it('rejects invalid tier1 freq threshold', () => {
@@ -158,5 +153,15 @@ describe('processRequestSchema', () => {
       config: defaultPipelineConfig,
     });
     expect(parsed.rows).toHaveLength(1);
+    expect(parsed.source).toBe('inline');
+  });
+
+  it('allows empty rows when source is db', () => {
+    const parsed = processRequestSchema.parse({
+      source: 'db',
+      config: defaultPipelineConfig,
+    });
+    expect(parsed.source).toBe('db');
+    expect(parsed.rows).toEqual([]);
   });
 });

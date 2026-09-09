@@ -30,8 +30,9 @@ export function DocumentationPage() {
             suspicious survey answers are removed.
           </Typography>
           <Typography variant="body1">
-            Use the <strong>Sanitization</strong> page to load a synthetic preset, tune tier
-            thresholds, run the pipeline, and inspect KPI, chart, and flagged store×month cells.
+            Use the <strong>Sanitization</strong> page to review Q10012 from 2026-01-01 through
+            latest (synthetic presets if the DB is unavailable), tune tier thresholds, and
+            inspect KPI, chart, and flagged store×month cells.
           </Typography>
         </CardContent>
       </Card>
@@ -62,17 +63,6 @@ export function DocumentationPage() {
               </Typography>
             </AccordionDetails>
           </Accordion>
-          <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight={600}>Tier 3 — IsolationForest (optional)</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography>
-                Optional ML layer on entity behaviour. Enable it in pipeline configuration and set
-                contamination; the KPI card shows how many entities were flagged.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
         </CardContent>
       </Card>
 
@@ -90,7 +80,7 @@ export function DocumentationPage() {
               <code>docs/report_tier2.md</code> — store×month outliers
             </Typography>
             <Typography component="li" variant="body2">
-              <code>docs/report_tier3.md</code> — IsolationForest experiments
+              <code>docs/report_tier3.md</code> — IsolationForest research (not in PoC UI)
             </Typography>
           </Stack>
         </CardContent>
