@@ -24,6 +24,22 @@ const sampleRow = {
   Month: 1,
 };
 
+const smallMeta = {
+  preset: 'small',
+  row_count: 1,
+  store_count: 1,
+  month_count: 1,
+  description: 'test',
+};
+
+const dbMeta = {
+  preset: 'db',
+  row_count: 50,
+  store_count: 4,
+  month_count: 3,
+  description: 'from db',
+};
+
 const processResult = {
   baseline_top_box_pct: 85.5,
   final_top_box_pct: 82.1,
@@ -50,7 +66,6 @@ const processResult = {
     },
   ],
   store_impact_series: [],
-  entities_flagged_tier3: 0,
   meta: {},
 };
 
@@ -68,7 +83,8 @@ describe('PipelineRunPanel', () => {
       surveyRows: [],
       processResult: null,
       sampleMeta: null,
-      lastPreset: 'small',
+      sampleGeneration: 0,
+      lastPreset: 'db',
       selectedStoreId: null,
     });
     mockUseProcess.mockReturnValue({
@@ -84,9 +100,56 @@ describe('PipelineRunPanel', () => {
   it('shows info when no survey rows loaded', () => {
     renderPanel();
     expect(
-      screen.getByText('Load a sample preset before running the pipeline.'),
+      screen.getByText('Waiting for survey data (database sample or synthetic preset).'),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run pipeline' })).toBeDisabled();
+  });
+
+  it('auto-runs pipeline when survey rows are loaded', async () => {
+    const mutate = vi.fn();
+    const reset = vi.fn();
+    mockUseProcess.mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+      data: undefined,
+      reset,
+    } as unknown as ReturnType<typeof useProcess>);
+
+    useUiStore.getState().setSurveyData([sampleRow], smallMeta, 'small');
+    renderPanel();
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        source: 'inline',
+        rows: [sampleRow],
+        config: defaultPipelineConfig,
+      });
+    });
+  });
+
+  it('auto-runs db source without shipping rows', async () => {
+    const mutate = vi.fn();
+    mockUseProcess.mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useProcess>);
+
+    useUiStore.getState().setSurveyData([], dbMeta, 'db');
+    renderPanel();
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith({
+        source: 'db',
+        rows: [],
+        config: defaultPipelineConfig,
+      });
+    });
   });
 
   it('runs pipeline and shows KPI cards', async () => {
@@ -100,11 +163,12 @@ describe('PipelineRunPanel', () => {
       reset: vi.fn(),
     } as unknown as ReturnType<typeof useProcess>);
 
-    useUiStore.setState({ surveyRows: [sampleRow] });
+    useUiStore.getState().setSurveyData([sampleRow], smallMeta, 'small');
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Run pipeline' }));
     expect(mutate).toHaveBeenCalledWith({
+      source: 'inline',
       rows: [sampleRow],
       config: defaultPipelineConfig,
     });
@@ -127,7 +191,7 @@ describe('PipelineRunPanel', () => {
       reset: vi.fn(),
     } as unknown as ReturnType<typeof useProcess>);
 
-    useUiStore.setState({ surveyRows: [sampleRow] });
+    useUiStore.getState().setSurveyData([sampleRow], smallMeta, 'small');
     renderPanel();
 
     expect(screen.getByText('Pipeline execution failed')).toBeInTheDocument();

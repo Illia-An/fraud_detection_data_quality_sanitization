@@ -27,14 +27,12 @@ export function HowItWorksCard() {
           <li>
             <strong>Tier 2</strong> — store×month cells with unusually high scores vs the network.
           </li>
-          <li>
-            <strong>Tier 3</strong> — optional ML (IsolationForest) on entity behaviour.
-          </li>
         </Typography>
         <Typography variant="body1">
-          Load a <strong>synthetic preset</strong> (scenario-based fake data from research), adjust
-          filters, then click <strong>Run pipeline</strong>. Pick a store in the chart to compare
-          actual vs sanitized 5% by month.
+          On start the tool loads <strong>Q10012 from 2026-01-01 through latest</strong> and
+          runs Tier 1/2. If the database is unavailable, it falls back to a{' '}
+          <strong>synthetic preset</strong>. Adjust filters and click <strong>Run pipeline</strong>{' '}
+          again to recompute. Pick a store in the chart to compare actual vs sanitized 5% by month.
         </Typography>
       </AccordionDetails>
     </Accordion>

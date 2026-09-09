@@ -32,3 +32,8 @@ def tier1_drop_reason_counts(flagged: pd.DataFrame, reason_col: str = "fraud_tie
                 continue
             counts[key] = counts.get(key, 0) + 1
     return counts
+
+
+def network_delta_pp(final_top_box_pct: float, baseline_top_box_pct: float) -> float:
+    """SPEC Invariant 5: network_delta_pp = final_top_box_pct - baseline_top_box_pct."""
+    return round(final_top_box_pct - baseline_top_box_pct, 4)

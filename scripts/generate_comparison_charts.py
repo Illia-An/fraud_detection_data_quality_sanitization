@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 
 import matplotlib.pyplot as plt
 import pandas as pd
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 
 from db.config import get_settings
 
@@ -27,6 +23,7 @@ from fraud_guard.tier2 import keep_clean_rows as keep_clean_rows_tier2
 from fraud_guard.tier3 import Tier3Config, apply_tier3
 from fraud_guard.tier3 import keep_clean_rows as keep_clean_rows_tier3
 
+ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "charts"
 VIEW = "dbo.TargetsByMetrics_RateGetAnswers"
 

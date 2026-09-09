@@ -26,7 +26,7 @@ describe('ConfigForm', () => {
     expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tier 1 — deterministic' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tier 2 — store×month' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Tier 3 — IsolationForest' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Tier 3/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Freq threshold')).toHaveValue(3);
     expect(screen.getByLabelText('Min volume')).toHaveValue(30);
   });

@@ -12,7 +12,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 
@@ -30,11 +30,20 @@ interface PipelineRunPanelProps {
 }
 
 export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
+  const lastPreset = useUiStore((state) => state.lastPreset);
   const surveyRows = useUiStore((state) => state.surveyRows);
+  const sampleMeta = useUiStore((state) => state.sampleMeta);
+  const sampleGeneration = useUiStore((state) => state.sampleGeneration);
   const processResult = useUiStore((state) => state.processResult);
   const setProcessResult = useUiStore((state) => state.setProcessResult);
 
   const { mutate, isPending, isError, error, data, reset } = useProcess();
+  const autoRunKeyRef = useRef<number | null>(null);
+
+  const useDbSource = lastPreset === 'db';
+  const canRun = useDbSource
+    ? Boolean(sampleMeta && sampleMeta.row_count > 0)
+    : surveyRows.length > 0;
 
   useEffect(() => {
     if (data) {
@@ -42,15 +51,45 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
     }
   }, [data, setProcessResult]);
 
-  const handleRun = () => {
-    if (!surveyRows.length) {
+  useEffect(() => {
+    if (!canRun || isPending || sampleGeneration === 0) {
       return;
     }
+    if (autoRunKeyRef.current === sampleGeneration) {
+      return;
+    }
+    autoRunKeyRef.current = sampleGeneration;
     reset();
-    mutate({ rows: surveyRows, config });
+    mutate(
+      useDbSource
+        ? { source: 'db', rows: [], config }
+        : { source: 'inline', rows: surveyRows, config },
+    );
+  }, [
+    canRun,
+    isPending,
+    sampleGeneration,
+    reset,
+    mutate,
+    useDbSource,
+    config,
+    surveyRows,
+  ]);
+
+  const handleRun = () => {
+    if (!canRun) {
+      return;
+    }
+    autoRunKeyRef.current = sampleGeneration;
+    reset();
+    mutate(
+      useDbSource
+        ? { source: 'db', rows: [], config }
+        : { source: 'inline', rows: surveyRows, config },
+    );
   };
 
-  const noData = surveyRows.length === 0;
+  const noData = !canRun;
   const displayResult = data ?? processResult;
 
   return (
@@ -70,7 +109,7 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
           </Box>
 
           {noData && (
-            <Alert severity="info">Load a sample preset before running the pipeline.</Alert>
+            <Alert severity="info">Waiting for survey data (database sample or synthetic preset).</Alert>
           )}
 
           {isError && (

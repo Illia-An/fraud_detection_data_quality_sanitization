@@ -6,19 +6,21 @@ describe('useUiStore survey data', () => {
   beforeEach(() => {
     useUiStore.setState({
       selectedStoreId: null,
-      lastPreset: 'small',
+      lastPreset: 'db',
       surveyRows: [],
       sampleMeta: null,
+      sampleGeneration: 0,
       processResult: null,
     });
   });
 
-  it('has default preset small and no selected store', () => {
+  it('has default preset db and no selected store', () => {
     const state = useUiStore.getState();
-    expect(state.lastPreset).toBe('small');
+    expect(state.lastPreset).toBe('db');
     expect(state.selectedStoreId).toBeNull();
     expect(state.surveyRows).toEqual([]);
     expect(state.sampleMeta).toBeNull();
+    expect(state.sampleGeneration).toBe(0);
   });
 
   it('updates selectedStoreId, lastPreset, and survey data', () => {
@@ -41,5 +43,22 @@ describe('useUiStore survey data', () => {
     expect(state.lastPreset).toBe('medium');
     expect(state.surveyRows).toHaveLength(1);
     expect(state.sampleMeta?.row_count).toBe(10);
+    expect(state.sampleGeneration).toBe(1);
+  });
+
+  it('accepts db as a data source', () => {
+    useUiStore.getState().setSurveyData(
+      [{ PrintStore: 82 }],
+      {
+        preset: 'db',
+        row_count: 5,
+        store_count: 5,
+        month_count: 1,
+        description: 'from db',
+      },
+      'db',
+    );
+    expect(useUiStore.getState().lastPreset).toBe('db');
+    expect(useUiStore.getState().sampleMeta?.preset).toBe('db');
   });
 });

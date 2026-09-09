@@ -1,11 +1,26 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { fetchHealth, fetchSample, postProcess } from './client';
-import type { ProcessRequest, SamplePreset } from '../schemas/api';
+import { fetchHealth, fetchSample, fetchSampleDb, postProcess } from './client';
+import {
+  sampleDbParamsSchema,
+  type ProcessRequest,
+  type SampleDbParams,
+  type SamplePreset,
+} from '../schemas/api';
 
 export const queryKeys = {
   health: ['health'] as const,
   sample: (preset: SamplePreset) => ['sample', preset] as const,
+  sampleDb: (params: SampleDbParams = {}) => {
+    const parsed = sampleDbParamsSchema.parse(params);
+    return [
+      'sample',
+      'db',
+      parsed.store ?? null,
+      parsed.year ?? null,
+      parsed.month ?? null,
+    ] as const;
+  },
 };
 
 export function useHealth() {
@@ -23,6 +38,18 @@ export function useSample(preset: SamplePreset, enabled = true) {
     queryFn: () => fetchSample(preset),
     enabled,
     staleTime: 5 * 60_000,
+  });
+}
+
+export function useSampleDb(params: SampleDbParams = {}, enabled = true) {
+  const parsed = sampleDbParamsSchema.parse(params);
+  return useQuery({
+    queryKey: queryKeys.sampleDb(parsed),
+    queryFn: () => fetchSampleDb(parsed),
+    enabled,
+    staleTime: 5 * 60_000,
+    retry: 1,
+    gcTime: 0,
   });
 }
 

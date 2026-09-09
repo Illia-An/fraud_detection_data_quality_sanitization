@@ -12,12 +12,11 @@ const processResult = {
   steps: [],
   high_store_months: [],
   store_impact_series: [],
-  entities_flagged_tier3: 2,
   meta: {},
 };
 
 describe('KpiCards', () => {
-  it('renders baseline, final, delta, and tier3 entity KPIs', () => {
+  it('renders baseline, final, and network delta KPIs', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <KpiCards result={processResult} />
@@ -30,7 +29,6 @@ describe('KpiCards', () => {
     expect(screen.getByText('82.10%')).toBeInTheDocument();
     expect(screen.getByText('Network delta')).toBeInTheDocument();
     expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
-    expect(screen.getByText('Tier 3 entities')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.queryByText('Tier 3 entities')).not.toBeInTheDocument();
   });
 });

@@ -74,3 +74,17 @@ def test_apply_tier2_flags_high_store_month_rows() -> None:
 
     clean = keep_clean_rows(flagged)
     assert (clean["PrintStore"] != 2.0).all()
+
+
+def test_tier2_top_box_is_answer_value_five() -> None:
+    """Invariant 3: panel five_pct uses Answer_Value == 5 only."""
+    df = pd.DataFrame(
+        {
+            "PrintStore": [1.0] * 30,
+            "Year": [2025] * 30,
+            "Month": [1] * 30,
+            "Answer_Value": [5] * 15 + [4] * 15,
+        }
+    )
+    panel = build_store_month_panel(df, min_volume=30)
+    assert float(panel.iloc[0]["five_pct"]) == 50.0
