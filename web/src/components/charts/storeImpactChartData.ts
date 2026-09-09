@@ -4,7 +4,6 @@ export const STORE_IMPACT_COLORS = {
   actual: '#4C78A8',
   tier1: '#F58518',
   tier2: '#54A24B',
-  tier3: '#72B7B2',
 } as const;
 
 export interface PlotTrace {
@@ -60,17 +59,6 @@ export function buildStoreImpactTraces(
       y: points.map((point) => point.after_tier2_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier2, width: 2 },
-      connectgaps: true,
-    });
-  }
-
-  if (config.tier3.enabled) {
-    traces.push({
-      name: 'After Tier 3',
-      x,
-      y: points.map((point) => point.after_tier3_five_pct ?? null),
-      mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.tier3, width: 2 },
       connectgaps: true,
     });
   }

@@ -3,6 +3,8 @@
 Experiment-backed rule (after Tier 1 MVP):
 flag answers belonging to store-months with z > 2 OR five_pct >= 90
 (volume >= 30). Classic z > 3 upward is ineffective when mean+3σ > 100.
+
+SPEC Invariant 3: top-box is strictly Answer_Value = 5.
 """
 
 from __future__ import annotations
@@ -26,7 +28,6 @@ class Tier2Config:
     min_volume: int = 30
     z_high: float = 2.0
     five_pct_min: float = 90.0
-    top_box_value: int = TOP_BOX_VALUE
 
 
 def build_store_month_panel(
@@ -34,7 +35,6 @@ def build_store_month_panel(
     mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
     *,
     min_volume: int = 30,
-    top_box_value: int = TOP_BOX_VALUE,
 ) -> pd.DataFrame:
     """Aggregate answered rows to PrintStore × Year × Month with five_pct and z."""
     store_col = mapping.store_id
@@ -46,7 +46,7 @@ def build_store_month_panel(
             raise ValueError(f"missing column for panel: {col}")
 
     def five_pct(s: pd.Series) -> float:
-        return 100.0 * float((s == top_box_value).mean())
+        return 100.0 * float((s == TOP_BOX_VALUE).mean())
 
     panel = (
         df.groupby([store_col, "Year", "Month"], dropna=False)[answer_col]
@@ -99,7 +99,6 @@ def apply_tier2(
         out,
         mapping,
         min_volume=config.min_volume,
-        top_box_value=config.top_box_value,
     )
     high = high_store_months(panel, config)
     if high.empty:

@@ -16,7 +16,10 @@ Angular 17 PoC reference: git tag `poc/angular-concept` (`frontend/`).
 |--------|--------------------|--------------------|-------------------|
 | GET    | `/health`          | —                  | `HealthResponse`  |
 | GET    | `/api/v1/sample/{preset}` | preset: small/medium/stress | `SampleResponse` |
-| POST   | `/api/v1/process`  | `ProcessRequest`   | `ProcessResponse` |
+| GET    | `/api/v1/sample/db` | optional `store`/`year`/`month` | `SampleResponse` meta only; `AnswerTime >= 2026-01-01` through latest |
+| POST   | `/api/v1/process`  | `ProcessRequest` (`source=inline` + `rows`, or `source=db`) | `ProcessResponse` |
+
+UI: on start, `GET /sample/db` (period counts) then auto `POST /process` with `source=db` (server loads the period). If the DB is unavailable, fall back to synthetic `small`. Preset buttons still call `GET /sample/{preset}` then `POST /process` with rows.
 
 CORS: `http://localhost:5173` (React v2; override via `API_CORS_ORIGINS`).
 
@@ -35,10 +38,10 @@ React form → ProcessRequest (JSON)
     → filter Q10012 answered rows
     → Tier1 flags (blacklist, freq≥3/store/day, optional always-5)
     → Tier2 flags (store-month z>2 or five_pct≥90)
-    → Tier3 flags (IsolationForest entity anomalies, optional)
   → ProcessResponse → KPI cards / tables / Plotly chart
 ```
 
+PoC UI runs **Tier 1 + Tier 2** only. `src/fraud_guard/tier3.py` remains for research / notebooks.
 ## Type parity
 
 - Python: `backend/schemas.py`
@@ -48,5 +51,8 @@ Field names and nesting MUST match 1:1 at the JSON boundary (PascalCase for surv
 
 ## Security
 
-- No PII in logs or responses beyond what the client submits.
+- No PII in logs or responses beyond hashed entity keys for Tier 1.
+- `GET /api/v1/sample/db` returns period metadata only (no survey row payload).
+- `POST /process` with `source=db` hashes `UserContact` / `PhoneFromLog` on the server; never selects name columns.
 - Do not commit `.env` or raw survey exports.
+- Read-only `SELECT` against `dbo.TargetsByMetrics_RateGetAnswers` only.

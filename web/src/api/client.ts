@@ -6,12 +6,14 @@ import {
   pipelineConfigSchema,
   processRequestSchema,
   processResponseSchema,
+  sampleDbParamsSchema,
   samplePresetSchema,
   sampleResponseSchema,
   type HealthResponse,
   type PipelineConfig,
   type ProcessRequest,
   type ProcessResponse,
+  type SampleDbParams,
   type SamplePreset,
   type SampleResponse,
 } from '../schemas/api';
@@ -73,6 +75,25 @@ export function fetchHealth(): Promise<HealthResponse> {
 export function fetchSample(preset: SamplePreset): Promise<SampleResponse> {
   const validPreset = samplePresetSchema.parse(preset);
   return fetchJson(`${API_BASE_URL}${API_PREFIX}/sample/${validPreset}`, sampleResponseSchema);
+}
+
+export function fetchSampleDb(params: SampleDbParams = {}): Promise<SampleResponse> {
+  const parsed = sampleDbParamsSchema.parse(params);
+  const query = new URLSearchParams();
+  if (parsed.store != null) {
+    query.set('store', String(parsed.store));
+  }
+  if (parsed.year != null) {
+    query.set('year', String(parsed.year));
+  }
+  if (parsed.month != null) {
+    query.set('month', String(parsed.month));
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/sample/db${suffix}`,
+    sampleResponseSchema,
+  );
 }
 
 export function postProcess(request: ProcessRequest): Promise<ProcessResponse> {

@@ -6,6 +6,18 @@ import { z } from 'zod';
 export const samplePresetSchema = z.enum(['small', 'medium', 'stress']);
 export type SamplePreset = z.infer<typeof samplePresetSchema>;
 
+/** Synthetic presets plus SQL Server sample source. */
+export const dataSourceSchema = z.enum(['small', 'medium', 'stress', 'db']);
+export type DataSource = z.infer<typeof dataSourceSchema>;
+
+export const sampleDbParamsSchema = z.object({
+  store: z.number().optional(),
+  year: z.number().int().min(2000).max(2100).optional(),
+  month: z.number().int().min(1).max(12).optional(),
+});
+
+export type SampleDbParams = z.input<typeof sampleDbParamsSchema>;
+
 export const surveyAnswerRowSchema = z
   .object({
     ParticipateNumber: z.string().nullable().optional(),
@@ -41,28 +53,30 @@ export const tier2OptionsSchema = z.object({
   five_pct_min: z.number().min(50).max(100).default(90),
 });
 
-export const tier3OptionsSchema = z.object({
-  enabled: z.boolean().default(false),
-  contamination: z.number().min(0.001).max(0.1).default(0.005),
-  min_entity_n: z.number().int().min(2).max(50).default(3),
-  n_estimators: z.number().int().min(50).max(500).default(200),
-  random_state: z.number().int().min(0).default(42),
-});
-
 export const pipelineConfigSchema = z.object({
   tier1: tier1OptionsSchema.default({}),
   tier2: tier2OptionsSchema.default({}),
-  tier3: tier3OptionsSchema.default({}),
 });
 
 export type PipelineConfig = z.output<typeof pipelineConfigSchema>;
 
 export const defaultPipelineConfig: PipelineConfig = pipelineConfigSchema.parse({});
 
-export const processRequestSchema = z.object({
-  rows: z.array(surveyAnswerRowSchema).min(1).max(500_000),
-  config: pipelineConfigSchema.default({}),
-});
+export const processRequestSchema = z
+  .object({
+    source: z.enum(['inline', 'db']).default('inline'),
+    rows: z.array(surveyAnswerRowSchema).max(500_000).default([]),
+    config: pipelineConfigSchema.default({}),
+  })
+  .superRefine((value, ctx) => {
+    if (value.source === 'inline' && value.rows.length < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'rows must not be empty',
+        path: ['rows'],
+      });
+    }
+  });
 
 export type ProcessRequest = z.output<typeof processRequestSchema>;
 
@@ -93,7 +107,6 @@ export const storeImpactPointSchema = z.object({
   actual_five_pct: z.number(),
   after_tier1_five_pct: z.number().nullable().optional(),
   after_tier2_five_pct: z.number().nullable().optional(),
-  after_tier3_five_pct: z.number().nullable().optional(),
   actual_volume: z.number().int().min(0),
   final_volume: z.number().int().min(0),
   rows_dropped: z.number().int().min(0),
@@ -106,7 +119,6 @@ export const processResponseSchema = z.object({
   steps: z.array(stepMetricsSchema).default([]),
   high_store_months: z.array(storeMonthCellSchema).default([]),
   store_impact_series: z.array(storeImpactPointSchema).default([]),
-  entities_flagged_tier3: z.number().int().min(0).default(0),
   meta: z.record(z.string(), z.unknown()).default({}),
 });
 
@@ -147,4 +159,3 @@ export type StoreMonthCell = z.output<typeof storeMonthCellSchema>;
 export type StoreImpactPoint = z.output<typeof storeImpactPointSchema>;
 export type Tier1Options = z.output<typeof tier1OptionsSchema>;
 export type Tier2Options = z.output<typeof tier2OptionsSchema>;
-export type Tier3Options = z.output<typeof tier3OptionsSchema>;

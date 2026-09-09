@@ -10,15 +10,16 @@ import {
   CardContent,
   CardHeader,
   CircularProgress,
+  Divider,
   Snackbar,
   Stack,
   Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
 
-import { useSample } from '../api/hooks';
+import { useSample, useSampleDb } from '../api/hooks';
 import { useUiStore } from '../store/uiStore';
-import type { SamplePreset } from '../schemas/api';
+import type { DataSource, SamplePreset } from '../schemas/api';
 
 const PRESETS: SamplePreset[] = ['small', 'medium', 'stress'];
 
@@ -29,7 +30,11 @@ export function SampleDataPanel() {
   const setLastPreset = useUiStore((state) => state.setLastPreset);
   const setSurveyData = useUiStore((state) => state.setSurveyData);
 
-  const { data, isFetching, isError, error, isSuccess } = useSample(lastPreset);
+  const isSynthetic = lastPreset !== 'db';
+  const syntheticPreset: SamplePreset = isSynthetic ? lastPreset : 'small';
+
+  const synthetic = useSample(syntheticPreset, isSynthetic);
+  const db = useSampleDb({}, lastPreset === 'db');
   const lastLoadedKey = useRef<string | null>(null);
 
   const [snackbar, setSnackbar] = useState<{
@@ -38,34 +43,55 @@ export function SampleDataPanel() {
     severity: 'success' | 'error';
   }>({ open: false, message: '', severity: 'success' });
 
+  const active = isSynthetic ? synthetic : db;
+  const loading = synthetic.isFetching || db.isFetching;
+
   useEffect(() => {
-    if (!isSuccess || !data || isFetching) {
+    if (!active.isSuccess || !active.data || active.isFetching) {
       return;
     }
 
-    const loadKey = `${data.preset}:${data.meta.row_count}:${data.meta.store_count}`;
-    setSurveyData(data.rows, data.meta, data.preset as SamplePreset);
-
-    if (lastLoadedKey.current !== loadKey) {
-      lastLoadedKey.current = loadKey;
-      setSnackbar({
-        open: true,
-        message: `Loaded ${data.meta.preset}: ${data.meta.row_count} rows, ${data.meta.store_count} stores`,
-        severity: 'success',
-      });
+    const loadKey = `${active.data.preset}:${active.dataUpdatedAt}:${active.data.meta.row_count}:${active.data.meta.store_count}`;
+    if (lastLoadedKey.current === loadKey) {
+      return;
     }
-  }, [data, isFetching, isSuccess, setSurveyData]);
+    lastLoadedKey.current = loadKey;
+    setSurveyData(active.data.rows, active.data.meta, active.data.preset as DataSource);
+    setSnackbar({
+      open: true,
+      message: `Loaded ${active.data.meta.preset}: ${active.data.meta.row_count} rows, ${active.data.meta.store_count} stores`,
+      severity: 'success',
+    });
+  }, [
+    active.data,
+    active.dataUpdatedAt,
+    active.isFetching,
+    active.isSuccess,
+    setSurveyData,
+  ]);
 
   useEffect(() => {
-    if (!isError || !error) {
+    if (isSynthetic || db.isFetching || !db.isError) {
       return;
     }
     setSnackbar({
       open: true,
-      message: error instanceof Error ? error.message : 'Failed to load sample data',
+      message: `${db.error instanceof Error ? db.error.message : 'Failed to load from database'}. Falling back to synthetic small.`,
       severity: 'error',
     });
-  }, [error, isError]);
+    setLastPreset('small');
+  }, [db.error, db.isError, db.isFetching, isSynthetic, setLastPreset]);
+
+  useEffect(() => {
+    if (!isSynthetic || !synthetic.isError || !synthetic.error) {
+      return;
+    }
+    setSnackbar({
+      open: true,
+      message: synthetic.error instanceof Error ? synthetic.error.message : 'Failed to load sample data',
+      severity: 'error',
+    });
+  }, [isSynthetic, synthetic.error, synthetic.isError]);
 
   const handlePresetClick = (preset: SamplePreset) => {
     if (preset !== lastPreset) {
@@ -73,34 +99,62 @@ export function SampleDataPanel() {
     }
   };
 
+  const handleLoadFromDb = () => {
+    if (lastPreset === 'db') {
+      void db.refetch();
+      return;
+    }
+    setLastPreset('db');
+  };
+
   return (
     <>
       <Card>
         <CardHeader
           title="Survey data"
-          subheader="Synthetic presets from research scenarios"
-          action={isFetching ? <CircularProgress size={24} sx={{ mt: 1, mr: 1 }} /> : null}
+          subheader="Database first: Q10012 from 2026-01-01 through latest (PII hashed). Synthetic presets if the DB is unavailable."
+          action={loading ? <CircularProgress size={24} sx={{ mt: 1, mr: 1 }} /> : null}
         />
         <CardContent>
           <Stack spacing={2}>
-            <ButtonGroup variant="outlined" aria-label="Sample preset">
-              {PRESETS.map((preset) => (
-                <Button
-                  key={preset}
-                  variant={lastPreset === preset ? 'contained' : 'outlined'}
-                  onClick={() => handlePresetClick(preset)}
-                  disabled={isFetching}
-                  sx={{ textTransform: 'capitalize' }}
-                >
-                  {preset}
-                </Button>
-              ))}
-            </ButtonGroup>
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Database (Q10012, AnswerTime ≥ 2026-01-01)
+              </Typography>
+              <Button
+                variant={lastPreset === 'db' ? 'contained' : 'outlined'}
+                onClick={handleLoadFromDb}
+                disabled={loading}
+              >
+                Load from DB
+              </Button>
+            </Box>
+
+            <Divider />
+
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Synthetic fallback
+              </Typography>
+              <ButtonGroup variant="outlined" aria-label="Sample preset">
+                {PRESETS.map((preset) => (
+                  <Button
+                    key={preset}
+                    variant={lastPreset === preset ? 'contained' : 'outlined'}
+                    onClick={() => handlePresetClick(preset)}
+                    disabled={loading}
+                    sx={{ textTransform: 'capitalize' }}
+                  >
+                    {preset}
+                  </Button>
+                ))}
+              </ButtonGroup>
+            </Box>
 
             {sampleMeta ? (
               <Box>
                 <Typography variant="body1">
-                  <strong>Preset:</strong> {sampleMeta.preset} · <strong>Rows:</strong>{' '}
+                  <strong>Source:</strong> {sampleMeta.preset} · <strong>Rows:</strong>{' '}
                   {sampleMeta.row_count} · <strong>Stores:</strong> {sampleMeta.store_count} ·{' '}
                   <strong>Months:</strong> {sampleMeta.month_count}
                 </Typography>
@@ -110,7 +164,7 @@ export function SampleDataPanel() {
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                Select a preset to load synthetic survey rows.
+                Loading Q10012 from 2026-01-01 through latest, or pick a synthetic preset.
               </Typography>
             )}
 

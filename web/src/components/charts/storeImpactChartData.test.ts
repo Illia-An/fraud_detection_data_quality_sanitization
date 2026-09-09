@@ -18,7 +18,6 @@ const series = [
     actual_five_pct: 95,
     after_tier1_five_pct: 88,
     after_tier2_five_pct: 85,
-    after_tier3_five_pct: null,
     actual_volume: 40,
     final_volume: 35,
     rows_dropped: 5,
@@ -31,7 +30,6 @@ const series = [
     actual_five_pct: 70,
     after_tier1_five_pct: 68,
     after_tier2_five_pct: 67,
-    after_tier3_five_pct: null,
     actual_volume: 38,
     final_volume: 36,
     rows_dropped: 2,
@@ -44,7 +42,6 @@ const series = [
     actual_five_pct: 80,
     after_tier1_five_pct: 79,
     after_tier2_five_pct: 78,
-    after_tier3_five_pct: null,
     actual_volume: 30,
     final_volume: 29,
     rows_dropped: 1,
@@ -84,11 +81,10 @@ describe('storeImpactChartData', () => {
     });
   });
 
-  it('omits tier2/tier3 traces when disabled', () => {
+  it('omits tier2 traces when disabled', () => {
     const config = {
       ...defaultPipelineConfig,
       tier2: { ...defaultPipelineConfig.tier2, enabled: false },
-      tier3: { ...defaultPipelineConfig.tier3, enabled: false },
     };
     const traces = buildStoreImpactTraces(filterStoreSeries(series, 1), config);
     expect(traces).toHaveLength(2);
