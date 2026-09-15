@@ -29,7 +29,7 @@ export default function SideMenuMobile({ open, toggleDrawer }: SideMenuMobilePro
         <Stack direction="row" sx={{ p: 2, pb: 0, gap: 1, alignItems: 'center' }}>
           <BrandLogo />
           <Typography component="p" variant="h6">
-            Fraud Guard
+            Survey Sanitization
           </Typography>
         </Stack>
         <Divider />

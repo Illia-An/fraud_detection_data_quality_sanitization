@@ -34,7 +34,7 @@ export default function NavbarBreadcrumbs() {
       separator={<NavigateNextRoundedIcon fontSize="small" />}
     >
       <Typography variant="body2" color="text.secondary">
-        Fraud Guard
+        Survey Sanitization
       </Typography>
       <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
         {pageCrumb}

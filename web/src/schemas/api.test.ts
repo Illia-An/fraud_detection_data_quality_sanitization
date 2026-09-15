@@ -6,6 +6,7 @@ import {
   processRequestSchema,
   processResponseSchema,
   sampleResponseSchema,
+  sortPipelineSteps,
 } from './api';
 
 const sampleRow = {
@@ -39,20 +40,25 @@ const processApiResponse = {
   network_delta_pp: -3.4,
   steps: [
     {
-      step_name: '0_raw_q10012',
-      rows_in: 100,
-      rows_out: 95,
-      rows_dropped: 5,
-      top_box_rate_pct: 85.5,
-      drop_reasons: {},
-    },
-    {
-      step_name: '1_tier1',
+      step_name: 'tier1' as const,
       rows_in: 95,
       rows_out: 90,
       rows_dropped: 5,
-      top_box_rate_pct: 84.0,
-      drop_reasons: { staff_blacklist: 3, freq_store_day: 2 },
+      top_box_pct: 84.0,
+    },
+    {
+      step_name: 'actual' as const,
+      rows_in: 100,
+      rows_out: 95,
+      rows_dropped: 5,
+      top_box_pct: 85.5,
+    },
+    {
+      step_name: 'tier2' as const,
+      rows_in: 90,
+      rows_out: 88,
+      rows_dropped: 2,
+      top_box_pct: 82.1,
     },
   ],
   high_store_months: [
@@ -80,7 +86,12 @@ const processApiResponse = {
       rows_dropped: 5,
     },
   ],
-  meta: { row_count_in: 100 },
+  echo_config: defaultPipelineConfig,
+  meta: {
+    execution_time_ms: 12.5,
+    peak_memory_mb: 1.2,
+    rows_scanned: 100,
+  },
 };
 
 describe('sampleResponseSchema', () => {
@@ -101,37 +112,59 @@ describe('sampleResponseSchema', () => {
   });
 });
 
-describe('processResponseSchema', () => {
-  it('parses all ProcessResponse fields', () => {
+describe('processResponseSchema / SanitizationResponse', () => {
+  it('parses SPEC response with echo_config and telemetry meta', () => {
     const parsed = processResponseSchema.parse(processApiResponse);
     expect(parsed.baseline_top_box_pct).toBe(85.5);
-    expect(parsed.final_top_box_pct).toBe(82.1);
-    expect(parsed.network_delta_pp).toBe(-3.4);
-    expect(parsed.steps).toHaveLength(2);
-    expect(parsed.high_store_months[0].flagged).toBe(true);
-    expect(parsed.store_impact_series[0].after_tier1_five_pct).toBe(88.0);
-    expect(parsed.meta.row_count_in).toBe(100);
+    expect(parsed.echo_config.tier1_freq_threshold).toBe(3);
+    expect(parsed.meta.execution_time_ms).toBe(12.5);
+    expect(parsed.meta.peak_memory_mb).toBe(1.2);
+    expect(parsed.meta.rows_scanned).toBe(100);
+    expect(parsed.steps[0].top_box_pct).toBe(84.0);
+  });
+
+  it('rejects missing echo_config', () => {
+    const { echo_config: _, ...rest } = processApiResponse;
+    expect(() => processResponseSchema.parse(rest)).toThrow();
+  });
+
+  it('rejects meta without telemetry keys', () => {
+    expect(() =>
+      processResponseSchema.parse({
+        ...processApiResponse,
+        meta: { row_count_in: 100 },
+      }),
+    ).toThrow();
+  });
+});
+
+describe('sortPipelineSteps', () => {
+  it('orders actual → tier1 → tier2', () => {
+    const ordered = sortPipelineSteps(processApiResponse.steps);
+    expect(ordered.map((s) => s.step_name)).toEqual(['actual', 'tier1', 'tier2']);
   });
 });
 
 describe('pipelineConfigSchema', () => {
-  it('applies backend defaults', () => {
-    expect(defaultPipelineConfig.tier1.freq_store_day_min).toBe(3);
-    expect(defaultPipelineConfig.tier2.enabled).toBe(true);
+  it('applies SPEC flat defaults', () => {
+    expect(defaultPipelineConfig.tier1_freq_threshold).toBe(3);
+    expect(defaultPipelineConfig.tier1_freq_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier1_blacklist_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier2_min_volume).toBe(30);
   });
 
   it('rejects invalid tier1 freq threshold', () => {
     expect(() =>
       pipelineConfigSchema.parse({
-        tier1: { freq_store_day_min: 1 },
+        tier1_freq_threshold: 0,
       }),
     ).toThrow();
   });
 
-  it('rejects invalid tier2 z_high', () => {
+  it('rejects invalid tier2 pct', () => {
     expect(() =>
       pipelineConfigSchema.parse({
-        tier2: { z_high: 10 },
+        tier2_pct_threshold: 150,
       }),
     ).toThrow();
   });

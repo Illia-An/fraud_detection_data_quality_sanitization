@@ -18,6 +18,7 @@ import {
 import { useMemo } from 'react';
 
 import type { StepMetrics } from '../schemas/api';
+import { sortPipelineSteps } from '../schemas/api';
 
 const columnHelper = createColumnHelper<StepMetrics>();
 
@@ -32,8 +33,8 @@ const columns = [
   columnHelper.accessor('step_name', { header: 'Step' }),
   columnHelper.accessor('rows_in', { header: 'Rows in' }),
   columnHelper.accessor('rows_out', { header: 'Rows out' }),
-  columnHelper.accessor('rows_dropped', { header: 'Dropped' }),
-  columnHelper.accessor('top_box_rate_pct', {
+  columnHelper.accessor('rows_dropped', { header: 'Excluded' }),
+  columnHelper.accessor('top_box_pct', {
     header: 'Top-box %',
     cell: (info) => formatPct(info.getValue()),
   }),
@@ -44,7 +45,7 @@ interface PipelineStepsTableProps {
 }
 
 export function PipelineStepsTable({ steps }: PipelineStepsTableProps) {
-  const data = useMemo(() => steps, [steps]);
+  const data = useMemo(() => sortPipelineSteps(steps), [steps]);
 
   const table = useReactTable({
     data,

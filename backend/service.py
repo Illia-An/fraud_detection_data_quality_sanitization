@@ -8,6 +8,7 @@ import pandas as pd
 
 from fraud_guard.stats import filter_stats, network_delta_pp, tier1_drop_reason_counts
 from fraud_guard.tier1 import (
+    FLAG_COL as T1_FLAG,
     REASON_COL as T1_REASON,
     Tier1Config,
     apply_tier1,
@@ -25,6 +26,7 @@ from fraud_guard.tier2 import (
     keep_clean_rows as keep_tier2_clean,
 )
 
+from backend.queries import ActualBaseline, network_top_box_pct
 from backend.schemas import (
     PipelineConfig,
     ProcessRequest,
@@ -65,8 +67,19 @@ def _ensure_year_month(df: pd.DataFrame) -> None:
 def _tier1_config(opts: PipelineConfig) -> Tier1Config:
     return Tier1Config(
         enable_blacklist=opts.tier1_blacklist_enabled,
-        enable_freq_store_day=True,
+        enable_freq_store_day=opts.tier1_freq_enabled,
         enable_always_topbox=opts.tier1_always_five_enabled,
+        freq_store_day_min=opts.tier1_freq_threshold,
+        always_topbox_min_n=opts.tier1_always_five_min_n,
+    )
+
+
+def _tier1_config_blacklist_only(opts: PipelineConfig) -> Tier1Config:
+    """Query B v1 loads blacklist rows only — do not apply freq/always-5 here."""
+    return Tier1Config(
+        enable_blacklist=opts.tier1_blacklist_enabled,
+        enable_freq_store_day=False,
+        enable_always_topbox=False,
         freq_store_day_min=opts.tier1_freq_threshold,
         always_topbox_min_n=opts.tier1_always_five_min_n,
     )
@@ -202,13 +215,263 @@ def _build_store_impact_series(
     return series
 
 
-def run_pipeline(request: ProcessRequest) -> SanitizationResponse:
-    """Execute Tier1 → Tier2 and return aggregate KPI metrics."""
+def _cell_key(store_id: float, year: int, month: int) -> tuple[float, int, int]:
+    return (float(store_id), int(year), int(month))
+
+
+def _drop_counts_by_cell(dropped: pd.DataFrame) -> dict[tuple[float, int, int], tuple[int, int]]:
+    """Return (total_dropped, top_box_dropped) per store×year×month."""
+    out: dict[tuple[float, int, int], list[int]] = {}
+    if dropped.empty:
+        return {}
+    for _, row in dropped.iterrows():
+        store = row.get("PrintStore")
+        year = row.get("Year")
+        month = row.get("Month")
+        if store is None or year is None or month is None or (isinstance(year, float) and pd.isna(year)):
+            continue
+        key = _cell_key(float(store), int(year), int(month))
+        bucket = out.setdefault(key, [0, 0])
+        bucket[0] += 1
+        answer = row.get("Answer_Value")
+        if answer == 5 or (isinstance(answer, (int, float)) and int(answer) == 5):
+            bucket[1] += 1
+    return {k: (v[0], v[1]) for k, v in out.items()}
+
+
+def _panel_from_cell_map(
+    cells: dict[tuple[float, int, int], tuple[int, int]],
+    *,
+    min_volume: int,
+) -> pd.DataFrame:
+    """Build Tier2-style panel from (volume, top_box_count) cell map."""
+    rows: list[dict] = []
+    for (store, year, month), (volume, top_box) in cells.items():
+        if volume < min_volume:
+            continue
+        five_pct = 100.0 * top_box / volume if volume else 0.0
+        rows.append(
+            {
+                "PrintStore": store,
+                "Year": year,
+                "Month": month,
+                "volume": volume,
+                "five_pct": five_pct,
+            }
+        )
+    panel = pd.DataFrame(rows)
+    if panel.empty:
+        panel["z"] = pd.Series(dtype=float)
+        return panel
+    mu = float(panel["five_pct"].mean())
+    sigma = float(panel["five_pct"].std(ddof=0))
+    if sigma == 0:
+        panel["z"] = 0.0
+    else:
+        panel["z"] = (panel["five_pct"] - mu) / sigma
+    return panel
+
+
+def _impact_from_cell_maps(
+    baseline_cells: dict[tuple[float, int, int], tuple[int, int]],
+    after_t1: dict[tuple[float, int, int], tuple[int, int]],
+    after_t2: dict[tuple[float, int, int], tuple[int, int]],
+) -> list[dict]:
+    series: list[dict] = []
+    for key in sorted(baseline_cells.keys()):
+        store, year, month = key
+        b_vol, b_top = baseline_cells[key]
+        t1_vol, t1_top = after_t1.get(key, (0, 0))
+        t2_vol, t2_top = after_t2.get(key, (0, 0))
+        actual_pct = network_top_box_pct(b_vol, b_top)
+        t1_pct = network_top_box_pct(t1_vol, t1_top) if t1_vol else None
+        t2_pct = network_top_box_pct(t2_vol, t2_top) if t2_vol else None
+        series.append(
+            StoreImpactPoint(
+                store_id=float(store),
+                year=year,
+                month=month,
+                period_label=_period_label(year, month),
+                actual_five_pct=actual_pct,
+                after_tier1_five_pct=t1_pct,
+                after_tier2_five_pct=t2_pct,
+                actual_volume=b_vol,
+                final_volume=t2_vol,
+                rows_dropped=max(b_vol - t2_vol, 0),
+            ).model_dump(mode="python")
+        )
+    return series
+
+
+def _actual_step_from_baseline(baseline: ActualBaseline) -> StepMetric:
+    """Build the ``actual`` step solely from Query A aggregates (no raw DF)."""
+    return StepMetric(
+        step_name=STEP_ACTUAL,
+        rows_in=baseline.total_responses,
+        rows_out=baseline.total_responses,
+        rows_dropped=0,
+        top_box_pct=baseline.top_box_pct,
+    )
+
+
+def run_pipeline_pushdown(
+    actual_baseline: ActualBaseline,
+    candidate_rows: list[SurveyAnswerRow],
+    config: PipelineConfig,
+    *,
+    query_b_mode: str = "blacklist_only",
+) -> SanitizationResponse:
+    """Query A + Query B reconciliation path (SPEC §5.2).
+
+    Reconciliation method:
+    1. ``actual`` / baseline from Query A aggregates (no raw period DF).
+    2. Tier 1 flags applied only to Query B candidate rows; drop counts
+       (total + top-box) are subtracted from Query A store×month cells.
+    3. Tier 2 runs on the adjusted aggregate panel (z / pct thresholds) —
+       equivalent to loading outlier store-months without a full raw scan.
+    4. ``final_top_box_pct`` = remaining top-box / remaining volume after Tier 2.
+
+    ``query_b_mode``:
+    - ``blacklist_only`` (VIEW v1): Tier1 blacklist rule only on candidates.
+    - ``tier1_full`` (snapshot phase 2): full Tier1 (blacklist + freq + always-5).
+    """
+    baseline_pct = actual_baseline.top_box_pct
+    steps: list[StepMetric] = [_actual_step_from_baseline(actual_baseline)]
+
+    baseline_cells: dict[tuple[float, int, int], tuple[int, int]] = {
+        _cell_key(a.store_id, a.year, a.month): (a.total_count, a.top_box_count)
+        for a in actual_baseline.by_store_period
+    }
+
+    raw = _rows_to_frame(candidate_rows)
+    answered = filter_answered_metric_rows(raw) if not raw.empty else raw
+
+    if query_b_mode == "tier1_full":
+        t1_cfg = _tier1_config(config)
+        reconciliation = "query_a_minus_tier1_candidate_drops_then_tier2_on_aggregates"
+    else:
+        t1_cfg = _tier1_config_blacklist_only(config)
+        reconciliation = "query_a_minus_blacklist_drops_then_tier2_on_aggregates"
+    t2_cfg = _tier2_config(config)
+
+    drop_reasons_t1: dict[str, int] = {}
+    t1_dropped_n = 0
+    t1_dropped_top = 0
+    t1_drops_by_cell: dict[tuple[float, int, int], tuple[int, int]] = {}
+
+    if not answered.empty:
+        flagged_t1 = apply_tier1(answered, config=t1_cfg)
+        dropped_t1 = flagged_t1.loc[flagged_t1[T1_FLAG].astype(bool)]
+        drop_reasons_t1 = tier1_drop_reason_counts(flagged_t1, T1_REASON)
+        t1_drops_by_cell = _drop_counts_by_cell(dropped_t1)
+        t1_dropped_n = int(len(dropped_t1))
+        t1_dropped_top = (
+            int((dropped_t1["Answer_Value"] == 5).sum()) if not dropped_t1.empty else 0
+        )
+
+    after_t1_cells: dict[tuple[float, int, int], tuple[int, int]] = {}
+    for key, (tot, top) in baseline_cells.items():
+        d_tot, d_top = t1_drops_by_cell.get(key, (0, 0))
+        rem_tot = max(tot - d_tot, 0)
+        rem_top = max(top - d_top, 0)
+        rem_top = min(rem_top, rem_tot)
+        after_t1_cells[key] = (rem_tot, rem_top)
+
+    n_after_t1 = sum(v for v, _ in after_t1_cells.values())
+    top_after_t1 = sum(t for _, t in after_t1_cells.values())
+    t1_pct = network_top_box_pct(n_after_t1, top_after_t1)
+
+    steps.append(
+        StepMetric(
+            step_name=STEP_TIER1,
+            rows_in=actual_baseline.total_responses,
+            rows_out=n_after_t1,
+            rows_dropped=max(actual_baseline.total_responses - n_after_t1, 0),
+            top_box_pct=t1_pct,
+        )
+    )
+
+    panel = _panel_from_cell_map(after_t1_cells, min_volume=t2_cfg.min_volume)
+    high = high_store_months(panel, t2_cfg)
+    high_store_months_out = _store_month_cells(panel, high)
+    high_keys = (
+        {
+            _cell_key(float(r["PrintStore"]), int(r["Year"]), int(r["Month"]))
+            for _, r in high.iterrows()
+        }
+        if not high.empty
+        else set()
+    )
+
+    after_t2_cells: dict[tuple[float, int, int], tuple[int, int]] = {}
+    t2_dropped_n = 0
+    for key, (tot, top) in after_t1_cells.items():
+        if key in high_keys:
+            t2_dropped_n += tot
+            after_t2_cells[key] = (0, 0)
+        else:
+            after_t2_cells[key] = (tot, top)
+
+    n_final = sum(v for v, _ in after_t2_cells.values())
+    top_final = sum(t for _, t in after_t2_cells.values())
+    final_pct = network_top_box_pct(n_final, top_final)
+
+    steps.append(
+        StepMetric(
+            step_name=STEP_TIER2,
+            rows_in=n_after_t1,
+            rows_out=n_final,
+            rows_dropped=max(n_after_t1 - n_final, 0),
+            top_box_pct=final_pct,
+        )
+    )
+
+    store_series = _impact_from_cell_maps(baseline_cells, after_t1_cells, after_t2_cells)
+    delta = network_delta_pp(final_pct, baseline_pct)
+
+    return SanitizationResponse(
+        baseline_top_box_pct=baseline_pct,
+        final_top_box_pct=final_pct,
+        network_delta_pp=delta,
+        steps=steps,
+        high_store_months=high_store_months_out,
+        store_impact_series=store_series,
+        echo_config=config,
+        meta={
+            "processed_at": datetime.now(UTC).isoformat(),
+            "input_rows": len(candidate_rows),
+            "answered_rows": 0 if answered.empty else len(answered),
+            "drop_reasons": {
+                "tier1": drop_reasons_t1,
+                "tier2": {"high_store_month_z_or_pct": t2_dropped_n} if t2_dropped_n else {},
+            },
+            "actual_source": "query_a",
+            "query_b_mode": query_b_mode,
+            "reconciliation": reconciliation,
+            "actual_total_responses": actual_baseline.total_responses,
+            "actual_top_box_count": actual_baseline.top_box_count,
+            "tier1_dropped_rows": t1_dropped_n,
+            "tier1_dropped_top_box": t1_dropped_top,
+        },
+    )
+
+
+def run_pipeline(
+    request: ProcessRequest,
+    *,
+    actual_baseline: ActualBaseline | None = None,
+) -> SanitizationResponse:
+    """Execute Tier1 → Tier2 and return aggregate KPI metrics.
+
+    When ``actual_baseline`` is provided (Query A pushdown), the ``actual`` step
+    and ``baseline_top_box_pct`` come from SQL aggregates — not from scanning a
+    raw-row DataFrame. Tier1/Tier2 still run on ``request.rows`` (Query B).
+    """
     config = request.config
     raw = _rows_to_frame(request.rows)
     answered = filter_answered_metric_rows(raw)
 
-    if answered.empty:
+    if answered.empty and actual_baseline is None:
         return SanitizationResponse(
             baseline_top_box_pct=0.0,
             final_top_box_pct=0.0,
@@ -229,19 +492,41 @@ def run_pipeline(request: ProcessRequest) -> SanitizationResponse:
         )
 
     steps: list[StepMetric] = []
-    baseline = top_box_rate(answered)
-    current = answered
-    baseline_pct = _pct(baseline)
-
-    steps.append(
-        StepMetric(
-            step_name=STEP_ACTUAL,
-            rows_in=len(raw),
-            rows_out=len(current),
-            rows_dropped=len(raw) - len(current),
-            top_box_pct=baseline_pct,
+    if actual_baseline is not None:
+        baseline_pct = actual_baseline.top_box_pct
+        steps.append(_actual_step_from_baseline(actual_baseline))
+    else:
+        baseline = top_box_rate(answered)
+        baseline_pct = _pct(baseline)
+        steps.append(
+            StepMetric(
+                step_name=STEP_ACTUAL,
+                rows_in=len(raw),
+                rows_out=len(answered),
+                rows_dropped=len(raw) - len(answered),
+                top_box_pct=baseline_pct,
+            )
         )
-    )
+
+    if answered.empty:
+        # Query A had data but Query B returned nothing usable — surface actual only.
+        return SanitizationResponse(
+            baseline_top_box_pct=baseline_pct,
+            final_top_box_pct=baseline_pct,
+            network_delta_pp=0.0,
+            steps=steps,
+            high_store_months=[],
+            store_impact_series=[],
+            echo_config=config,
+            meta={
+                "processed_at": datetime.now(UTC).isoformat(),
+                "input_rows": len(raw),
+                "answered_rows": 0,
+                "actual_source": "query_a",
+            },
+        )
+
+    current = answered
 
     # Tier 1
     t1_cfg = _tier1_config(config)
@@ -299,5 +584,16 @@ def run_pipeline(request: ProcessRequest) -> SanitizationResponse:
             "input_rows": len(raw),
             "answered_rows": len(answered),
             "drop_reasons": {"tier1": drop_reasons_t1, "tier2": drop_reasons_t2},
+            "actual_source": "query_a" if actual_baseline is not None else "inline",
+            "actual_total_responses": (
+                actual_baseline.total_responses if actual_baseline is not None else len(answered)
+            ),
+            "actual_top_box_count": (
+                actual_baseline.top_box_count
+                if actual_baseline is not None
+                else int((answered["Answer_Value"] == 5).sum())
+                if "Answer_Value" in answered.columns
+                else 0
+            ),
         },
     )

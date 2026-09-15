@@ -24,41 +24,64 @@ describe('ConfigForm', () => {
     renderConfigForm();
 
     expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Tier 1 — deterministic' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Tier 2 — store×month' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Tier 1/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Tier 2/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Tier 3/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Tier 1 frequency filter')).toBeChecked();
     expect(screen.getByLabelText('Freq threshold')).toHaveValue(3);
     expect(screen.getByLabelText('Min volume')).toHaveValue(30);
+    expect(screen.queryByRole('checkbox', { name: 'Tier 2 enabled' })).not.toBeInTheDocument();
   });
 
-  it('toggles Tier 2 off and emits valid PipelineConfig', async () => {
+  it('disables freq threshold input when frequency filter is off', async () => {
+    renderConfigForm();
+
+    const freqSwitch = screen.getByLabelText('Tier 1 frequency filter');
+    fireEvent.click(freqSwitch);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Freq threshold')).toBeDisabled();
+    });
+  });
+
+  it('emits flat SPEC PipelineConfig when freq threshold changes', async () => {
     const onValidConfigChange = vi.fn();
     renderConfigForm(onValidConfigChange);
 
-    const tier2Switch = screen.getByRole('checkbox', { name: 'Tier 2 enabled' });
-    expect(tier2Switch).toBeChecked();
-
-    fireEvent.click(tier2Switch);
-    expect(tier2Switch).not.toBeChecked();
+    const freq = screen.getByLabelText('Freq threshold');
+    fireEvent.change(freq, { target: { value: '5' } });
 
     await waitFor(() => {
       const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
-      expect(lastCall?.tier2.enabled).toBe(false);
+      expect(lastCall?.tier1_freq_threshold).toBe(5);
+      expect(lastCall?.tier1_freq_enabled).toBe(true);
     });
 
     const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
     expect(pipelineConfigSchema.safeParse(lastCall).success).toBe(true);
   });
 
-  it('produces valid PipelineConfig from toggled form values', () => {
+  it('emits tier1_freq_enabled false when frequency switch is turned off', async () => {
+    const onValidConfigChange = vi.fn();
+    renderConfigForm(onValidConfigChange);
+
+    fireEvent.click(screen.getByLabelText('Tier 1 frequency filter'));
+
+    await waitFor(() => {
+      const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
+      expect(lastCall?.tier1_freq_enabled).toBe(false);
+    });
+  });
+
+  it('produces valid PipelineConfig from form values', () => {
     const formValues = {
       ...defaultConfigFormValues,
-      tier2: { ...defaultConfigFormValues.tier2, enabled: false },
+      tier1_blacklist_enabled: false,
     };
     const parsed = configFormSchema.parse(formValues);
     const config = toPipelineConfig(parsed);
 
     expect(pipelineConfigSchema.safeParse(config).success).toBe(true);
-    expect(config.tier2.enabled).toBe(false);
+    expect(config.tier1_blacklist_enabled).toBe(false);
   });
 });

@@ -44,7 +44,7 @@ export default function SideMenu() {
         <BrandLogo />
         <Stack spacing={0}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-            Fraud Guard
+            Survey Sanitization
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             Sanitization PoC

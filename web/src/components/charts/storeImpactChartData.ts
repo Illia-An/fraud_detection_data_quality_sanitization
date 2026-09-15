@@ -30,10 +30,11 @@ export function filterStoreSeries(
 
 export function buildStoreImpactTraces(
   points: StoreImpactPoint[],
-  config: PipelineConfig,
+  _config: PipelineConfig,
 ): PlotTrace[] {
   const x = points.map((point) => point.period_label);
-  const traces: PlotTrace[] = [
+  // Tier 2 is always on (SPEC) — always show after-tier2 series.
+  return [
     {
       name: 'Actual',
       x,
@@ -50,20 +51,15 @@ export function buildStoreImpactTraces(
       line: { color: STORE_IMPACT_COLORS.tier1, width: 2 },
       connectgaps: true,
     },
-  ];
-
-  if (config.tier2.enabled) {
-    traces.push({
+    {
       name: 'After Tier 2',
       x,
       y: points.map((point) => point.after_tier2_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier2, width: 2 },
       connectgaps: true,
-    });
-  }
-
-  return traces;
+    },
+  ];
 }
 
 export function defaultSelectedStoreId(

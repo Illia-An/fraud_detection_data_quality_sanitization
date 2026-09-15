@@ -1,5 +1,6 @@
 /**
- * Zod mirror of backend/schemas.py — keep JSON field names identical.
+ * Zod mirror of SPEC.md Section 2 + Section 5.3 meta telemetry.
+ * Layout: web/src (project frontend root).
  */
 import { z } from 'zod';
 
@@ -37,25 +38,16 @@ export const surveyAnswerRowSchema = z
 
 export type SurveyAnswerRow = z.infer<typeof surveyAnswerRowSchema>;
 
-export const tier1OptionsSchema = z.object({
-  enable_blacklist: z.boolean().default(true),
-  enable_freq_store_day: z.boolean().default(true),
-  enable_always_topbox: z.boolean().default(false),
-  freq_store_day_min: z.number().int().min(2).max(20).default(3),
-  always_topbox_min_n: z.number().int().min(3).max(100).default(10),
-  customer_blacklist_value: z.string().default('לא'),
-});
-
-export const tier2OptionsSchema = z.object({
-  enabled: z.boolean().default(true),
-  min_volume: z.number().int().min(1).max(10_000).default(30),
-  z_high: z.number().min(0.5).max(5).default(2),
-  five_pct_min: z.number().min(50).max(100).default(90),
-});
-
+/** Flat PipelineConfig — SPEC Section 2 (no nested tier1/tier2). */
 export const pipelineConfigSchema = z.object({
-  tier1: tier1OptionsSchema.default({}),
-  tier2: tier2OptionsSchema.default({}),
+  tier1_blacklist_enabled: z.boolean().default(true),
+  tier1_freq_enabled: z.boolean().default(true),
+  tier1_freq_threshold: z.number().int().min(1).default(3),
+  tier1_always_five_enabled: z.boolean().default(false),
+  tier1_always_five_min_n: z.number().int().min(1).default(10),
+  tier2_min_volume: z.number().int().min(1).default(30),
+  tier2_z_threshold: z.number().min(0).default(2.0),
+  tier2_pct_threshold: z.number().min(0).max(100).default(90.0),
 });
 
 export type PipelineConfig = z.output<typeof pipelineConfigSchema>;
@@ -80,13 +72,15 @@ export const processRequestSchema = z
 
 export type ProcessRequest = z.output<typeof processRequestSchema>;
 
+export const stepNameSchema = z.enum(['actual', 'tier1', 'tier2']);
+export type StepName = z.infer<typeof stepNameSchema>;
+
 export const stepMetricsSchema = z.object({
-  step_name: z.string(),
+  step_name: stepNameSchema,
   rows_in: z.number().int().min(0),
   rows_out: z.number().int().min(0),
   rows_dropped: z.number().int().min(0),
-  top_box_rate_pct: z.number().nullable().optional(),
-  drop_reasons: z.record(z.string(), z.number().int()).default({}),
+  top_box_pct: z.number(),
 });
 
 export const storeMonthCellSchema = z.object({
@@ -112,18 +106,48 @@ export const storeImpactPointSchema = z.object({
   rows_dropped: z.number().int().min(0),
 });
 
-export const processResponseSchema = z.object({
-  baseline_top_box_pct: z.number().nullable().optional(),
-  final_top_box_pct: z.number().nullable().optional(),
-  network_delta_pp: z.number().nullable().optional(),
+/** SPEC §5.3 profiling keys — required on /process responses. */
+export const responseMetaSchema = z
+  .object({
+    execution_time_ms: z.number(),
+    peak_memory_mb: z.number(),
+    rows_scanned: z.number().int().nonnegative(),
+    db_query_a_time_ms: z.number().optional(),
+    db_query_b_time_ms: z.number().optional(),
+  })
+  .passthrough();
+
+export type ResponseMeta = z.output<typeof responseMetaSchema>;
+
+const STEP_ORDER: Record<StepName, number> = {
+  actual: 0,
+  tier1: 1,
+  tier2: 2,
+};
+
+/** Deterministic actual → tier1 → tier2 ordering. */
+export function sortPipelineSteps<T extends { step_name: StepName }>(steps: T[]): T[] {
+  return [...steps].sort(
+    (a, b) => STEP_ORDER[a.step_name] - STEP_ORDER[b.step_name],
+  );
+}
+
+export const sanitizationResponseSchema = z.object({
+  baseline_top_box_pct: z.number(),
+  final_top_box_pct: z.number(),
+  network_delta_pp: z.number(),
   steps: z.array(stepMetricsSchema).default([]),
   high_store_months: z.array(storeMonthCellSchema).default([]),
   store_impact_series: z.array(storeImpactPointSchema).default([]),
-  echo_config: z.record(z.string(), z.unknown()).optional(),
-  meta: z.record(z.string(), z.unknown()).default({}),
+  echo_config: pipelineConfigSchema,
+  meta: responseMetaSchema,
 });
 
-export type ProcessResponse = z.output<typeof processResponseSchema>;
+export type SanitizationResponse = z.output<typeof sanitizationResponseSchema>;
+
+/** @deprecated Prefer SanitizationResponse — kept for gradual rename. */
+export type ProcessResponse = SanitizationResponse;
+export const processResponseSchema = sanitizationResponseSchema;
 
 export const healthResponseSchema = z.object({
   status: z.string(),
@@ -158,5 +182,3 @@ export type ErrorDetail = z.infer<typeof errorDetailSchema>;
 export type StepMetrics = z.output<typeof stepMetricsSchema>;
 export type StoreMonthCell = z.output<typeof storeMonthCellSchema>;
 export type StoreImpactPoint = z.output<typeof storeImpactPointSchema>;
-export type Tier1Options = z.output<typeof tier1OptionsSchema>;
-export type Tier2Options = z.output<typeof tier2OptionsSchema>;
