@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { defaultPipelineConfig } from '../../schemas/api';
 import {
   buildStoreImpactTraces,
   defaultSelectedStoreId,
@@ -65,7 +64,7 @@ describe('storeImpactChartData', () => {
   });
 
   it('builds actual and tier traces (Tier2 always on)', () => {
-    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1), defaultPipelineConfig);
+    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1));
     expect(traces).toHaveLength(3);
     expect(traces[0]).toMatchObject({
       name: 'Actual',
