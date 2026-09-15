@@ -46,12 +46,25 @@ const processResult = {
   network_delta_pp: -3.4,
   steps: [
     {
-      step_name: '1_tier1',
+      step_name: 'actual' as const,
+      rows_in: 100,
+      rows_out: 95,
+      rows_dropped: 5,
+      top_box_pct: 85.5,
+    },
+    {
+      step_name: 'tier1' as const,
       rows_in: 95,
       rows_out: 90,
       rows_dropped: 5,
-      top_box_rate_pct: 84.0,
-      drop_reasons: {},
+      top_box_pct: 84.0,
+    },
+    {
+      step_name: 'tier2' as const,
+      rows_in: 90,
+      rows_out: 88,
+      rows_dropped: 2,
+      top_box_pct: 82.1,
     },
   ],
   high_store_months: [
@@ -66,7 +79,12 @@ const processResult = {
     },
   ],
   store_impact_series: [],
-  meta: {},
+  echo_config: defaultPipelineConfig,
+  meta: {
+    execution_time_ms: 12.5,
+    peak_memory_mb: 0.5,
+    rows_scanned: 100,
+  },
 };
 
 function renderPanel() {
@@ -174,8 +192,9 @@ describe('PipelineRunPanel', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('85.50%')).toBeInTheDocument();
+      expect(screen.getAllByText('85.50%').length).toBeGreaterThan(0);
       expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
+      expect(screen.getByText('Pipeline telemetry')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Pipeline steps/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Flagged store×months/i })).toBeInTheDocument();
     });

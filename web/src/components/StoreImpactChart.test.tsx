@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { appTheme } from '../theme';
 import { StoreImpactChart } from './StoreImpactChart';
-import { defaultPipelineConfig } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 
 vi.mock('react-plotly.js', () => ({
@@ -31,7 +30,7 @@ describe('StoreImpactChart', () => {
     useUiStore.setState({ selectedStoreId: 1 });
     render(
       <ThemeProvider theme={appTheme}>
-        <StoreImpactChart series={series} config={defaultPipelineConfig} />
+        <StoreImpactChart series={series} />
       </ThemeProvider>,
     );
 

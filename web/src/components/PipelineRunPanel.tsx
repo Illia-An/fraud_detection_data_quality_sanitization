@@ -23,6 +23,7 @@ import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 import { KpiCards } from './KpiCards';
 import { PipelineStepsTable } from './PipelineStepsTable';
 import { StoreImpactChart } from './StoreImpactChart';
+import { TelemetryMetaCard } from './TelemetryMetaCard';
 
 
 interface PipelineRunPanelProps {
@@ -121,10 +122,8 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
           {displayResult && !isPending && (
             <>
               <KpiCards result={displayResult} />
-              <StoreImpactChart
-                series={displayResult.store_impact_series}
-                config={config}
-              />
+              <TelemetryMetaCard meta={displayResult.meta} />
+              <StoreImpactChart series={displayResult.store_impact_series} />
               <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography variant="subtitle1" fontWeight={600}>

@@ -11,6 +11,7 @@ from schemas import PipelineConfig, SanitizationResponse, StepMetric
 def test_pipeline_config_defaults_match_spec() -> None:
     cfg = PipelineConfig()
     assert cfg.tier1_blacklist_enabled is True
+    assert cfg.tier1_freq_enabled is True
     assert cfg.tier1_freq_threshold == 3
     assert cfg.tier1_always_five_enabled is False
     assert cfg.tier1_always_five_min_n == 10

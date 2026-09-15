@@ -12,7 +12,7 @@ import {
   type SelectChangeEvent,
 } from '@mui/material';
 
-import type { PipelineConfig, StoreImpactPoint } from '../schemas/api';
+import type { StoreImpactPoint } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
   buildStoreImpactTraces,
@@ -28,10 +28,9 @@ const Plot = lazy(async () => {
 
 interface StoreImpactChartProps {
   series: StoreImpactPoint[];
-  config: PipelineConfig;
 }
 
-export function StoreImpactChart({ series, config }: StoreImpactChartProps) {
+export function StoreImpactChart({ series }: StoreImpactChartProps) {
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
 
@@ -46,7 +45,7 @@ export function StoreImpactChart({ series, config }: StoreImpactChartProps) {
 
   const activeStoreId = selectedStoreId ?? defaultSelectedStoreId(series, null);
   const storePoints = activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId);
-  const traces = buildStoreImpactTraces(storePoints, config);
+  const traces = buildStoreImpactTraces(storePoints);
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));

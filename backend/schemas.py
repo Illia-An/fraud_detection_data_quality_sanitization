@@ -12,11 +12,27 @@ Architecture contract:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from schemas import PipelineConfig, SanitizationResponse, StepMetric
+
+
+class ResponseMeta(TypedDict, total=False):
+    """Telemetry keys merged into ``SanitizationResponse.meta`` (SPEC §5.3)."""
+
+    execution_time_ms: float
+    peak_memory_mb: float
+    rows_scanned: int
+    db_query_a_time_ms: float
+    db_query_b_time_ms: float
+    processed_at: str
+    input_rows: int
+    answered_rows: int
+    source: str
+    sample: dict[str, Any]
+    drop_reasons: dict[str, Any]
 
 # Transitional aliases for callers not yet migrated off legacy names.
 ProcessResponse = SanitizationResponse
@@ -32,6 +48,7 @@ __all__ = [
     "StoreImpactPoint",
     "SanitizationResponse",
     "ProcessResponse",
+    "ResponseMeta",
     "HealthResponse",
     "SamplePresetMeta",
     "SampleResponse",

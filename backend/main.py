@@ -1,9 +1,11 @@
+
 """FastAPI entry point for sanitization PoC."""
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -16,9 +18,16 @@ from backend.db_sample import (
     DEFAULT_FROM_DATE,
     DbSampleError,
     DbSampleQuery,
-    load_db_sample_from_settings,
     load_db_sample_meta_from_settings,
 )
+from backend.profiler import profile_block, profiling_meta
+from backend.queries import (
+    load_actual_baseline_from_settings,
+    load_tier_candidates_from_settings,
+    process_source_meta_extra,
+    query_b_mode_for_dialect,
+)
+from backend.snapshot import get_sanitization_source
 from backend.schemas import (
     HealthResponse,
     PipelineConfig,
@@ -28,7 +37,7 @@ from backend.schemas import (
     SamplePresetMeta,
     SurveyAnswerRow,
 )
-from backend.service import run_pipeline
+from backend.service import run_pipeline, run_pipeline_pushdown
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -163,26 +172,77 @@ def create_app() -> FastAPI:
     def process(body: ProcessRequest) -> SanitizationResponse:
         """Run sanitization and return SPEC Section 2 ``SanitizationResponse``."""
         try:
-            if body.source == "db":
-                sample = load_db_sample_from_settings(
-                    DbSampleQuery(from_date=DEFAULT_FROM_DATE)
-                )
-                if not sample.rows:
-                    raise HTTPException(
-                        status_code=422,
-                        detail="No Q10012 rows from 2026-01-01",
+            with profile_block() as profile:
+                db_query_a_time_ms: float | None = None
+                db_query_b_time_ms: float | None = None
+                if body.source == "db":
+                    db_query = DbSampleQuery(from_date=DEFAULT_FROM_DATE)
+
+                    # Query A — aggregated actual baseline (no raw rows).
+                    t_a = time.perf_counter()
+                    actual_baseline = load_actual_baseline_from_settings(
+                        period_start=db_query.from_date,
+                        period_end=db_query.to_date,
                     )
-                result = run_pipeline(
-                    ProcessRequest(rows=sample.rows, config=body.config)
-                )
-                return _as_sanitization_response(
-                    result,
-                    meta_extra={
+                    db_query_a_time_ms = round(
+                        (time.perf_counter() - t_a) * 1000.0, 3
+                    )
+                    if actual_baseline.total_responses <= 0:
+                        raise HTTPException(
+                            status_code=422,
+                            detail="No Q10012 rows from 2026-01-01",
+                        )
+
+                    # Query B — Tier 1 candidate rows only (not full period).
+                    t_b = time.perf_counter()
+                    sample = load_tier_candidates_from_settings(
+                        period_start=db_query.from_date,
+                        period_end=db_query.to_date,
+                        config=body.config,
+                    )
+                    db_query_b_time_ms = round(
+                        (time.perf_counter() - t_b) * 1000.0, 3
+                    )
+                    # Snapshot → phase 2 full Tier1; VIEW → v1 blacklist-only.
+                    q_mode = query_b_mode_for_dialect(
+                        "sqlite"
+                        if get_sanitization_source() == "snapshot"
+                        else "mssql"
+                    )
+                    result = run_pipeline_pushdown(
+                        actual_baseline,
+                        sample.rows,
+                        body.config,
+                        query_b_mode=q_mode,
+                    )
+                    rows_scanned = len(sample.rows)
+                    meta_extra = {
                         "source": "db",
                         "sample": sample.meta.model_dump(),
-                    },
+                        "query_a_store_periods": len(
+                            actual_baseline.by_store_period
+                        ),
+                        "query_a_total_responses": actual_baseline.total_responses,
+                        "query_b_candidate_rows": len(sample.rows),
+                        **process_source_meta_extra(),
+                    }
+                else:
+                    result = run_pipeline(body)
+                    rows_scanned = int(
+                        result.meta.get("input_rows", len(body.rows))
+                    )
+                    meta_extra = {}
+
+            meta_extra.update(
+                profiling_meta(
+                    execution_time_ms=float(profile["execution_time_ms"]),
+                    peak_memory_mb=float(profile["peak_memory_mb"]),
+                    rows_scanned=rows_scanned,
+                    db_query_a_time_ms=db_query_a_time_ms,
+                    db_query_b_time_ms=db_query_b_time_ms,
                 )
-            return _as_sanitization_response(run_pipeline(body))
+            )
+            return _as_sanitization_response(result, meta_extra=meta_extra)
         except HTTPException:
             raise
         except DbSampleError as exc:

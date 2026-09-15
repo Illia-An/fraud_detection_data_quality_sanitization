@@ -61,7 +61,7 @@ export default function AppNavbar() {
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mr: 'auto' }}>
             <BrandLogo />
             <Typography variant="h4" component="div" sx={{ color: 'text.primary' }}>
-              Fraud Guard — Sanitization PoC
+              Survey Sanitization PoC
             </Typography>
           </Stack>
           <ColorModeIconDropdown />

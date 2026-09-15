@@ -50,11 +50,9 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
     onValidConfigChange?.(toPipelineConfig(parsed.data));
   }, [values, isValid, onValidConfigChange]);
 
-  const tier2Enabled = values?.tier2?.enabled ?? true;
-
   return (
     <Card>
-      <CardHeader title="Pipeline configuration" subheader="Tier 1 / 2 thresholds" />
+      <CardHeader title="Pipeline configuration" subheader="Tier 1 / 2 thresholds (SPEC)" />
       <CardContent>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -64,10 +62,10 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
         >
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle1" component="h3">
-              Tier 1 — deterministic
+              Tier 1 — respondent quality
             </Typography>
             <Controller
-              name="tier1.enable_blacklist"
+              name="tier1_blacklist_enabled"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
@@ -83,7 +81,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               )}
             />
             <Controller
-              name="tier1.enable_freq_store_day"
+              name="tier1_freq_enabled"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
@@ -91,15 +89,15 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                     <Switch
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 1 freq store day' }}
+                      inputProps={{ 'aria-label': 'Tier 1 frequency filter' }}
                     />
                   }
-                  label="Freq ≥ N / store×day"
+                  label="Frequency filter (entity×store×day)"
                 />
               )}
             />
             <Controller
-              name="tier1.enable_always_topbox"
+              name="tier1_always_five_enabled"
               control={control}
               render={({ field }) => (
                 <FormControlLabel
@@ -118,62 +116,44 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Freq threshold"
               type="number"
               size="small"
-              {...register('tier1.freq_store_day_min', { valueAsNumber: true })}
-              error={Boolean(errors.tier1?.freq_store_day_min)}
-              helperText={errors.tier1?.freq_store_day_min?.message}
-              slotProps={{ htmlInput: { min: 2, max: 20 } }}
+              disabled={!values.tier1_freq_enabled}
+              {...register('tier1_freq_threshold', { valueAsNumber: true })}
+              error={Boolean(errors.tier1_freq_threshold)}
+              helperText={errors.tier1_freq_threshold?.message}
+              slotProps={{ htmlInput: { min: 1, max: 20 } }}
             />
           </Box>
 
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="subtitle1" component="h3">
-              Tier 2 — store×month
+              Tier 2 — store×month (always on)
             </Typography>
-            <Controller
-              name="tier2.enabled"
-              control={control}
-              render={({ field }) => (
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={field.value}
-                      onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 2 enabled' }}
-                    />
-                  }
-                  label="Enabled"
-                />
-              )}
-            />
             <TextField
               label="Min volume"
               type="number"
               size="small"
-              disabled={!tier2Enabled}
-              {...register('tier2.min_volume', { valueAsNumber: true })}
-              error={Boolean(errors.tier2?.min_volume)}
-              helperText={errors.tier2?.min_volume?.message}
+              {...register('tier2_min_volume', { valueAsNumber: true })}
+              error={Boolean(errors.tier2_min_volume)}
+              helperText={errors.tier2_min_volume?.message}
               slotProps={{ htmlInput: { min: 1 } }}
             />
             <TextField
               label="Z high"
               type="number"
               size="small"
-              disabled={!tier2Enabled}
-              {...register('tier2.z_high', { valueAsNumber: true })}
-              error={Boolean(errors.tier2?.z_high)}
-              helperText={errors.tier2?.z_high?.message}
-              slotProps={{ htmlInput: { min: 0.5, max: 5, step: 0.1 } }}
+              {...register('tier2_z_threshold', { valueAsNumber: true })}
+              error={Boolean(errors.tier2_z_threshold)}
+              helperText={errors.tier2_z_threshold?.message}
+              slotProps={{ htmlInput: { min: 0, max: 5, step: 0.1 } }}
             />
             <TextField
               label="Five % min"
               type="number"
               size="small"
-              disabled={!tier2Enabled}
-              {...register('tier2.five_pct_min', { valueAsNumber: true })}
-              error={Boolean(errors.tier2?.five_pct_min)}
-              helperText={errors.tier2?.five_pct_min?.message}
-              slotProps={{ htmlInput: { min: 50, max: 100 } }}
+              {...register('tier2_pct_threshold', { valueAsNumber: true })}
+              error={Boolean(errors.tier2_pct_threshold)}
+              helperText={errors.tier2_pct_threshold?.message}
+              slotProps={{ htmlInput: { min: 0, max: 100 } }}
             />
           </Box>
         </Stack>
