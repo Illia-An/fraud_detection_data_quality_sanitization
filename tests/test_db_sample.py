@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -50,7 +50,9 @@ def test_build_sql_period_filters_without_top() -> None:
     sql, params = _build_sql(
         DbSampleQuery(store=82, year=2026, month=3, from_date=DEFAULT_FROM_DATE)
     )
+    assert "SELECT *" not in sql
     assert "TOP" not in sql.upper()
+    assert "Question_ID" in sql
     assert "AnswerTime >=" in sql
     assert "PrintStore = :store" in sql
     assert "[Year] = :year" in sql
@@ -58,6 +60,15 @@ def test_build_sql_period_filters_without_top() -> None:
     assert params["store"] == 82
     assert params["year"] == 2026
     assert params["month"] == 3
+
+
+def test_build_sql_includes_to_date_exclusive() -> None:
+    sql, params = _build_sql(
+        DbSampleQuery(from_date=date(2026, 1, 1), to_date=date(2026, 9, 14))
+    )
+    assert "AnswerTime < :to_date_exclusive" in sql
+    assert params["to_date_exclusive"].date().isoformat() == "2026-09-15"
+    assert "to_date_exclusive" in params
 
 
 def test_build_meta_sql_counts_period() -> None:
@@ -175,8 +186,17 @@ def test_sample_db_endpoint_503(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SANITIZATION_SOURCE", "view")
+    from backend.queries import ActualBaseline, StorePeriodAggregate
+
+    baseline = ActualBaseline(
+        total_responses=1,
+        top_box_count=1,
+        top_box_pct=100.0,
+        by_store_period=(StorePeriodAggregate(1.0, 2026, 2, 1, 1),),
+    )
     fake = SampleResponse(
-        preset="db",
+        preset="db_query_b",
         rows=[
             SurveyAnswerRow(
                 ParticipateNumber="p1",
@@ -191,36 +211,44 @@ def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> No
             )
         ],
         meta=SamplePresetMeta(
-            preset="db",
+            preset="db_query_b",
             row_count=1,
             store_count=1,
             month_count=1,
             description="from db",
         ),
     )
-    monkeypatch.setattr("backend.main.load_db_sample_from_settings", lambda query: fake)
+    monkeypatch.setattr(
+        "backend.main.load_actual_baseline_from_settings",
+        lambda **_kwargs: baseline,
+    )
+    monkeypatch.setattr(
+        "backend.main.load_tier_candidates_from_settings",
+        lambda **_kwargs: fake,
+    )
     client = TestClient(create_app())
     res = client.post("/api/v1/process", json={"source": "db", "config": {}})
     assert res.status_code == 200
     body = res.json()
     assert body["meta"]["source"] == "db"
     assert body["meta"]["sample"]["row_count"] == 1
-    assert body["baseline_top_box_pct"] is not None
+    assert body["baseline_top_box_pct"] == 100.0
+    assert body["meta"]["actual_source"] == "query_a"
 
 
 def test_process_db_source_empty_period(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = SampleResponse(
-        preset="db",
-        rows=[],
-        meta=SamplePresetMeta(
-            preset="db",
-            row_count=0,
-            store_count=0,
-            month_count=0,
-            description="empty",
-        ),
+    from backend.queries import ActualBaseline
+
+    empty = ActualBaseline(
+        total_responses=0,
+        top_box_count=0,
+        top_box_pct=0.0,
+        by_store_period=(),
     )
-    monkeypatch.setattr("backend.main.load_db_sample_from_settings", lambda query: fake)
+    monkeypatch.setattr(
+        "backend.main.load_actual_baseline_from_settings",
+        lambda **_kwargs: empty,
+    )
     client = TestClient(create_app())
     res = client.post("/api/v1/process", json={"source": "db", "config": {}})
     assert res.status_code == 422

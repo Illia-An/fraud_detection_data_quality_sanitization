@@ -64,7 +64,7 @@ describe('storeImpactChartData', () => {
     expect(points[1].period_label).toBe('2025-02');
   });
 
-  it('builds actual and tier traces with PoC colors', () => {
+  it('builds actual and tier traces (Tier2 always on)', () => {
     const traces = buildStoreImpactTraces(filterStoreSeries(series, 1), defaultPipelineConfig);
     expect(traces).toHaveLength(3);
     expect(traces[0]).toMatchObject({
@@ -79,15 +79,5 @@ describe('storeImpactChartData', () => {
       name: 'After Tier 2',
       line: { color: STORE_IMPACT_COLORS.tier2 },
     });
-  });
-
-  it('omits tier2 traces when disabled', () => {
-    const config = {
-      ...defaultPipelineConfig,
-      tier2: { ...defaultPipelineConfig.tier2, enabled: false },
-    };
-    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1), config);
-    expect(traces).toHaveLength(2);
-    expect(traces.map((trace) => trace.name)).toEqual(['Actual', 'After Tier 1']);
   });
 });

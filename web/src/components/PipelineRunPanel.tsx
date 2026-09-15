@@ -23,6 +23,7 @@ import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 import { KpiCards } from './KpiCards';
 import { PipelineStepsTable } from './PipelineStepsTable';
 import { StoreImpactChart } from './StoreImpactChart';
+import { TelemetryMetaCard } from './TelemetryMetaCard';
 
 
 interface PipelineRunPanelProps {
@@ -121,6 +122,7 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
           {displayResult && !isPending && (
             <>
               <KpiCards result={displayResult} />
+              <TelemetryMetaCard meta={displayResult.meta} />
               <StoreImpactChart
                 series={displayResult.store_impact_series}
                 config={config}

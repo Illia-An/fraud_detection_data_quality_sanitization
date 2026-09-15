@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { describe, expect, it } from 'vitest';
 
+import { defaultPipelineConfig } from '../schemas/api';
 import { appTheme } from '../theme';
 import { KpiCards } from './KpiCards';
 
@@ -12,7 +13,12 @@ const processResult = {
   steps: [],
   high_store_months: [],
   store_impact_series: [],
-  meta: {},
+  echo_config: defaultPipelineConfig,
+  meta: {
+    execution_time_ms: 10,
+    peak_memory_mb: 0.1,
+    rows_scanned: 1,
+  },
 };
 
 describe('KpiCards', () => {
