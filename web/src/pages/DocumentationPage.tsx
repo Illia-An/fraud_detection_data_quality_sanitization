@@ -22,7 +22,7 @@ export function DocumentationPage() {
   return (
     <Stack spacing={3}>
       <Card>
-        <CardHeader title="Overview" subheader="Fraud Guard sanitization PoC" />
+        <CardHeader title="Overview" subheader="Survey sanitization PoC" />
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Typography variant="body1">
             This UI is a what-if demo for the batch data-quality pipeline. It estimates how the{' '}
@@ -38,7 +38,7 @@ export function DocumentationPage() {
       </Card>
 
       <Card>
-        <CardHeader title="Pipeline tiers" subheader="Rules promoted from notebooks into fraud_guard" />
+        <CardHeader title="Pipeline tiers" subheader="Rules promoted from notebooks into the sanitization engine" />
         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
           <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>

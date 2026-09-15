@@ -16,6 +16,14 @@ wheels/
 .env.*
 !.env.example
 
+# Internal research exports with raw PII (do not commit)
+docs/research/*_internal_pii*
+docs/research/*_INTERNAL_PII*
+
+# Local Q10012 daily snapshot (may contain PII — never commit)
+data/*.sqlite
+data/*.sqlite-*
+
 # Jupyter
 .ipynb_checkpoints/
 notebooks/Untitled.ipynb

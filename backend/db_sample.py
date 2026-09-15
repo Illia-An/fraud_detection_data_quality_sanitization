@@ -1,9 +1,10 @@
 """Read-only DB sample loader for the sanitization PoC.
 
-Pulls Q10012 rows from ``dbo.TargetsByMetrics_RateGetAnswers`` for the
-period ``AnswerTime >= 2026-01-01`` (through latest). Optional store /
-year / month filters narrow that window. Entity PII is hashed so Tier 1
-entity keys still work; name columns are never selected.
+Pulls Q10012 rows from ``dbo.TargetsByMetrics_RateGetAnswers`` for a
+bounded ``AnswerTime`` window (default ``from_date=2026-01-01``, optional
+inclusive ``to_date``). Optional store / year / month filters narrow that
+window. Entity PII is hashed so Tier 1 entity keys still work; name
+columns are never selected.
 
 GET ``/sample/db`` returns metadata only (no row payload). POST
 ``/process`` with ``source=db`` loads the period on the server and runs
@@ -14,14 +15,16 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Any
+from datetime import date, datetime, timedelta
+from typing import Any, Literal
 
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.schemas import SamplePresetMeta, SampleResponse, SurveyAnswerRow
 from fraud_guard.pii import hash_pii_value
+
+SqlDialect = Literal["mssql", "sqlite"]
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +55,17 @@ _HASH_PII_COLUMNS = ("UserContact", "PhoneFromLog")
 
 @dataclass(frozen=True)
 class DbSampleQuery:
-    """Filters for a read-only period pull."""
+    """Filters for a read-only period pull.
+
+    ``from_date`` / ``to_date`` bound ``AnswerTime`` (inclusive calendar days):
+    ``from_date`` 00:00:00 <= AnswerTime < (to_date + 1 day) 00:00:00.
+    """
 
     store: int | float | None = None
     year: int | None = None
     month: int | None = None
     from_date: date = DEFAULT_FROM_DATE
+    to_date: date | None = None
 
 
 class DbSampleError(Exception):
@@ -77,7 +85,19 @@ def redact_row(row: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def _period_params(query: DbSampleQuery) -> tuple[str, dict[str, Any]]:
+def _ident_year_month(dialect: SqlDialect) -> tuple[str, str]:
+    """Dialect-safe Year/Month identifiers (SQL Server brackets vs SQLite)."""
+    if dialect == "sqlite":
+        return "Year", "Month"
+    return "[Year]", "[Month]"
+
+
+def _period_params(
+    query: DbSampleQuery,
+    *,
+    dialect: SqlDialect = "mssql",
+) -> tuple[str, dict[str, Any]]:
+    year_col, month_col = _ident_year_month(dialect)
     where = """
 WHERE Question_ID = :question_id
   AND AnswerTime >= :from_date
@@ -86,20 +106,33 @@ WHERE Question_ID = :question_id
         "question_id": QUESTION_ID,
         "from_date": datetime.combine(query.from_date, datetime.min.time()),
     }
+    if dialect == "sqlite":
+        # SQLite stores AnswerTime as ISO text; compare as strings.
+        params["from_date"] = query.from_date.isoformat()
+    if query.to_date is not None:
+        # Inclusive end date: AnswerTime < start of the next calendar day.
+        end_exclusive = datetime.combine(query.to_date, datetime.min.time()) + timedelta(days=1)
+        where += "  AND AnswerTime < :to_date_exclusive\n"
+        if dialect == "sqlite":
+            params["to_date_exclusive"] = end_exclusive.date().isoformat()
+        else:
+            params["to_date_exclusive"] = end_exclusive
     if query.store is not None:
         where += "  AND PrintStore = :store\n"
         params["store"] = query.store
     if query.year is not None:
-        where += "  AND [Year] = :year\n"
+        where += f"  AND {year_col} = :year\n"
         params["year"] = query.year
     if query.month is not None:
-        where += "  AND [Month] = :month\n"
+        where += f"  AND {month_col} = :month\n"
         params["month"] = query.month
     return where, params
 
 
 def _filter_labels(query: DbSampleQuery) -> list[str]:
     filters: list[str] = [f"AnswerTime>={query.from_date.isoformat()}"]
+    if query.to_date is not None:
+        filters.append(f"AnswerTime<={(query.to_date.isoformat())}")
     if query.store is not None:
         filters.append(f"store={query.store}")
     if query.year is not None:
@@ -218,8 +251,66 @@ def _engine_from_settings() -> Engine:
         raise DbSampleError("Database is not available") from exc
 
 
+def _process_engine() -> tuple[Engine, SqlDialect]:
+    """Engine for ``source=db``: VIEW (mssql) or local snapshot (sqlite)."""
+    from backend.snapshot import get_sanitization_source, require_snapshot_engine
+
+    if get_sanitization_source() == "snapshot":
+        return require_snapshot_engine(), "sqlite"
+    return _engine_from_settings(), "mssql"
+
+
 def load_db_sample_meta_from_settings(query: DbSampleQuery | None = None) -> SampleResponse:
-    """Create engine from ``.env`` and fetch period metadata."""
+    """Create engine from ``.env`` / snapshot and fetch period metadata."""
+    from backend.snapshot import (
+        ANSWERS_TABLE,
+        get_sanitization_source,
+        read_meta,
+        require_snapshot_engine,
+    )
+
+    if get_sanitization_source() == "snapshot":
+        engine = require_snapshot_engine()
+        q = query or DbSampleQuery()
+        where, params = _period_params(q, dialect="sqlite")
+        sql = f"""
+SELECT
+    COUNT(*) AS row_count,
+    COUNT(DISTINCT PrintStore) AS store_count,
+    COUNT(DISTINCT (Year * 100 + Month)) AS month_count
+FROM {ANSWERS_TABLE}
+{where}
+"""
+        try:
+            with engine.connect() as conn:
+                result = conn.execute(text(sql), params)
+                mapping = result.mappings().first() or {}
+        except SQLAlchemyError as exc:
+            logger.exception("snapshot sample meta query failed")
+            raise DbSampleError("Snapshot query failed") from exc
+        snap = read_meta(engine)
+        meta = _sample_meta(
+            q,
+            row_count=mapping.get("row_count") or 0,
+            store_count=mapping.get("store_count") or 0,
+            month_count=mapping.get("month_count") or 0,
+        )
+        desc = meta.description
+        if snap.loaded_at:
+            desc = f"SQLite snapshot (loaded {snap.loaded_at}); " + ", ".join(
+                _filter_labels(q)
+            )
+        return SampleResponse(
+            preset="db",
+            rows=[],
+            meta=SamplePresetMeta(
+                preset=meta.preset,
+                row_count=meta.row_count,
+                store_count=meta.store_count,
+                month_count=meta.month_count,
+                description=desc,
+            ),
+        )
     return fetch_db_sample_meta(_engine_from_settings(), query)
 
 

@@ -50,7 +50,8 @@ Scenarios in `tests/e2e/sanitization.spec.ts`:
 
 - API health chip shows `ok`
 - Small preset → Run pipeline → KPI cards + pipeline steps table
-- Tier 2 off → re-run → network delta changes
+- Freq threshold change → re-run → network delta changes
+- Pipeline telemetry shows execution_time_ms / peak_memory_mb / rows_scanned
 
 ```powershell
 npx playwright install chromium

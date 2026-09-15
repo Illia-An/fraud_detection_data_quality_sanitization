@@ -13,6 +13,7 @@ class PipelineConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     tier1_blacklist_enabled: bool = True
+    tier1_freq_enabled: bool = True
     tier1_freq_threshold: int = Field(default=3, ge=1)
     tier1_always_five_enabled: bool = False
     tier1_always_five_min_n: int = 10
