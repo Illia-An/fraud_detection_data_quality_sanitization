@@ -124,7 +124,8 @@ describe('processResponseSchema / SanitizationResponse', () => {
   });
 
   it('rejects missing echo_config', () => {
-    const { echo_config: _, ...rest } = processApiResponse;
+    const { echo_config: _echoConfig, ...rest } = processApiResponse;
+    void _echoConfig;
     expect(() => processResponseSchema.parse(rest)).toThrow();
   });
 

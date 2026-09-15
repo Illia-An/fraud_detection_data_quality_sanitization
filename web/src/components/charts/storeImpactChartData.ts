@@ -1,4 +1,4 @@
-import type { PipelineConfig, StoreImpactPoint } from '../../schemas/api';
+import type { StoreImpactPoint } from '../../schemas/api';
 
 export const STORE_IMPACT_COLORS = {
   actual: '#4C78A8',
@@ -28,10 +28,7 @@ export function filterStoreSeries(
     .sort((a, b) => a.year - b.year || a.month - b.month);
 }
 
-export function buildStoreImpactTraces(
-  points: StoreImpactPoint[],
-  _config: PipelineConfig,
-): PlotTrace[] {
+export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
   const x = points.map((point) => point.period_label);
   // Tier 2 is always on (SPEC) — always show after-tier2 series.
   return [
