@@ -21,10 +21,12 @@ import {
   ToggleButtonGroup,
   type SelectChangeEvent,
 } from '@mui/material';
+import type { PlotMouseEvent } from 'plotly.js';
 
 import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
+  applyTraceHoverFocus,
   buildStoreImpactTraces,
   buildStoreImpactXAxis,
   buildStoreImpactYAxis,
@@ -54,6 +56,7 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
   const highlightedPeriodLabel = useUiStore((state) => state.highlightedPeriodLabel);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
+  const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
 
@@ -75,11 +78,16 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
     [highStoreMonths, activeStoreId],
   );
 
-  const traces = useMemo(() => {
+  const baseTraces = useMemo(() => {
     const base = buildStoreImpactTraces(storePoints);
     const flagTrace = buildTier4FlagMarkerTrace(storePoints, flaggedForStore);
     return flagTrace ? [...base, flagTrace] : base;
   }, [storePoints, flaggedForStore]);
+
+  const traces = useMemo(
+    () => applyTraceHoverFocus(baseTraces, focusedTraceIndex),
+    [baseTraces, focusedTraceIndex],
+  );
 
   const periodLabels = useMemo(
     () => storePoints.map((point) => point.period_label),
@@ -100,6 +108,7 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
+    setFocusedTraceIndex(null);
   };
 
   const handleYScaleChange = (
@@ -111,6 +120,17 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
     }
   };
 
+  const handlePlotHover = (event: Readonly<PlotMouseEvent>) => {
+    const curveNumber = event.points?.[0]?.curveNumber;
+    if (typeof curveNumber === 'number') {
+      setFocusedTraceIndex(curveNumber);
+    }
+  };
+
+  const handlePlotUnhover = () => {
+    setFocusedTraceIndex(null);
+  };
+
   if (storeIds.length === 0) {
     return null;
   }
@@ -119,7 +139,7 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
     <Card sx={{ mb: 3 }}>
       <CardHeader
         title="Store impact"
-        subheader="Actual vs sanitized 5% KPI by month"
+        subheader="Actual vs sanitized 5% KPI by month — hover a series to isolate it"
         action={
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
             <ToggleButtonGroup
@@ -172,11 +192,14 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
                 xaxis: xAxis,
                 yaxis: yAxis,
                 shapes,
+                hovermode: 'closest',
                 legend: { orientation: 'h', y: -0.15 },
               }}
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
               useResizeHandler
+              onHover={handlePlotHover}
+              onUnhover={handlePlotUnhover}
             />
           </Suspense>
         </Box>

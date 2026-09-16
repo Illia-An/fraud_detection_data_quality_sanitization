@@ -12,7 +12,9 @@ import {
   filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
+  applyTraceHoverFocus,
   STORE_IMPACT_COLORS,
+  STORE_IMPACT_HOVER_DIM_OPACITY,
   TIER4_BAND_FILL,
   TIER4_HIGHLIGHT_BAND_FILL,
 } from './storeImpactChartData';
@@ -224,5 +226,16 @@ describe('storeImpactChartData', () => {
       marker: { line: { color: STORE_IMPACT_COLORS.tier4Flag } },
     });
     expect(trace!.customdata).toEqual([[2.4, 40, 95]]);
+  });
+
+  it('dims sibling traces when one series is focused', () => {
+    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1));
+    const focused = applyTraceHoverFocus(traces, 0);
+    expect(focused[0].opacity).toBe(1);
+    expect(focused[1].opacity).toBe(STORE_IMPACT_HOVER_DIM_OPACITY);
+    expect(focused[4].opacity).toBe(STORE_IMPACT_HOVER_DIM_OPACITY);
+
+    const clear = applyTraceHoverFocus(traces, null);
+    expect(clear.every((trace) => trace.opacity === 1)).toBe(true);
   });
 });

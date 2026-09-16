@@ -28,6 +28,7 @@ export interface PlotTrace {
   hovertemplate?: string;
   customdata?: (string | number)[][];
   showlegend?: boolean;
+  opacity?: number;
 }
 
 export interface PlotShape {
@@ -322,4 +323,24 @@ export function buildTier4FlagMarkerTrace(
       'Tier 4 flagged<br>z=%{customdata[0]:.2f}<br>volume=%{customdata[1]}<br>5%=%{customdata[2]:.1f}%<extra></extra>',
     showlegend: true,
   };
+}
+
+/** Dim sibling series while one trace is hovered (Datadog-style focus). */
+export const STORE_IMPACT_HOVER_DIM_OPACITY = 0.25;
+
+/**
+ * When ``focusedIndex`` is set, that trace stays full opacity; others dim.
+ * When null, all traces stay at full opacity.
+ */
+export function applyTraceHoverFocus(
+  traces: PlotTrace[],
+  focusedIndex: number | null,
+): PlotTrace[] {
+  if (focusedIndex == null || focusedIndex < 0 || focusedIndex >= traces.length) {
+    return traces.map((trace) => ({ ...trace, opacity: 1 }));
+  }
+  return traces.map((trace, index) => ({
+    ...trace,
+    opacity: index === focusedIndex ? 1 : STORE_IMPACT_HOVER_DIM_OPACITY,
+  }));
 }

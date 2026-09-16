@@ -7,7 +7,27 @@ import { StoreImpactChart } from './StoreImpactChart';
 import { useUiStore } from '../store/uiStore';
 
 vi.mock('react-plotly.js', () => ({
-  default: () => <div data-testid="plotly-chart" />,
+  default: ({
+    onHover,
+    onUnhover,
+    data,
+  }: {
+    onHover?: (event: { points: { curveNumber: number }[] }) => void;
+    onUnhover?: () => void;
+    data?: { opacity?: number }[];
+  }) => (
+    <div data-testid="plotly-chart">
+      <button type="button" data-testid="plotly-hover-tier1" onClick={() => onHover?.({ points: [{ curveNumber: 1 }] })}>
+        hover-tier1
+      </button>
+      <button type="button" data-testid="plotly-unhover" onClick={() => onUnhover?.()}>
+        unhover
+      </button>
+      <span data-testid="plotly-opacities">
+        {(data ?? []).map((trace) => trace.opacity ?? 1).join(',')}
+      </span>
+    </div>
+  ),
 }));
 
 const series = [
@@ -86,6 +106,29 @@ describe('StoreImpactChart', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
+    });
+  });
+
+  it('dims sibling series on hover and restores on unhover', async () => {
+    useUiStore.setState({ selectedStoreId: 1 });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart series={series} />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('plotly-hover-tier1'));
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-opacities').textContent).toBe('0.25,1,0.25,0.25,0.25');
+    });
+
+    fireEvent.click(screen.getByTestId('plotly-unhover'));
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
     });
   });
 });
