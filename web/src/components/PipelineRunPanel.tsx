@@ -123,7 +123,10 @@ export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
             <>
               <KpiCards result={displayResult} />
               <TelemetryMetaCard meta={displayResult.meta} />
-              <StoreImpactChart series={displayResult.store_impact_series} />
+              <StoreImpactChart
+                series={displayResult.store_impact_series}
+                highStoreMonths={displayResult.high_store_months}
+              />
               <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography variant="subtitle1" fontWeight={600}>

@@ -6,6 +6,7 @@ describe('useUiStore survey data', () => {
   beforeEach(() => {
     useUiStore.setState({
       selectedStoreId: null,
+      highlightedPeriodLabel: null,
       lastPreset: 'db',
       surveyRows: [],
       sampleMeta: null,
@@ -18,6 +19,7 @@ describe('useUiStore survey data', () => {
     const state = useUiStore.getState();
     expect(state.lastPreset).toBe('db');
     expect(state.selectedStoreId).toBeNull();
+    expect(state.highlightedPeriodLabel).toBeNull();
     expect(state.surveyRows).toEqual([]);
     expect(state.sampleMeta).toBeNull();
     expect(state.sampleGeneration).toBe(0);
@@ -60,5 +62,19 @@ describe('useUiStore survey data', () => {
     );
     expect(useUiStore.getState().lastPreset).toBe('db');
     expect(useUiStore.getState().sampleMeta?.preset).toBe('db');
+  });
+
+  it('selectFlaggedStoreMonth sets store and period highlight together', () => {
+    useUiStore.getState().selectFlaggedStoreMonth(82, 2026, 3);
+    const state = useUiStore.getState();
+    expect(state.selectedStoreId).toBe(82);
+    expect(state.highlightedPeriodLabel).toBe('2026-03');
+  });
+
+  it('clears highlight when store is changed via selector', () => {
+    useUiStore.getState().selectFlaggedStoreMonth(82, 2026, 3);
+    useUiStore.getState().setSelectedStoreId(1);
+    expect(useUiStore.getState().selectedStoreId).toBe(1);
+    expect(useUiStore.getState().highlightedPeriodLabel).toBeNull();
   });
 });
