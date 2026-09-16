@@ -10,6 +10,8 @@ export const STORE_IMPACT_COLORS = {
 } as const;
 
 export const TIER4_BAND_FILL = 'rgba(239, 68, 68, 0.12)';
+export const TIER4_HIGHLIGHT_BAND_FILL = 'rgba(239, 68, 68, 0.28)';
+export const TIER4_HIGHLIGHT_BAND_LINE = 'rgba(185, 28, 28, 0.85)';
 
 export interface PlotTrace {
   name: string;
@@ -37,7 +39,7 @@ export interface PlotShape {
   y0: number;
   y1: number;
   fillcolor: string;
-  line: { width: number };
+  line: { width: number; color?: string };
   layer: 'below';
 }
 
@@ -223,6 +225,34 @@ export function buildTier4FlagShapes(
     });
   }
   return shapes;
+}
+
+/**
+ * Stronger band for the month selected from FlaggedMonthsTable (same category axis).
+ */
+export function buildHighlightedMonthShape(
+  periodLabels: string[],
+  highlightedPeriodLabel: string | null,
+): PlotShape | null {
+  if (!highlightedPeriodLabel || periodLabels.length === 0) {
+    return null;
+  }
+  const index = periodLabels.indexOf(highlightedPeriodLabel);
+  if (index < 0) {
+    return null;
+  }
+  return {
+    type: 'rect',
+    xref: 'x',
+    yref: 'paper',
+    x0: index - 0.45,
+    x1: index + 0.45,
+    y0: 0,
+    y1: 1,
+    fillcolor: TIER4_HIGHLIGHT_BAND_FILL,
+    line: { width: 2, color: TIER4_HIGHLIGHT_BAND_LINE },
+    layer: 'below',
+  };
 }
 
 /** Force categorical months so ``YYYY-MM`` is never treated as a date axis. */

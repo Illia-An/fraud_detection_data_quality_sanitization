@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildHighlightedMonthShape,
   buildStoreImpactTraces,
   buildStoreImpactXAxis,
   buildStoreImpactYAxis,
@@ -13,6 +14,7 @@ import {
   getStoreIds,
   STORE_IMPACT_COLORS,
   TIER4_BAND_FILL,
+  TIER4_HIGHLIGHT_BAND_FILL,
 } from './storeImpactChartData';
 
 const series = [
@@ -188,6 +190,16 @@ describe('storeImpactChartData', () => {
       categoryorder: 'array',
       categoryarray: ['2025-01', '2025-02'],
     });
+  });
+
+  it('builds a stronger highlight band for a selected period', () => {
+    const shape = buildHighlightedMonthShape(['2025-01', '2025-02'], '2025-02');
+    expect(shape).toMatchObject({
+      fillcolor: TIER4_HIGHLIGHT_BAND_FILL,
+      x0: 0.55,
+      x1: 1.45,
+    });
+    expect(buildHighlightedMonthShape(['2025-01'], '2099-01')).toBeNull();
   });
 
   it('builds Tier 4 flag marker trace with z/volume tooltip data', () => {
