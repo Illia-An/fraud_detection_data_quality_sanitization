@@ -18,15 +18,21 @@ async function useSmallPreset(page: Page) {
   });
 }
 
+/** KPI Network delta card value (not Pipeline steps Δ vs prev cells). */
+function networkDeltaValue(page: Page) {
+  return page
+    .getByText('Network delta', { exact: true })
+    .locator('xpath=following-sibling::*[1]');
+}
+
 async function runPipeline(page: Page) {
   await page.getByRole('button', { name: 'Run pipeline' }).click();
   await expect(page.getByText('Baseline 5%')).toBeVisible();
-  await expect(page.getByText(/-?\d+\.\d{2} pp/)).toBeVisible();
+  await expect(networkDeltaValue(page)).toBeVisible();
 }
 
 async function readNetworkDelta(page: Page): Promise<string> {
-  const value = page.getByText(/-?\d+\.\d{2} pp/);
-  return (await value.textContent())?.trim() ?? '';
+  return (await networkDeltaValue(page).textContent())?.trim() ?? '';
 }
 
 test.describe('Sanitization flow', () => {
@@ -50,7 +56,7 @@ test.describe('Sanitization flow', () => {
     await expect(page.getByRole('button', { name: /Pipeline steps/i })).toBeVisible();
   });
 
-  test('changing tier1 freq threshold changes network delta on re-run', async ({ page }) => {
+  test('changing tier2 freq threshold changes network delta on re-run', async ({ page }) => {
     await useSmallPreset(page);
     await expect(page.getByText('Baseline 5%')).toBeVisible({ timeout: 30_000 });
     const deltaDefault = await readNetworkDelta(page);
