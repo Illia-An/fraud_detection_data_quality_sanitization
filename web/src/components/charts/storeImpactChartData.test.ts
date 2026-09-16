@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildStoreImpactTraces,
+  buildStoreImpactYAxis,
+  collectStoreImpactYValues,
   defaultSelectedStoreId,
   filterStoreSeries,
   getStoreIds,
@@ -86,5 +88,29 @@ describe('storeImpactChartData', () => {
       name: 'After Tier 4 (Store×month)',
       line: { color: STORE_IMPACT_COLORS.tier4 },
     });
+  });
+
+  it('collects numeric y values across tiers', () => {
+    expect(collectStoreImpactYValues(filterStoreSeries(series, 1))).toEqual([
+      95, 88, 85, 70, 68, 67,
+    ]);
+  });
+
+  it('builds full 0–100 y-axis', () => {
+    expect(buildStoreImpactYAxis('full', [85, 90])).toEqual({
+      title: { text: 'Top-box rate (%)' },
+      range: [0, 100],
+    });
+  });
+
+  it('builds fit y-axis zoomed to local data (no forced zero)', () => {
+    const axis = buildStoreImpactYAxis('fit', [85, 90, 88]);
+    expect(axis.range).toBeDefined();
+    const [lo, hi] = axis.range!;
+    expect(lo).toBeGreaterThan(0);
+    expect(lo).toBeLessThan(85);
+    expect(hi).toBeGreaterThan(90);
+    expect(hi).toBeLessThanOrEqual(100);
+    expect(axis.rangemode).toBeUndefined();
   });
 });
