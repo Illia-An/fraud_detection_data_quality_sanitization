@@ -402,6 +402,8 @@ def _output_suffix(args: argparse.Namespace) -> str:
     parts: list[str] = []
     if args.all_tiers:
         parts.append("4tier_all")
+        if args.always_five_min_n != 10:
+            parts.append(f"always5_min{args.always_five_min_n}")
     elif args.always_five:
         parts.append(f"always5_min{args.always_five_min_n}")
     return f"_{'_'.join(parts)}" if parts else ""

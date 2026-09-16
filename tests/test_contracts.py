@@ -52,6 +52,8 @@ def test_pipeline_config_field_constraints() -> None:
     with pytest.raises(ValidationError):
         PipelineConfig(tier2_freq_threshold=0)
     with pytest.raises(ValidationError):
+        PipelineConfig(tier2_freq_threshold=1)  # degenerate: would drop all identified rows
+    with pytest.raises(ValidationError):
         PipelineConfig(tier4_min_volume=0)
     with pytest.raises(ValidationError):
         PipelineConfig(tier4_z_threshold=-0.1)

@@ -70,7 +70,7 @@ export const pipelineConfigSchema = z.preprocess(
   z.object({
     tier1_blacklist_enabled: z.boolean().default(true),
     tier2_freq_enabled: z.boolean().default(true),
-    tier2_freq_threshold: z.number().int().min(1).default(3),
+    tier2_freq_threshold: z.number().int().min(2).default(3),
     tier3_always_five_enabled: z.boolean().default(false),
     tier3_always_five_min_n: z.number().int().min(1).default(10),
     tier4_enabled: z.boolean().default(true),

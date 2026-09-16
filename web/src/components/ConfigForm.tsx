@@ -108,7 +108,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               {...register('tier2_freq_threshold', { valueAsNumber: true })}
               error={Boolean(errors.tier2_freq_threshold)}
               helperText={errors.tier2_freq_threshold?.message}
-              slotProps={{ htmlInput: { min: 1, max: 20 } }}
+              slotProps={{ htmlInput: { min: 2, max: 20 } }}
             />
 
             <Typography variant="subtitle1" component="h3">
@@ -129,6 +129,16 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                   label="Always top-box (optional)"
                 />
               )}
+            />
+            <TextField
+              label="Always-5 min n"
+              type="number"
+              size="small"
+              disabled={!values.tier3_always_five_enabled}
+              {...register('tier3_always_five_min_n', { valueAsNumber: true })}
+              error={Boolean(errors.tier3_always_five_min_n)}
+              helperText={errors.tier3_always_five_min_n?.message}
+              slotProps={{ htmlInput: { min: 1 } }}
             />
           </Box>
 

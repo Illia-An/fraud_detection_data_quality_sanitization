@@ -201,6 +201,11 @@ describe('pipelineConfigSchema', () => {
         tier2_freq_threshold: 0,
       }),
     ).toThrow();
+    expect(() =>
+      pipelineConfigSchema.parse({
+        tier2_freq_threshold: 1,
+      }),
+    ).toThrow();
   });
 
   it('rejects invalid tier4 pct', () => {
