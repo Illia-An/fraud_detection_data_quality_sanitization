@@ -6,12 +6,14 @@
 ---
 
 ## 1. Context & Boundaries
-- **Objective:** Compute survey sanitization deltas (Actual -> Tier1 -> Tier2) on Q10012 five-star percentage.
+- **Objective:** Compute survey sanitization deltas (Actual → Tier1 → Tier2 → Tier3 → Tier4) on Q10012 five-star percentage.
 - **In-Scope:** 
-  - Tier 1: BlackList filtering (Hebrew: 'לא'), optional frequency rule (>= N per entity×store×day; default on), optional always-5.
-  - Tier 2: Store×Month anomaly flagging (volume >= 30, z > 2.0 OR top_box >= 90%).
+  - Tier 1: BlackList filtering (Hebrew: 'לא').
+  - Tier 2: Frequency rule (>= N per entity×store×day; default on).
+  - Tier 3: Optional always top-box (100% fives with enough history).
+  - Tier 4: Store×Month anomaly flagging (volume >= 30, z > 2.0 OR top_box >= 90%; toggleable).
 - **Out-of-Scope (Non-Goals):**
-  - No Tier 3 research / ML models in production API pipeline.
+  - No ML / research Tier 5+ models in production API pipeline.
   - No raw survey responses emitted to UI if source=db.
   - No writing/mutating SQL Server DB (strictly read-only).
 
@@ -26,16 +28,17 @@ from pydantic import BaseModel, Field
 
 class PipelineConfig(BaseModel):
     tier1_blacklist_enabled: bool = True
-    tier1_freq_enabled: bool = True
-    tier1_freq_threshold: int = Field(default=3, ge=1)
-    tier1_always_five_enabled: bool = False
-    tier1_always_five_min_n: int = 10
-    tier2_min_volume: int = Field(default=30, ge=1)
-    tier2_z_threshold: float = Field(default=2.0, ge=0.0)
-    tier2_pct_threshold: float = Field(default=90.0, ge=0.0, le=100.0)
+    tier2_freq_enabled: bool = True
+    tier2_freq_threshold: int = Field(default=3, ge=1)
+    tier3_always_five_enabled: bool = False
+    tier3_always_five_min_n: int = 10
+    tier4_enabled: bool = True
+    tier4_min_volume: int = Field(default=30, ge=1)
+    tier4_z_threshold: float = Field(default=2.0, ge=0.0)
+    tier4_pct_threshold: float = Field(default=90.0, ge=0.0, le=100.0)
 
 class StepMetric(BaseModel):
-    step_name: Literal["actual", "tier1", "tier2"]
+    step_name: Literal["actual", "tier1", "tier2", "tier3", "tier4"]
     rows_in: int
     rows_out: int
     rows_dropped: int
@@ -101,10 +104,10 @@ top_box_pct = (top_box_count * 100.0) / NULLIF(total_responses, 0)
 - **Out of scope for Query B v1 (phase 2):** SQL pushdown for high-frequency entity×store×day and always-5 entity groups on the **production VIEW** (too slow).
 - **Phase 2 (snapshot / fast physical tables):** When `SANITIZATION_SOURCE=snapshot`, Query B selects the union of:
   - blacklist candidates (if enabled),
-  - when `tier1_freq_enabled`: all rows in entity×store×day groups with `COUNT(*) >= tier1_freq_threshold`,
-  - when `tier1_always_five_enabled`: all rows for entities with `n >= tier1_always_five_min_n` and 100% top-box.
-  Pushdown then applies **full Tier1** on those candidates (`query_b_mode=tier1_full`).
-- **Tier 2:** Applied in application memory on Query A aggregates after Tier 1 blacklist drops (no full raw store-month scan).
+  - when `tier2_freq_enabled`: all rows in entity×store×day groups with `COUNT(*) >= tier2_freq_threshold`,
+  - when `tier3_always_five_enabled`: all rows for entities with `n >= tier3_always_five_min_n` and 100% top-box.
+  Pushdown then applies **tiers 1–3** on those candidates (`query_b_mode=tier1_full`, legacy name).
+- **Tier 4:** Applied in application memory on Query A aggregates after tier 1–3 drops (no full raw store-month scan).
 - **Columns (Invariant 4):** essential fields only — e.g. `UserContact`, `PhoneFromLog`, `ext_user_id`, `Question_ID`, `Answer_Value`, `BlackList`, `PrintStore`, `AnswerTime`, `Year`, `Month` (+ `ParticipateNumber`). No `SELECT *`.
 - **Invariant 1:** PII hashing before any in-memory grouping on Query B rows.
 

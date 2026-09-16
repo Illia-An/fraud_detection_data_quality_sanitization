@@ -109,7 +109,7 @@ class ProcessRequest(BaseModel):
 
 
 class StoreMonthCell(BaseModel):
-    """Store × year × month aggregate used by Tier 2."""
+    """Store × year × month aggregate used by Tier 4 (store×month anomaly)."""
 
     store_id: float
     year: int
@@ -130,6 +130,8 @@ class StoreImpactPoint(BaseModel):
     actual_five_pct: float
     after_tier1_five_pct: float | None = None
     after_tier2_five_pct: float | None = None
+    after_tier3_five_pct: float | None = None
+    after_tier4_five_pct: float | None = None
     actual_volume: int = Field(ge=0)
     final_volume: int = Field(ge=0)
     rows_dropped: int = Field(ge=0)

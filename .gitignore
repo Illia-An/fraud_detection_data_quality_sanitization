@@ -44,3 +44,6 @@ web/.npmrc
 .cursor/
 Thumbs.db
 .DS_Store
+
+# Accidental MUI template clone (do not commit)
+web/_mui-template-tmp/
