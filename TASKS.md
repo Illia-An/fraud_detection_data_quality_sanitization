@@ -20,10 +20,9 @@
 
 ## [TASK-07] SQL Pushdown for Actual Baseline
 - **Role:** DB/Data Engineer
+- **Status:** Done
 - **Objective:** Eliminate the full scan of raw rows into RAM for the actual step.
-- **Files to modify:**
-- `src/db/queries.py` (or the applicable data-access module)
-- `src/services/sanitization_service.py`
+- **Files (current layout):** `backend/queries.py`, `backend/service.py`
 - **Requirements**
 1. Implement a function/query named `get_actual_baseline_aggregates(period_start, period_end, store_ids=None)`.
 2. The SQL query must return strictly aggregated data grouped by `store_id` and `period`, with the following fields:
@@ -38,15 +37,13 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
 
 ## [TASK-08] Latency & RAM Profiling in the Meta Block
 - **Role:** Engine Optimizer
+- **Status:** Done
 - **Objective:** Provide transparent resource monitoring to validate the impact of TASK-07.
-- **Files to modify:**
--`src/schemas/response.py` (the ResponseMeta model)
-- `src/services/profiler.py` (profiling context manager)
-- `src/api/v1/endpoints/process.py`
-- ** Requirements **
-1. Implement a context manager using `time.perf_counter` and `tracemallo`c to measure execution time and peak memory usage.
-2. Extend the Pydantic ResponseMeta schema with:
--`execution_time_ms`
+- **Files (current layout):** `backend/profiler.py`, `backend/service.py` / process path, response `meta`
+- **Requirements**
+1. Implement a context manager using `time.perf_counter` and `tracemalloc` to measure execution time and peak memory usage.
+2. Extend response `meta` with:
+- `execution_time_ms`
 - `peak_memory_mb`
 - `rows_scanned`
 3. Propagate the collected profiling metrics into the final `SanitizationResponse.meta`.
@@ -58,36 +55,35 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
 
 ## [TASK-09] SQL Pushdown for Query B (Candidate Selection)
 - **Role:** DB/Data Engineer
-- **Status:** Done (v1 — blacklist-only; freq/always-5 SQL = phase 2)
-- **Objective:** Reduce Python-side RAM and I/O for `source="db"` by loading only Tier 1 blacklist candidate rows instead of the full period scan (SPEC Section 5.2 Query B v1).
+- **Status:** Done (v1 — blacklist-only on VIEW; freq/always-5 SQL = snapshot phase 2)
+- **Objective:** Reduce Python-side RAM and I/O for `source="db"` by loading only candidate rows instead of the full period scan (SPEC Section 5.2 Query B).
 - **Depends on:** TASK-07 (Query A actual baseline), TASK-08 (profiling meta).
-- **v1 decision:** Drop SQL CTE/HAVING/EXISTS for frequency — too slow on production VIEW (>7 min). Query B is a single `BlackList` filter; Tier2 stays on Query A aggregates.
-- **Files to modify (map to current layout):**
-  - `backend/queries.py` (or applicable data-access module)
+- **v1 decision:** Drop SQL CTE/HAVING/EXISTS for frequency on production VIEW (>7 min). Query B is a single `BlackList` filter; Tier4 stays on Query A aggregates after row-tier drops.
+- **Files (current layout):**
+  - `backend/queries.py`
   - `backend/db_sample.py` / `backend/service.py`
   - `backend/main.py` (`source=db` orchestration)
-  - `tests/test_queries.py` (or `tests/test_query_b.py`)
+  - `tests/test_queries.py`, `tests/test_query_b.py`
 - **Requirements**
   1. Implement a function named `get_tier_candidate_rows(period_start, period_end, config, store_ids=None)` (Query B).
-  2. Query B MUST NOT use `SELECT *` (Invariant 4). Select only essential columns needed by Tier 1 / Tier 2, e.g.:
+  2. Query B MUST NOT use `SELECT *` (Invariant 4). Select only essential columns needed by tiers 1–3, e.g.:
      `UserContact`, `PhoneFromLog`, `ext_user_id`, `Question_ID`, `Answer_Value`, `BlackList`, `PrintStore`, `AnswerTime`, `Year`, `Month` (plus any other audit-approved must-columns already used by the pipeline).
   3. Push candidate predicates to SQL whenever practical (HAVING / semi-joins), including at least:
-     - BlackList staff filter candidates (`BlackList` = Hebrew `לא` when Tier 1 blacklist is enabled)
-     - High-frequency entity×store×day groups (`COUNT(*) >= tier1_freq_threshold`)
-     - Optional always-5 entity candidates when `tier1_always_five_enabled` is true
-     - Tier 2 outlier store×month cells (volume / z / top-box thresholds from `PipelineConfig`), or an equivalent SQL-side prefilter consistent with Tier 2 rules
+     - BlackList staff filter candidates (`BlackList` ≠ Hebrew `לא` when Tier 1 blacklist is enabled)
+     - High-frequency entity×store×day groups (`COUNT(*) >= tier2_freq_threshold`) — **snapshot phase 2**
+     - Optional always-5 entity candidates when `tier3_always_five_enabled` is true — **snapshot phase 2**
+     - Tier 4 outlier store×month cells applied in-app on Query A aggregates after tiers 1–3 drops
   4. Wire `source="db"` so:
      - Query A still builds the `actual` step / `baseline_top_box_pct`
-     - Query B supplies only candidate rows for Tier 1 / Tier 2
-     - Final KPI / `network_delta_pp` remain consistent with the full-scan baseline to **4 decimal places** (document the reconciliation method: e.g. apply drops on candidates and recompute final rates against Query A totals, or an approved equivalent)
+     - Query B supplies only candidate rows for tiers 1–3 (mode depends on VIEW vs snapshot)
+     - Final KPI / `network_delta_pp` remain consistent with the full-scan baseline to **4 decimal places**
   5. Populate `meta.db_query_b_time_ms` and ensure `meta.rows_scanned` reflects Query B rows only (not the full period cardinality).
 - **Definition of Done (Acceptance Criteria)**
-  - For the same period, `rows_scanned` under Query B is **materially lower** than the previous full-period load (target: clearly below full Q10012 period row count; record before/after via TASK-08 meta).
+  - For the same period, `rows_scanned` under Query B is **materially lower** than the previous full-period load.
   - `peak_memory_mb` for `source="db"` does not scale linearly with the full raw period size the way the pre-pushdown path did.
-  - `baseline_top_box_pct` (Query A) and post-sanitization `final_top_box_pct` / `network_delta_pp` match the full-scan reference within **4 decimal places** on a fixed fixture or live period sample.
+  - `baseline_top_box_pct` (Query A) and post-sanitization `final_top_box_pct` / `network_delta_pp` match the full-scan reference within **4 decimal places**.
   - Unit/integration tests cover: SQL shape (no `SELECT *`), candidate filters, and KPI parity.
   - PII hashing (Invariant 1) still occurs before any in-memory grouping on Query B rows.
-
 
 
 ## [TASK-10] Daily Q10012 SQLite Snapshot (S0–S5)
@@ -101,24 +97,49 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
   - **S2** `scripts/refresh_q10012_snapshot.py` — full reload from VIEW + aggregates + log — done.
   - **S3** Wire Query A/B via `SANITIZATION_SOURCE` / `SNAPSHOT_URL` — done.
   - **S4** Unit/API smoke on mini snapshot (`tests/test_snapshot.py`) — done.
-  - **S5** Query B phase 2 on snapshot: freq + always-5 candidate SQL + full Tier1 pushdown (`query_b_mode=tier1_full`); VIEW stays v1 blacklist-only — done (`tests/test_query_b_phase2.py`).
+  - **S5** Query B phase 2 on snapshot: freq + always-5 candidate SQL + full Tier1–3 pushdown (`query_b_mode=tier1_full`); VIEW stays v1 blacklist-only — done (`tests/test_query_b_phase2.py`).
 - **Do not commit:** `*_internal_pii*`, `data/*.sqlite`.
 
 ## [TASK-06] Frontend Contract Alignment & Telemetry UI
 - **Role:** Frontend Engineer (with participation from Contract Engineer)
-- **Status:** Done
-- ** Goal:** Synchronize the client layer (React 19 / Vite / MUI / TanStack Query) with the production API contract and eliminate legacy terminology drift.
-- **Input artifacts:** `SPEC.md` (Section 4: Schema & Section 5: Meta), current types in `frontend/src/`.
-- **Files to modify:**
--`frontend/src/types/sanitization.ts` (or the equivalent DTO file)
-- `frontend/src/api/` (request client for `/api/v1/process`)
-- `frontend/src/components/KPICards/` and chart components
+- **Status:** Done (extended by TASK-11 for four-tier UI)
+- **Goal:** Synchronize the client layer (React 19 / Vite / MUI / TanStack Query in `web/`) with the production API contract and eliminate legacy terminology drift.
+- **Input artifacts:** `SPEC.md` (Section 2 Schema & Section 5 Meta), types in `web/src/schemas/`.
+- **Files (current layout):**
+  - `web/src/schemas/api.ts`, `web/src/schemas/configForm.ts`
+  - `web/src/components/KpiCards.tsx`, chart / pipeline tables
+  - `web/src/components/TelemetryMetaCard.tsx` (or equivalent)
 - **Requirements:**
-1. Fully replace the outdated `fraud_*` fields with the product fields `sanitized_*` / `excluded_*`.
-2. Synchronize the Zod response parsing schemas: add mandatory validation for `echo_config` and the `meta` block.
-3. Update the step mapping: strictly deterministic chain `actual` -> `tier1` -> `tier2`.
+1. Fully replace outdated `fraud_*` fields with product sanitization naming.
+2. Synchronize Zod response parsing: mandatory `echo_config` and `meta` block.
+3. Step mapping: deterministic chain `actual` → `tier1` → `tier2` → `tier3` → `tier4` (see TASK-11).
 4. Display the `meta` telemetry block (`execution_time_ms`, `peak_memory_mb`, `rows_scanned`) in the UI.
-- **DoD (Definition of Done):**
-- TypeScript compiles without errors (`tsc --noEmit` exits with status 0).
-- Zod schemas successfully parse a real response from the backend.
-Searching the frontend codebase (`grep -r "fraud" frontend/src/`) returns 0 matches.
+- **DoD:**
+  - TypeScript compiles without errors (`tsc --noEmit` exits with status 0).
+  - Zod schemas successfully parse a real response from the backend.
+  - Searching the web codebase for legacy fraud DTO field names returns 0 product-path matches.
+
+## [TASK-11] Four-tier sequential pipeline + UI thresholds
+- **Role:** Contract Engineer + Engine Optimizer + Frontend Engineer + Drift Verifier
+- **Status:** Done
+- **Contract:** `SPEC.md#1`, `SPEC.md#2`
+- **Objective:** Split the former bundled Tier1+Tier2 model into **four independent sequential tiers** with cumulative KPI impact; expose all toggles/thresholds in the React UI.
+- **Pipeline model**
+  | Step | Rule |
+  |------|------|
+  | `actual` | Baseline (Query A / inline) |
+  | `tier1` | BlackList (keep Hebrew `לא`) |
+  | `tier2` | Frequency entity×store×day (`tier2_freq_threshold`, **ge=2**) |
+  | `tier3` | Always top-box (optional; `tier3_always_five_min_n`) |
+  | `tier4` | Store×month anomaly (former “Tier 2” store-month rule) |
+- **Delivered**
+  1. **Contract:** `PipelineConfig` / `StepMetric.step_name` / legacy key migration (`tier1_freq_*` → `tier2_freq_*`, etc.) in `src/schemas/pipeline.py`, `SPEC.md`, Zod `web/src/schemas/api.ts`.
+  2. **Engine:** sequential `apply_blacklist_tier` → `apply_freq_tier` → `apply_always_topbox_tier` → Tier4; pushdown path updated; `drop_reasons` per tier.
+  3. **Frontend:** `ConfigForm` four sections; Always-5 min n control; Pipeline steps table with Δ vs prev; chart lines after each tier; e2e scopes Network delta to KPI card.
+  4. **Research tooling:** `scripts/export_store_research_excel.py` (`--all-tiers`, `--always-five-min-n`); `scripts/verify_research_excel.py`.
+  5. **Guardrail:** `tier2_freq_threshold` minimum raised to **2** (threshold=1 would drop all identified respondents — verified on snapshot).
+- **Verify**
+  - `pytest tests/test_contracts.py tests/test_backend_poc.py tests/test_process_api.py tests/test_tier1.py`
+  - `cd web && npm run test:run` / `npm run test:e2e`
+  - Manual / snapshot: changing Tier2 freq or Tier3 min n changes Network delta as expected
+- **Do not commit:** `docs/research/*.xlsx` (local manager exports), `data/*.sqlite`, `.env`

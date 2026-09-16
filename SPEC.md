@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 class PipelineConfig(BaseModel):
     tier1_blacklist_enabled: bool = True
     tier2_freq_enabled: bool = True
-    tier2_freq_threshold: int = Field(default=3, ge=1)
+    tier2_freq_threshold: int = Field(default=3, ge=2)
     tier3_always_five_enabled: bool = False
     tier3_always_five_min_n: int = 10
     tier4_enabled: bool = True
