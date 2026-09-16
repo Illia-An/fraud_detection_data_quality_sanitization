@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -36,9 +36,30 @@ describe('StoreImpactChart', () => {
 
     expect(screen.getByText('Store impact')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Store' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fit to data' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
     });
+  });
+
+  it('toggles Y-scale between Fit and 0–100%', () => {
+    useUiStore.setState({ selectedStoreId: 1 });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart series={series} />
+      </ThemeProvider>,
+    );
+
+    const fullButton = screen.getByRole('button', { name: '0 to 100 percent' });
+    fireEvent.click(fullButton);
+    expect(fullButton).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Fit to data' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 });

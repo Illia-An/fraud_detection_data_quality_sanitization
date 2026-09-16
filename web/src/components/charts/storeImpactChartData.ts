@@ -89,3 +89,65 @@ export function defaultSelectedStoreId(
   }
   return storeIds.includes(1) ? 1 : storeIds[0];
 }
+
+/** Default: zoom Y to local data range so 1–3 pp shifts stay readable. */
+export type StoreImpactYScaleMode = 'fit' | 'full';
+
+export interface StoreImpactYAxis {
+  title: { text: string };
+  rangemode?: 'tozero' | 'normal' | 'nonnegative';
+  range?: [number, number];
+}
+
+const Y_AXIS_TITLE = { text: 'Top-box rate (%)' } as const;
+const FIT_PAD_RATIO = 0.08;
+const FIT_PAD_MIN_PP = 1;
+
+/** Collect numeric top-box % values used by Store impact traces. */
+export function collectStoreImpactYValues(points: StoreImpactPoint[]): number[] {
+  const values: number[] = [];
+  for (const point of points) {
+    values.push(point.actual_five_pct);
+    if (point.after_tier1_five_pct != null) values.push(point.after_tier1_five_pct);
+    if (point.after_tier2_five_pct != null) values.push(point.after_tier2_five_pct);
+    if (point.after_tier3_five_pct != null) values.push(point.after_tier3_five_pct);
+    if (point.after_tier4_five_pct != null) values.push(point.after_tier4_five_pct);
+  }
+  return values;
+}
+
+/**
+ * Plotly y-axis for Store impact.
+ * - ``fit``: local min/max with padding (no forced zero).
+ * - ``full``: fixed 0–100% scale.
+ */
+export function buildStoreImpactYAxis(
+  mode: StoreImpactYScaleMode,
+  values: number[],
+): StoreImpactYAxis {
+  if (mode === 'full') {
+    return { title: Y_AXIS_TITLE, range: [0, 100] };
+  }
+
+  if (values.length === 0) {
+    return { title: Y_AXIS_TITLE, range: [0, 100] };
+  }
+
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const span = Math.max(rawMax - rawMin, FIT_PAD_MIN_PP);
+  const pad = Math.max(span * FIT_PAD_RATIO, FIT_PAD_MIN_PP);
+  const lo = Math.max(0, rawMin - pad);
+  const hi = Math.min(100, rawMax + pad);
+
+  // Degenerate / near-full span — keep a readable band without collapsing to a point.
+  if (hi - lo < FIT_PAD_MIN_PP) {
+    const mid = (lo + hi) / 2;
+    return {
+      title: Y_AXIS_TITLE,
+      range: [Math.max(0, mid - FIT_PAD_MIN_PP), Math.min(100, mid + FIT_PAD_MIN_PP)],
+    };
+  }
+
+  return { title: Y_AXIS_TITLE, range: [lo, hi] };
+}

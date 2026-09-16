@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from 'react';
 import {
   Box,
   Card,
@@ -9,6 +16,9 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   type SelectChangeEvent,
 } from '@mui/material';
 
@@ -16,9 +26,12 @@ import type { StoreImpactPoint } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
   buildStoreImpactTraces,
+  buildStoreImpactYAxis,
+  collectStoreImpactYValues,
   defaultSelectedStoreId,
   filterStoreSeries,
   getStoreIds,
+  type StoreImpactYScaleMode,
 } from './charts/storeImpactChartData';
 
 const Plot = lazy(async () => {
@@ -33,6 +46,7 @@ interface StoreImpactChartProps {
 export function StoreImpactChart({ series }: StoreImpactChartProps) {
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
+  const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
 
@@ -46,9 +60,22 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
   const activeStoreId = selectedStoreId ?? defaultSelectedStoreId(series, null);
   const storePoints = activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId);
   const traces = buildStoreImpactTraces(storePoints);
+  const yAxis = useMemo(
+    () => buildStoreImpactYAxis(yScaleMode, collectStoreImpactYValues(storePoints)),
+    [yScaleMode, storePoints],
+  );
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
+  };
+
+  const handleYScaleChange = (
+    _event: MouseEvent<HTMLElement>,
+    next: StoreImpactYScaleMode | null,
+  ) => {
+    if (next != null) {
+      setYScaleMode(next);
+    }
   };
 
   if (storeIds.length === 0) {
@@ -61,21 +88,37 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
         title="Store impact"
         subheader="Actual vs sanitized 5% KPI by month"
         action={
-          <FormControl size="small" sx={{ minWidth: 140, mt: 0.5 }}>
-            <InputLabel id="store-impact-store-label">Store</InputLabel>
-            <Select
-              labelId="store-impact-store-label"
-              label="Store"
-              value={activeStoreId ?? ''}
-              onChange={handleStoreChange}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={yScaleMode}
+              onChange={handleYScaleChange}
+              aria-label="Y-axis scale"
             >
-              {storeIds.map((storeId) => (
-                <MenuItem key={storeId} value={storeId}>
-                  Store {storeId}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              <ToggleButton value="fit" aria-label="Fit to data">
+                Fit
+              </ToggleButton>
+              <ToggleButton value="full" aria-label="0 to 100 percent">
+                0–100%
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="store-impact-store-label">Store</InputLabel>
+              <Select
+                labelId="store-impact-store-label"
+                label="Store"
+                value={activeStoreId ?? ''}
+                onChange={handleStoreChange}
+              >
+                {storeIds.map((storeId) => (
+                  <MenuItem key={storeId} value={storeId}>
+                    Store {storeId}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
         }
       />
       <CardContent>
@@ -94,7 +137,7 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
                 height: 360,
                 margin: { l: 48, r: 24, t: 16, b: 48 },
                 xaxis: { title: { text: 'Month' } },
-                yaxis: { title: { text: 'Top-box rate (%)' }, rangemode: 'tozero' },
+                yaxis: yAxis,
                 legend: { orientation: 'h', y: -0.15 },
               }}
               config={{ displayModeBar: false, responsive: true }}
