@@ -77,23 +77,23 @@ describe('storeImpactChartData', () => {
     expect(traces).toHaveLength(5);
     expect(traces[0]).toMatchObject({
       name: 'Actual',
-      line: { color: STORE_IMPACT_COLORS.actual },
+      line: { color: STORE_IMPACT_COLORS.actual, width: 2.5, dash: 'solid' },
     });
     expect(traces[1]).toMatchObject({
       name: 'After Tier 1 (BlackList)',
-      line: { color: STORE_IMPACT_COLORS.tier1 },
+      line: { color: STORE_IMPACT_COLORS.tier1, width: 1.5, dash: 'dash' },
     });
     expect(traces[2]).toMatchObject({
       name: 'After Tier 2 (Frequency)',
-      line: { color: STORE_IMPACT_COLORS.tier2 },
+      line: { color: STORE_IMPACT_COLORS.tier2, width: 1.5, dash: 'dashdot' },
     });
     expect(traces[3]).toMatchObject({
       name: 'After Tier 3 (Always top-box)',
-      line: { color: STORE_IMPACT_COLORS.tier3 },
+      line: { color: STORE_IMPACT_COLORS.tier3, width: 1.5, dash: 'dot' },
     });
     expect(traces[4]).toMatchObject({
       name: 'After Tier 4 (Store×month)',
-      line: { color: STORE_IMPACT_COLORS.tier4 },
+      line: { color: STORE_IMPACT_COLORS.tier4, width: 2.5, dash: 'solid' },
     });
   });
 

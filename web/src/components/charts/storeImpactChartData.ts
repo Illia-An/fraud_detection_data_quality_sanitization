@@ -18,7 +18,7 @@ export interface PlotTrace {
   x: string[];
   y: (number | null)[];
   mode: 'lines+markers' | 'markers';
-  line?: { color: string; width: number };
+  line?: { color: string; width: number; dash?: string };
   marker?: {
     size: number | number[];
     color: string | string[];
@@ -56,6 +56,12 @@ export function filterStoreSeries(
     .sort((a, b) => a.year - b.year || a.month - b.month);
 }
 
+/**
+ * Visual hierarchy (Datadog-style): texture + weight, not color alone.
+ * - Actual: solid baseline (thick)
+ * - Tier1–3: progressive dashes (thinner intermediate steps)
+ * - Tier4: solid final sanitized series (thick accent)
+ */
 export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
   const x = points.map((point) => point.period_label);
   return [
@@ -64,7 +70,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       x,
       y: points.map((point) => point.actual_five_pct),
       mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.actual, width: 2 },
+      line: { color: STORE_IMPACT_COLORS.actual, width: 2.5, dash: 'solid' },
       connectgaps: true,
     },
     {
@@ -72,7 +78,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       x,
       y: points.map((point) => point.after_tier1_five_pct ?? null),
       mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.tier1, width: 2 },
+      line: { color: STORE_IMPACT_COLORS.tier1, width: 1.5, dash: 'dash' },
       connectgaps: true,
     },
     {
@@ -80,7 +86,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       x,
       y: points.map((point) => point.after_tier2_five_pct ?? null),
       mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.tier2, width: 2 },
+      line: { color: STORE_IMPACT_COLORS.tier2, width: 1.5, dash: 'dashdot' },
       connectgaps: true,
     },
     {
@@ -88,7 +94,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       x,
       y: points.map((point) => point.after_tier3_five_pct ?? null),
       mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.tier3, width: 2 },
+      line: { color: STORE_IMPACT_COLORS.tier3, width: 1.5, dash: 'dot' },
       connectgaps: true,
     },
     {
@@ -96,7 +102,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       x,
       y: points.map((point) => point.after_tier4_five_pct ?? null),
       mode: 'lines+markers',
-      line: { color: STORE_IMPACT_COLORS.tier4, width: 2 },
+      line: { color: STORE_IMPACT_COLORS.tier4, width: 2.5, dash: 'solid' },
       connectgaps: true,
     },
   ];
