@@ -29,8 +29,11 @@ describe('ConfigForm', () => {
     expect(screen.getByRole('heading', { name: /Tier 3/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 4/i })).toBeInTheDocument();
     expect(screen.getByLabelText('Tier 2 frequency filter')).toBeChecked();
+    expect(screen.getByLabelText('Tier 3 always top-box')).not.toBeChecked();
     expect(screen.getByLabelText('Tier 4 store-month filter')).toBeChecked();
     expect(screen.getByLabelText('Freq threshold')).toHaveValue(3);
+    expect(screen.getByLabelText('Always-5 min n')).toHaveValue(10);
+    expect(screen.getByLabelText('Always-5 min n')).toBeDisabled();
     expect(screen.getByLabelText('Min volume')).toHaveValue(30);
   });
 
@@ -42,6 +45,16 @@ describe('ConfigForm', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('Freq threshold')).toBeDisabled();
+    });
+  });
+
+  it('enables always-5 min n when Tier 3 is turned on', async () => {
+    renderConfigForm();
+
+    fireEvent.click(screen.getByLabelText('Tier 3 always top-box'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Always-5 min n')).not.toBeDisabled();
     });
   });
 
@@ -60,6 +73,21 @@ describe('ConfigForm', () => {
 
     const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
     expect(pipelineConfigSchema.safeParse(lastCall).success).toBe(true);
+  });
+
+  it('emits tier3_always_five_min_n when Always-5 min n changes', async () => {
+    const onValidConfigChange = vi.fn();
+    renderConfigForm(onValidConfigChange);
+
+    fireEvent.click(screen.getByLabelText('Tier 3 always top-box'));
+    const minN = screen.getByLabelText('Always-5 min n');
+    fireEvent.change(minN, { target: { value: '20' } });
+
+    await waitFor(() => {
+      const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
+      expect(lastCall?.tier3_always_five_enabled).toBe(true);
+      expect(lastCall?.tier3_always_five_min_n).toBe(20);
+    });
   });
 
   it('emits tier2_freq_enabled false when frequency switch is turned off', async () => {
