@@ -140,10 +140,10 @@ def test_pushdown_kpi_parity_blacklist_only_four_decimals() -> None:
     # Freq off so full-scan matches blacklist-only pushdown (SPEC Query B v1).
     config = PipelineConfig(
         tier1_blacklist_enabled=True,
-        tier1_always_five_enabled=False,
-        tier2_min_volume=30,  # cells too small → no Tier2 drops in this fixture
-        tier2_z_threshold=2.0,
-        tier2_pct_threshold=90.0,
+        tier3_always_five_enabled=False,
+        tier4_min_volume=30,  # cells too small → no Tier4 drops in this fixture
+        tier4_z_threshold=2.0,
+        tier4_pct_threshold=90.0,
     )
     # Use inline pipeline with freq disabled via Tier1Config path:
     # run_pipeline always enables freq — compare against blacklist-only

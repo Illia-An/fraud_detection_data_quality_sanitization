@@ -78,7 +78,7 @@ export function FlaggedMonthsTable({ rows }: FlaggedMonthsTableProps) {
     <Card variant="outlined">
       <CardHeader
         title="Flagged store×months"
-        subheader="Tier 2 cells above z and 5% thresholds"
+        subheader="Tier 4 store×month cells above z and 5% thresholds"
       />
       <CardContent sx={{ pt: 0 }}>
         <TableContainer>

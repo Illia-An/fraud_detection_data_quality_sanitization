@@ -1,6 +1,6 @@
 # Fraud Guard — React UI v2
 
-What-if demo for survey sanitization (Tier 1/2/3) against the FastAPI backend.
+What-if demo for survey sanitization (four independent tiers) against the FastAPI backend.
 
 ## Prerequisites
 

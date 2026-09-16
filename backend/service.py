@@ -6,12 +6,15 @@ from datetime import UTC, datetime
 
 import pandas as pd
 
-from fraud_guard.stats import filter_stats, network_delta_pp, tier1_drop_reason_counts
+from fraud_guard.stats import network_delta_pp, tier1_drop_reason_counts
 from fraud_guard.tier1 import (
+    CUSTOMER_BLACKLIST_VALUE,
     FLAG_COL as T1_FLAG,
     REASON_COL as T1_REASON,
     Tier1Config,
-    apply_tier1,
+    apply_always_topbox_tier,
+    apply_blacklist_tier,
+    apply_freq_tier,
     filter_answered_metric_rows,
     keep_clean_rows as keep_tier1_clean,
     top_box_rate,
@@ -40,6 +43,8 @@ from backend.schemas import (
 STEP_ACTUAL = "actual"
 STEP_TIER1 = "tier1"
 STEP_TIER2 = "tier2"
+STEP_TIER3 = "tier3"
+STEP_TIER4 = "tier4"
 
 
 def _rows_to_frame(rows: list[SurveyAnswerRow]) -> pd.DataFrame:
@@ -64,33 +69,147 @@ def _ensure_year_month(df: pd.DataFrame) -> None:
         df["Month"] = df["Month"].fillna(ts.dt.month)
 
 
-def _tier1_config(opts: PipelineConfig) -> Tier1Config:
+def _blacklist_tier_config(opts: PipelineConfig) -> Tier1Config:
     return Tier1Config(
-        enable_blacklist=opts.tier1_blacklist_enabled,
-        enable_freq_store_day=opts.tier1_freq_enabled,
-        enable_always_topbox=opts.tier1_always_five_enabled,
-        freq_store_day_min=opts.tier1_freq_threshold,
-        always_topbox_min_n=opts.tier1_always_five_min_n,
+        customer_blacklist_value=CUSTOMER_BLACKLIST_VALUE,
+        enable_blacklist=True,
     )
 
 
-def _tier1_config_blacklist_only(opts: PipelineConfig) -> Tier1Config:
-    """Query B v1 loads blacklist rows only — do not apply freq/always-5 here."""
+def _freq_tier_config(opts: PipelineConfig) -> Tier1Config:
     return Tier1Config(
-        enable_blacklist=opts.tier1_blacklist_enabled,
-        enable_freq_store_day=False,
-        enable_always_topbox=False,
-        freq_store_day_min=opts.tier1_freq_threshold,
-        always_topbox_min_n=opts.tier1_always_five_min_n,
+        enable_freq_store_day=True,
+        freq_store_day_min=opts.tier2_freq_threshold,
     )
 
 
-def _tier2_config(opts: PipelineConfig) -> Tier2Config:
+def _always_topbox_tier_config(opts: PipelineConfig) -> Tier1Config:
+    return Tier1Config(
+        enable_always_topbox=True,
+        always_topbox_min_n=opts.tier3_always_five_min_n,
+    )
+
+
+def _tier4_config(opts: PipelineConfig) -> Tier2Config:
     return Tier2Config(
-        min_volume=opts.tier2_min_volume,
-        z_high=opts.tier2_z_threshold,
-        five_pct_min=opts.tier2_pct_threshold,
+        min_volume=opts.tier4_min_volume,
+        z_high=opts.tier4_z_threshold,
+        five_pct_min=opts.tier4_pct_threshold,
     )
+
+
+def _make_step(
+    step_name: str,
+    rows_in: int,
+    rows_out: int,
+    top_box_pct: float,
+) -> StepMetric:
+    return StepMetric(
+        step_name=step_name,  # type: ignore[arg-type]
+        rows_in=rows_in,
+        rows_out=rows_out,
+        rows_dropped=max(rows_in - rows_out, 0),
+        top_box_pct=top_box_pct,
+    )
+
+
+def _subtract_cells(
+    cells: dict[tuple[float, int, int], tuple[int, int]],
+    drops_by_cell: dict[tuple[float, int, int], tuple[int, int]],
+) -> dict[tuple[float, int, int], tuple[int, int]]:
+    out: dict[tuple[float, int, int], tuple[int, int]] = {}
+    for key, (tot, top) in cells.items():
+        d_tot, d_top = drops_by_cell.get(key, (0, 0))
+        rem_tot = max(tot - d_tot, 0)
+        rem_top = max(top - d_top, 0)
+        rem_top = min(rem_top, rem_tot)
+        out[key] = (rem_tot, rem_top)
+    return out
+
+
+def _cells_totals(cells: dict[tuple[float, int, int], tuple[int, int]]) -> tuple[int, int]:
+    volume = sum(v for v, _ in cells.values())
+    top_box = sum(t for _, t in cells.values())
+    return volume, top_box
+
+
+def _step_from_cells(
+    step_name: str,
+    rows_in: int,
+    cells: dict[tuple[float, int, int], tuple[int, int]],
+) -> StepMetric:
+    rows_out, top_out = _cells_totals(cells)
+    pct = network_top_box_pct(rows_out, top_out)
+    return _make_step(step_name, rows_in, rows_out, pct)
+
+
+def _apply_row_tier_step(
+    current: pd.DataFrame,
+    step_name: str,
+    *,
+    enabled: bool,
+    apply_fn,
+) -> tuple[pd.DataFrame, StepMetric, dict[str, int]]:
+    rows_in = len(current)
+    if not enabled or current.empty:
+        return current, _make_step(step_name, rows_in, rows_in, _pct(top_box_rate(current))), {}
+
+    flagged = apply_fn(current)
+    after = keep_tier1_clean(flagged)
+    reasons = tier1_drop_reason_counts(flagged, T1_REASON)
+    return after, _make_step(step_name, rows_in, len(after), _pct(top_box_rate(after))), reasons
+
+
+def _apply_tier4_row_step(
+    current: pd.DataFrame,
+    config: PipelineConfig,
+) -> tuple[pd.DataFrame, StepMetric, list[dict], dict[str, int]]:
+    rows_in = len(current)
+    if not config.tier4_enabled or current.empty:
+        return (
+            current,
+            _make_step(STEP_TIER4, rows_in, rows_in, _pct(top_box_rate(current))),
+            [],
+            {},
+        )
+
+    t4_cfg = _tier4_config(config)
+    panel = build_store_month_panel(current, min_volume=t4_cfg.min_volume)
+    high = high_store_months(panel, t4_cfg)
+    high_store_months_out = _store_month_cells(panel, high)
+    flagged = apply_tier2(current, config=t4_cfg)
+    after = keep_tier2_clean(flagged)
+    reasons = _reason_counts(flagged, T2_FLAG, T2_REASON)
+    return (
+        after,
+        _make_step(STEP_TIER4, rows_in, len(after), _pct(top_box_rate(after))),
+        high_store_months_out,
+        reasons,
+    )
+
+
+def _pushdown_row_tier_step(
+    working: pd.DataFrame,
+    cells: dict[tuple[float, int, int], tuple[int, int]],
+    step_name: str,
+    rows_in: int,
+    *,
+    enabled: bool,
+    apply_fn,
+) -> tuple[pd.DataFrame, dict[tuple[float, int, int], tuple[int, int]], StepMetric, dict[str, int]]:
+    if not enabled:
+        return working, cells, _step_from_cells(step_name, rows_in, cells), {}
+
+    if working.empty:
+        return working, cells, _step_from_cells(step_name, rows_in, cells), {}
+
+    flagged = apply_fn(working)
+    dropped = flagged.loc[flagged[T1_FLAG].astype(bool)]
+    reasons = tier1_drop_reason_counts(flagged, T1_REASON)
+    cells_out = _subtract_cells(cells, _drop_counts_by_cell(dropped))
+    working_out = keep_tier1_clean(flagged)
+    step = _step_from_cells(step_name, rows_in, cells_out)
+    return working_out, cells_out, step, reasons
 
 
 def _pct(rate: float) -> float:
@@ -164,7 +283,9 @@ def _period_label(year: int, month: int) -> str:
 def _build_store_impact_series(
     baseline: pd.DataFrame,
     after_t1: pd.DataFrame,
-    after_t2: pd.DataFrame | None,
+    after_t2: pd.DataFrame,
+    after_t3: pd.DataFrame,
+    after_t4: pd.DataFrame,
     *,
     store_col: str = "PrintStore",
 ) -> list[dict]:
@@ -173,8 +294,10 @@ def _build_store_impact_series(
     if base_panel.empty:
         return []
 
-    t1_panel = _store_month_panel(after_t1, store_col)
-    t2_panel = _store_month_panel(after_t2, store_col) if after_t2 is not None else None
+    stage_panels = [
+        _store_month_panel(stage, store_col)
+        for stage in (after_t1, after_t2, after_t3, after_t4)
+    ]
 
     def _lookup(panel: pd.DataFrame | None, store, year, month) -> tuple[float | None, int]:
         if panel is None or panel.empty:
@@ -193,10 +316,8 @@ def _build_store_impact_series(
         year = int(row["Year"])
         month = int(row["Month"])
         actual_vol = int(row["volume"])
-        t1_pct, t1_vol = _lookup(t1_panel, store, year, month)
-        t2_pct, t2_vol = _lookup(t2_panel, store, year, month)
-
-        final_vol = t2_vol if after_t2 is not None else t1_vol
+        stage_pct_vol = [_lookup(panel, store, year, month) for panel in stage_panels]
+        final_vol = stage_pct_vol[-1][1]
 
         series.append(
             StoreImpactPoint(
@@ -205,8 +326,10 @@ def _build_store_impact_series(
                 month=month,
                 period_label=_period_label(year, month),
                 actual_five_pct=round(float(row["five_pct"]), 4),
-                after_tier1_five_pct=t1_pct,
-                after_tier2_five_pct=t2_pct,
+                after_tier1_five_pct=stage_pct_vol[0][0],
+                after_tier2_five_pct=stage_pct_vol[1][0],
+                after_tier3_five_pct=stage_pct_vol[2][0],
+                after_tier4_five_pct=stage_pct_vol[3][0],
                 actual_volume=actual_vol,
                 final_volume=final_vol,
                 rows_dropped=max(actual_vol - final_vol, 0),
@@ -276,28 +399,33 @@ def _impact_from_cell_maps(
     baseline_cells: dict[tuple[float, int, int], tuple[int, int]],
     after_t1: dict[tuple[float, int, int], tuple[int, int]],
     after_t2: dict[tuple[float, int, int], tuple[int, int]],
+    after_t3: dict[tuple[float, int, int], tuple[int, int]],
+    after_t4: dict[tuple[float, int, int], tuple[int, int]],
 ) -> list[dict]:
     series: list[dict] = []
     for key in sorted(baseline_cells.keys()):
         store, year, month = key
         b_vol, b_top = baseline_cells[key]
-        t1_vol, t1_top = after_t1.get(key, (0, 0))
-        t2_vol, t2_top = after_t2.get(key, (0, 0))
-        actual_pct = network_top_box_pct(b_vol, b_top)
-        t1_pct = network_top_box_pct(t1_vol, t1_top) if t1_vol else None
-        t2_pct = network_top_box_pct(t2_vol, t2_top) if t2_vol else None
+        stage_cells = (after_t1, after_t2, after_t3, after_t4)
+        stage_pct: list[float | None] = []
+        for cells in stage_cells:
+            vol, top = cells.get(key, (0, 0))
+            stage_pct.append(network_top_box_pct(vol, top) if vol else None)
+        final_vol, _ = after_t4.get(key, (0, 0))
         series.append(
             StoreImpactPoint(
                 store_id=float(store),
                 year=year,
                 month=month,
                 period_label=_period_label(year, month),
-                actual_five_pct=actual_pct,
-                after_tier1_five_pct=t1_pct,
-                after_tier2_five_pct=t2_pct,
+                actual_five_pct=network_top_box_pct(b_vol, b_top),
+                after_tier1_five_pct=stage_pct[0],
+                after_tier2_five_pct=stage_pct[1],
+                after_tier3_five_pct=stage_pct[2],
+                after_tier4_five_pct=stage_pct[3],
                 actual_volume=b_vol,
-                final_volume=t2_vol,
-                rows_dropped=max(b_vol - t2_vol, 0),
+                final_volume=final_vol,
+                rows_dropped=max(b_vol - final_vol, 0),
             ).model_dump(mode="python")
         )
     return series
@@ -325,15 +453,13 @@ def run_pipeline_pushdown(
 
     Reconciliation method:
     1. ``actual`` / baseline from Query A aggregates (no raw period DF).
-    2. Tier 1 flags applied only to Query B candidate rows; drop counts
-       (total + top-box) are subtracted from Query A store×month cells.
-    3. Tier 2 runs on the adjusted aggregate panel (z / pct thresholds) —
-       equivalent to loading outlier store-months without a full raw scan.
-    4. ``final_top_box_pct`` = remaining top-box / remaining volume after Tier 2.
+    2. Tiers 1–3 subtract candidate-row drops from Query A store×month cells.
+    3. Tier 4 runs on the adjusted aggregate panel (z / pct thresholds).
+    4. ``final_top_box_pct`` = remaining top-box / remaining volume after Tier 4.
 
     ``query_b_mode``:
-    - ``blacklist_only`` (VIEW v1): Tier1 blacklist rule only on candidates.
-    - ``tier1_full`` (snapshot phase 2): full Tier1 (blacklist + freq + always-5).
+    - ``blacklist_only`` (VIEW v1): Tier 1 blacklist only on candidates.
+    - ``tier1_full`` (snapshot phase 2): tiers 1–3 on Query B candidates.
     """
     baseline_pct = actual_baseline.top_box_pct
     steps: list[StepMetric] = [_actual_step_from_baseline(actual_baseline)]
@@ -346,88 +472,102 @@ def run_pipeline_pushdown(
     raw = _rows_to_frame(candidate_rows)
     answered = filter_answered_metric_rows(raw) if not raw.empty else raw
 
-    if query_b_mode == "tier1_full":
-        t1_cfg = _tier1_config(config)
-        reconciliation = "query_a_minus_tier1_candidate_drops_then_tier2_on_aggregates"
-    else:
-        t1_cfg = _tier1_config_blacklist_only(config)
-        reconciliation = "query_a_minus_blacklist_drops_then_tier2_on_aggregates"
-    t2_cfg = _tier2_config(config)
-
-    drop_reasons_t1: dict[str, int] = {}
-    t1_dropped_n = 0
-    t1_dropped_top = 0
-    t1_drops_by_cell: dict[tuple[float, int, int], tuple[int, int]] = {}
-
-    if not answered.empty:
-        flagged_t1 = apply_tier1(answered, config=t1_cfg)
-        dropped_t1 = flagged_t1.loc[flagged_t1[T1_FLAG].astype(bool)]
-        drop_reasons_t1 = tier1_drop_reason_counts(flagged_t1, T1_REASON)
-        t1_drops_by_cell = _drop_counts_by_cell(dropped_t1)
-        t1_dropped_n = int(len(dropped_t1))
-        t1_dropped_top = (
-            int((dropped_t1["Answer_Value"] == 5).sum()) if not dropped_t1.empty else 0
-        )
-
-    after_t1_cells: dict[tuple[float, int, int], tuple[int, int]] = {}
-    for key, (tot, top) in baseline_cells.items():
-        d_tot, d_top = t1_drops_by_cell.get(key, (0, 0))
-        rem_tot = max(tot - d_tot, 0)
-        rem_top = max(top - d_top, 0)
-        rem_top = min(rem_top, rem_tot)
-        after_t1_cells[key] = (rem_tot, rem_top)
-
-    n_after_t1 = sum(v for v, _ in after_t1_cells.values())
-    top_after_t1 = sum(t for _, t in after_t1_cells.values())
-    t1_pct = network_top_box_pct(n_after_t1, top_after_t1)
-
-    steps.append(
-        StepMetric(
-            step_name=STEP_TIER1,
-            rows_in=actual_baseline.total_responses,
-            rows_out=n_after_t1,
-            rows_dropped=max(actual_baseline.total_responses - n_after_t1, 0),
-            top_box_pct=t1_pct,
-        )
+    tiers_23_on_candidates = query_b_mode == "tier1_full"
+    reconciliation = (
+        "query_a_minus_tiers_1_3_candidate_drops_then_tier4_on_aggregates"
+        if tiers_23_on_candidates
+        else "query_a_minus_blacklist_drops_then_tier4_on_aggregates"
     )
 
-    panel = _panel_from_cell_map(after_t1_cells, min_volume=t2_cfg.min_volume)
-    high = high_store_months(panel, t2_cfg)
-    high_store_months_out = _store_month_cells(panel, high)
-    high_keys = (
-        {
-            _cell_key(float(r["PrintStore"]), int(r["Year"]), int(r["Month"]))
-            for _, r in high.iterrows()
-        }
-        if not high.empty
-        else set()
+    working = answered
+    cells = baseline_cells
+    rows_in = actual_baseline.total_responses
+    drop_reasons: dict[str, dict[str, int]] = {
+        STEP_TIER1: {},
+        STEP_TIER2: {},
+        STEP_TIER3: {},
+        STEP_TIER4: {},
+    }
+    cell_snapshots: list[dict[tuple[float, int, int], tuple[int, int]]] = []
+
+    working, cells, step_t1, drop_reasons[STEP_TIER1] = _pushdown_row_tier_step(
+        working,
+        cells,
+        STEP_TIER1,
+        rows_in,
+        enabled=config.tier1_blacklist_enabled,
+        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
     )
+    steps.append(step_t1)
+    cell_snapshots.append(dict(cells))
+    rows_in = step_t1.rows_out
 
-    after_t2_cells: dict[tuple[float, int, int], tuple[int, int]] = {}
-    t2_dropped_n = 0
-    for key, (tot, top) in after_t1_cells.items():
-        if key in high_keys:
-            t2_dropped_n += tot
-            after_t2_cells[key] = (0, 0)
-        else:
-            after_t2_cells[key] = (tot, top)
+    working, cells, step_t2, drop_reasons[STEP_TIER2] = _pushdown_row_tier_step(
+        working,
+        cells,
+        STEP_TIER2,
+        rows_in,
+        enabled=tiers_23_on_candidates and config.tier2_freq_enabled,
+        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
+    )
+    steps.append(step_t2)
+    cell_snapshots.append(dict(cells))
+    rows_in = step_t2.rows_out
 
-    n_final = sum(v for v, _ in after_t2_cells.values())
-    top_final = sum(t for _, t in after_t2_cells.values())
-    final_pct = network_top_box_pct(n_final, top_final)
+    working, cells, step_t3, drop_reasons[STEP_TIER3] = _pushdown_row_tier_step(
+        working,
+        cells,
+        STEP_TIER3,
+        rows_in,
+        enabled=tiers_23_on_candidates and config.tier3_always_five_enabled,
+        apply_fn=lambda df: apply_always_topbox_tier(
+            df, config=_always_topbox_tier_config(config)
+        ),
+    )
+    steps.append(step_t3)
+    cell_snapshots.append(dict(cells))
+    rows_in = step_t3.rows_out
 
-    steps.append(
-        StepMetric(
-            step_name=STEP_TIER2,
-            rows_in=n_after_t1,
-            rows_out=n_final,
-            rows_dropped=max(n_after_t1 - n_final, 0),
-            top_box_pct=final_pct,
+    t4_cfg = _tier4_config(config)
+    high_store_months_out: list[dict] = []
+    t4_dropped_n = 0
+    if config.tier4_enabled:
+        panel = _panel_from_cell_map(cells, min_volume=t4_cfg.min_volume)
+        high = high_store_months(panel, t4_cfg)
+        high_store_months_out = _store_month_cells(panel, high)
+        high_keys = (
+            {
+                _cell_key(float(r["PrintStore"]), int(r["Year"]), int(r["Month"]))
+                for _, r in high.iterrows()
+            }
+            if not high.empty
+            else set()
         )
-    )
+        after_t4_cells: dict[tuple[float, int, int], tuple[int, int]] = {}
+        for key, (tot, top) in cells.items():
+            if key in high_keys:
+                t4_dropped_n += tot
+                after_t4_cells[key] = (0, 0)
+            else:
+                after_t4_cells[key] = (tot, top)
+        if t4_dropped_n:
+            drop_reasons[STEP_TIER4] = {"high_store_month_z_or_pct": t4_dropped_n}
+        cells = after_t4_cells
 
-    store_series = _impact_from_cell_maps(baseline_cells, after_t1_cells, after_t2_cells)
+    step_t4 = _step_from_cells(STEP_TIER4, rows_in, cells)
+    steps.append(step_t4)
+    cell_snapshots.append(dict(cells))
+
+    store_series = _impact_from_cell_maps(
+        baseline_cells,
+        cell_snapshots[0],
+        cell_snapshots[1],
+        cell_snapshots[2],
+        cell_snapshots[3],
+    )
+    final_pct = step_t4.top_box_pct
     delta = network_delta_pp(final_pct, baseline_pct)
+    tiers_123_dropped = sum(s.rows_dropped for s in steps[1:4])
 
     return SanitizationResponse(
         baseline_top_box_pct=baseline_pct,
@@ -441,17 +581,13 @@ def run_pipeline_pushdown(
             "processed_at": datetime.now(UTC).isoformat(),
             "input_rows": len(candidate_rows),
             "answered_rows": 0 if answered.empty else len(answered),
-            "drop_reasons": {
-                "tier1": drop_reasons_t1,
-                "tier2": {"high_store_month_z_or_pct": t2_dropped_n} if t2_dropped_n else {},
-            },
+            "drop_reasons": drop_reasons,
             "actual_source": "query_a",
             "query_b_mode": query_b_mode,
             "reconciliation": reconciliation,
             "actual_total_responses": actual_baseline.total_responses,
             "actual_top_box_count": actual_baseline.top_box_count,
-            "tier1_dropped_rows": t1_dropped_n,
-            "tier1_dropped_top_box": t1_dropped_top,
+            "tiers_123_dropped_rows": tiers_123_dropped,
         },
     )
 
@@ -461,11 +597,11 @@ def run_pipeline(
     *,
     actual_baseline: ActualBaseline | None = None,
 ) -> SanitizationResponse:
-    """Execute Tier1 → Tier2 and return aggregate KPI metrics.
+    """Execute actual → tier1 → tier2 → tier3 → tier4 and return aggregate KPI metrics.
 
     When ``actual_baseline`` is provided (Query A pushdown), the ``actual`` step
     and ``baseline_top_box_pct`` come from SQL aggregates — not from scanning a
-    raw-row DataFrame. Tier1/Tier2 still run on ``request.rows`` (Query B).
+    raw-row DataFrame. Tiers 1–4 still run on ``request.rows`` (Query B).
     """
     config = request.config
     raw = _rows_to_frame(request.rows)
@@ -527,48 +663,51 @@ def run_pipeline(
         )
 
     current = answered
+    drop_reasons: dict[str, dict[str, int]] = {
+        STEP_TIER1: {},
+        STEP_TIER2: {},
+        STEP_TIER3: {},
+        STEP_TIER4: {},
+    }
 
-    # Tier 1
-    t1_cfg = _tier1_config(config)
-    flagged_t1 = apply_tier1(current, config=t1_cfg)
-    after_t1 = keep_tier1_clean(flagged_t1)
-    t1_stats = filter_stats(current, after_t1)
-    steps.append(
-        StepMetric(
-            step_name=STEP_TIER1,
-            rows_in=t1_stats.rows_read,
-            rows_out=t1_stats.rows_kept,
-            rows_dropped=t1_stats.rows_dropped,
-            top_box_pct=_pct(top_box_rate(after_t1)),
-        )
+    current, step_t1, drop_reasons[STEP_TIER1] = _apply_row_tier_step(
+        current,
+        STEP_TIER1,
+        enabled=config.tier1_blacklist_enabled,
+        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
     )
-    current = after_t1
-    drop_reasons_t1 = tier1_drop_reason_counts(flagged_t1, T1_REASON)
+    steps.append(step_t1)
+    after_t1 = current
 
-    # Tier 2 (always on — thresholds come from PipelineConfig)
-    t2_cfg = _tier2_config(config)
-    panel = build_store_month_panel(current, min_volume=t2_cfg.min_volume)
-    high = high_store_months(panel, t2_cfg)
-    high_store_months_out = _store_month_cells(panel, high)
-
-    flagged_t2 = apply_tier2(current, config=t2_cfg)
-    after_t2 = keep_tier2_clean(flagged_t2)
-    t2_stats = filter_stats(current, after_t2)
-    steps.append(
-        StepMetric(
-            step_name=STEP_TIER2,
-            rows_in=t2_stats.rows_read,
-            rows_out=t2_stats.rows_kept,
-            rows_dropped=t2_stats.rows_dropped,
-            top_box_pct=_pct(top_box_rate(after_t2)),
-        )
+    current, step_t2, drop_reasons[STEP_TIER2] = _apply_row_tier_step(
+        current,
+        STEP_TIER2,
+        enabled=config.tier2_freq_enabled,
+        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
     )
-    drop_reasons_t2 = _reason_counts(flagged_t2, T2_FLAG, T2_REASON)
-    current = after_t2
+    steps.append(step_t2)
+    after_t2 = current
 
-    store_series = _build_store_impact_series(answered, after_t1, after_t2)
+    current, step_t3, drop_reasons[STEP_TIER3] = _apply_row_tier_step(
+        current,
+        STEP_TIER3,
+        enabled=config.tier3_always_five_enabled,
+        apply_fn=lambda df: apply_always_topbox_tier(
+            df, config=_always_topbox_tier_config(config)
+        ),
+    )
+    steps.append(step_t3)
+    after_t3 = current
 
-    final_pct = _pct(top_box_rate(current))
+    current, step_t4, high_store_months_out, drop_reasons[STEP_TIER4] = _apply_tier4_row_step(
+        current, config
+    )
+    steps.append(step_t4)
+    after_t4 = current
+
+    store_series = _build_store_impact_series(answered, after_t1, after_t2, after_t3, after_t4)
+
+    final_pct = step_t4.top_box_pct
     delta = network_delta_pp(final_pct, baseline_pct)
 
     return SanitizationResponse(
@@ -583,7 +722,7 @@ def run_pipeline(
             "processed_at": datetime.now(UTC).isoformat(),
             "input_rows": len(raw),
             "answered_rows": len(answered),
-            "drop_reasons": {"tier1": drop_reasons_t1, "tier2": drop_reasons_t2},
+            "drop_reasons": drop_reasons,
             "actual_source": "query_a" if actual_baseline is not None else "inline",
             "actual_total_responses": (
                 actual_baseline.total_responses if actual_baseline is not None else len(answered)
