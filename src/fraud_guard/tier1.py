@@ -201,19 +201,69 @@ def _flag_always_topbox(
     return out
 
 
+def _prepare_tier_frame(
+    df: pd.DataFrame,
+    mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
+) -> pd.DataFrame:
+    """Hash PII and attach entity keys before any tier rule (Invariant 1)."""
+    out = ensure_pii_hashed(df, mapping)
+    out[FLAG_COL] = False
+    out[REASON_COL] = ""
+    out[ENTITY_COL] = build_entity_key(out, mapping)
+    return out
+
+
+def apply_blacklist_tier(
+    df: pd.DataFrame,
+    mapping: ColumnMapping | None = None,
+    config: Tier1Config | None = None,
+) -> pd.DataFrame:
+    """Tier 1 — BlackList filter only (rows are not dropped)."""
+    mapping = mapping or RATE_GET_ANSWERS_MAPPING
+    config = config or Tier1Config(enable_blacklist=True)
+    out = _prepare_tier_frame(df, mapping)
+    if config.enable_blacklist:
+        out = _flag_blacklist(out, mapping, config)
+    return out
+
+
+def apply_freq_tier(
+    df: pd.DataFrame,
+    mapping: ColumnMapping | None = None,
+    config: Tier1Config | None = None,
+) -> pd.DataFrame:
+    """Tier 2 — entity×store×day frequency filter (rows are not dropped)."""
+    mapping = mapping or RATE_GET_ANSWERS_MAPPING
+    config = config or Tier1Config(enable_freq_store_day=True)
+    out = _prepare_tier_frame(df, mapping)
+    if config.enable_freq_store_day:
+        out = _flag_freq_store_day(out, mapping, config)
+    return out
+
+
+def apply_always_topbox_tier(
+    df: pd.DataFrame,
+    mapping: ColumnMapping | None = None,
+    config: Tier1Config | None = None,
+) -> pd.DataFrame:
+    """Tier 3 — always top-box entity filter (rows are not dropped)."""
+    mapping = mapping or RATE_GET_ANSWERS_MAPPING
+    config = config or Tier1Config(enable_always_topbox=True)
+    out = _prepare_tier_frame(df, mapping)
+    if config.enable_always_topbox:
+        out = _flag_always_topbox(out, mapping, config)
+    return out
+
+
 def apply_tier1(
     df: pd.DataFrame,
     mapping: ColumnMapping | None = None,
     config: Tier1Config | None = None,
 ) -> pd.DataFrame:
-    """Return a copy with Tier-1 flags and reason codes (rows are not dropped)."""
+    """Apply all enabled Tier 1–3 rules in one pass (legacy / test helper)."""
     mapping = mapping or RATE_GET_ANSWERS_MAPPING
     config = config or Tier1Config()
-    # Invariant 1: hash PII before any in-memory entity grouping.
-    out = ensure_pii_hashed(df, mapping)
-    out[FLAG_COL] = False
-    out[REASON_COL] = ""
-    out[ENTITY_COL] = build_entity_key(out, mapping)
+    out = _prepare_tier_frame(df, mapping)
 
     if config.enable_blacklist:
         out = _flag_blacklist(out, mapping, config)

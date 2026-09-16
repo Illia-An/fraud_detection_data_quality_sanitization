@@ -4,6 +4,8 @@ export const STORE_IMPACT_COLORS = {
   actual: '#4C78A8',
   tier1: '#F58518',
   tier2: '#54A24B',
+  tier3: '#EECA3B',
+  tier4: '#B279A2',
 } as const;
 
 export interface PlotTrace {
@@ -30,7 +32,6 @@ export function filterStoreSeries(
 
 export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
   const x = points.map((point) => point.period_label);
-  // Tier 2 is always on (SPEC) — always show after-tier2 series.
   return [
     {
       name: 'Actual',
@@ -41,7 +42,7 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       connectgaps: true,
     },
     {
-      name: 'After Tier 1',
+      name: 'After Tier 1 (BlackList)',
       x,
       y: points.map((point) => point.after_tier1_five_pct ?? null),
       mode: 'lines+markers',
@@ -49,11 +50,27 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       connectgaps: true,
     },
     {
-      name: 'After Tier 2',
+      name: 'After Tier 2 (Frequency)',
       x,
       y: points.map((point) => point.after_tier2_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier2, width: 2 },
+      connectgaps: true,
+    },
+    {
+      name: 'After Tier 3 (Always top-box)',
+      x,
+      y: points.map((point) => point.after_tier3_five_pct ?? null),
+      mode: 'lines+markers',
+      line: { color: STORE_IMPACT_COLORS.tier3, width: 2 },
+      connectgaps: true,
+    },
+    {
+      name: 'After Tier 4 (Store×month)',
+      x,
+      y: points.map((point) => point.after_tier4_five_pct ?? null),
+      mode: 'lines+markers',
+      line: { color: STORE_IMPACT_COLORS.tier4, width: 2 },
       connectgaps: true,
     },
   ];

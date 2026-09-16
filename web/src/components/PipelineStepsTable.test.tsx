@@ -8,6 +8,20 @@ import { PipelineStepsTable } from './PipelineStepsTable';
 
 const steps: StepMetrics[] = [
   {
+    step_name: 'tier2',
+    rows_in: 90,
+    rows_out: 88,
+    rows_dropped: 2,
+    top_box_pct: 83.0,
+  },
+  {
+    step_name: 'tier4',
+    rows_in: 87,
+    rows_out: 85,
+    rows_dropped: 2,
+    top_box_pct: 82.0,
+  },
+  {
     step_name: 'tier1',
     rows_in: 95,
     rows_out: 90,
@@ -22,11 +36,11 @@ const steps: StepMetrics[] = [
     top_box_pct: 85.5,
   },
   {
-    step_name: 'tier2',
-    rows_in: 90,
-    rows_out: 88,
-    rows_dropped: 2,
-    top_box_pct: 82.0,
+    step_name: 'tier3',
+    rows_in: 88,
+    rows_out: 87,
+    rows_dropped: 1,
+    top_box_pct: 82.5,
   },
 ];
 
@@ -41,7 +55,7 @@ describe('PipelineStepsTable', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders steps in actual → tier1 → tier2 order', () => {
+  it('renders human-readable steps in actual → tier1 → … → tier4 order with Δ vs prev', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <PipelineStepsTable steps={steps} />
@@ -50,11 +64,26 @@ describe('PipelineStepsTable', () => {
 
     expect(screen.getByText('Pipeline steps')).toBeInTheDocument();
     expect(screen.getByText('Excluded')).toBeInTheDocument();
+    expect(screen.getByText('Δ vs prev')).toBeInTheDocument();
+
+    const labels = [
+      'Actual (baseline)',
+      'Tier 1 — BlackList',
+      'Tier 2 — Frequency',
+      'Tier 3 — Always top-box',
+      'Tier 4 — Store×month',
+    ];
+    for (const label of labels) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+
     const stepCells = screen.getAllByRole('cell').filter((cell) =>
-      ['actual', 'tier1', 'tier2'].includes(cell.textContent ?? ''),
+      labels.includes(cell.textContent ?? ''),
     );
-    expect(stepCells.map((c) => c.textContent)).toEqual(['actual', 'tier1', 'tier2']);
+    expect(stepCells.map((c) => c.textContent)).toEqual(labels);
+
     expect(screen.getByText('85.50%')).toBeInTheDocument();
     expect(screen.getByText('84.00%')).toBeInTheDocument();
+    expect(screen.getByText('-1.50 pp')).toBeInTheDocument();
   });
 });

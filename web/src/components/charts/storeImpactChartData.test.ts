@@ -63,20 +63,28 @@ describe('storeImpactChartData', () => {
     expect(points[1].period_label).toBe('2025-02');
   });
 
-  it('builds actual and tier traces (Tier2 always on)', () => {
+  it('builds actual and tier traces for all four tiers', () => {
     const traces = buildStoreImpactTraces(filterStoreSeries(series, 1));
-    expect(traces).toHaveLength(3);
+    expect(traces).toHaveLength(5);
     expect(traces[0]).toMatchObject({
       name: 'Actual',
       line: { color: STORE_IMPACT_COLORS.actual },
     });
     expect(traces[1]).toMatchObject({
-      name: 'After Tier 1',
+      name: 'After Tier 1 (BlackList)',
       line: { color: STORE_IMPACT_COLORS.tier1 },
     });
     expect(traces[2]).toMatchObject({
-      name: 'After Tier 2',
+      name: 'After Tier 2 (Frequency)',
       line: { color: STORE_IMPACT_COLORS.tier2 },
+    });
+    expect(traces[3]).toMatchObject({
+      name: 'After Tier 3 (Always top-box)',
+      line: { color: STORE_IMPACT_COLORS.tier3 },
+    });
+    expect(traces[4]).toMatchObject({
+      name: 'After Tier 4 (Store×month)',
+      line: { color: STORE_IMPACT_COLORS.tier4 },
     });
   });
 });
