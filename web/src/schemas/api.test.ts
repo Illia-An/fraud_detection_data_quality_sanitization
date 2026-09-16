@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultPipelineConfig,
+  formatPipelineStepLabel,
   pipelineConfigSchema,
   processRequestSchema,
   processResponseSchema,
@@ -116,7 +117,7 @@ describe('processResponseSchema / SanitizationResponse', () => {
   it('parses SPEC response with echo_config and telemetry meta', () => {
     const parsed = processResponseSchema.parse(processApiResponse);
     expect(parsed.baseline_top_box_pct).toBe(85.5);
-    expect(parsed.echo_config.tier1_freq_threshold).toBe(3);
+    expect(parsed.echo_config.tier2_freq_threshold).toBe(3);
     expect(parsed.meta.execution_time_ms).toBe(12.5);
     expect(parsed.meta.peak_memory_mb).toBe(1.2);
     expect(parsed.meta.rows_scanned).toBe(100);
@@ -140,32 +141,72 @@ describe('processResponseSchema / SanitizationResponse', () => {
 });
 
 describe('sortPipelineSteps', () => {
-  it('orders actual → tier1 → tier2', () => {
-    const ordered = sortPipelineSteps(processApiResponse.steps);
-    expect(ordered.map((s) => s.step_name)).toEqual(['actual', 'tier1', 'tier2']);
+  it('orders actual → tier1 → tier2 → tier3 → tier4', () => {
+    const ordered = sortPipelineSteps([
+      ...processApiResponse.steps,
+      {
+        step_name: 'tier4' as const,
+        rows_in: 88,
+        rows_out: 87,
+        rows_dropped: 1,
+        top_box_pct: 81.5,
+      },
+      {
+        step_name: 'tier3' as const,
+        rows_in: 90,
+        rows_out: 89,
+        rows_dropped: 1,
+        top_box_pct: 81.8,
+      },
+    ]);
+    expect(ordered.map((s) => s.step_name)).toEqual([
+      'actual',
+      'tier1',
+      'tier2',
+      'tier3',
+      'tier4',
+    ]);
+  });
+});
+
+describe('formatPipelineStepLabel', () => {
+  it('maps step names to human-readable labels', () => {
+    expect(formatPipelineStepLabel('actual')).toBe('Actual (baseline)');
+    expect(formatPipelineStepLabel('tier1')).toBe('Tier 1 — BlackList');
+    expect(formatPipelineStepLabel('tier4')).toBe('Tier 4 — Store×month');
   });
 });
 
 describe('pipelineConfigSchema', () => {
   it('applies SPEC flat defaults', () => {
-    expect(defaultPipelineConfig.tier1_freq_threshold).toBe(3);
-    expect(defaultPipelineConfig.tier1_freq_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier2_freq_threshold).toBe(3);
+    expect(defaultPipelineConfig.tier2_freq_enabled).toBe(true);
     expect(defaultPipelineConfig.tier1_blacklist_enabled).toBe(true);
-    expect(defaultPipelineConfig.tier2_min_volume).toBe(30);
+    expect(defaultPipelineConfig.tier4_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier4_min_volume).toBe(30);
   });
 
-  it('rejects invalid tier1 freq threshold', () => {
+  it('migrates legacy config keys', () => {
+    const parsed = pipelineConfigSchema.parse({
+      tier1_freq_threshold: 4,
+      tier2_min_volume: 25,
+    });
+    expect(parsed.tier2_freq_threshold).toBe(4);
+    expect(parsed.tier4_min_volume).toBe(25);
+  });
+
+  it('rejects invalid tier2 freq threshold', () => {
     expect(() =>
       pipelineConfigSchema.parse({
-        tier1_freq_threshold: 0,
+        tier2_freq_threshold: 0,
       }),
     ).toThrow();
   });
 
-  it('rejects invalid tier2 pct', () => {
+  it('rejects invalid tier4 pct', () => {
     expect(() =>
       pipelineConfigSchema.parse({
-        tier2_pct_threshold: 150,
+        tier4_pct_threshold: 150,
       }),
     ).toThrow();
   });

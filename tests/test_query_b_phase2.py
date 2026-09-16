@@ -34,8 +34,8 @@ def test_build_phase2_sql_has_freq_cte() -> None:
         DbSampleQuery(from_date=date(2026, 1, 1)),
         PipelineConfig(
             tier1_blacklist_enabled=True,
-            tier1_freq_threshold=3,
-            tier1_always_five_enabled=False,
+            tier2_freq_threshold=3,
+            tier3_always_five_enabled=False,
         ),
         dialect="sqlite",
     )
@@ -52,8 +52,8 @@ def test_build_phase2_sql_omits_freq_when_disabled() -> None:
         DbSampleQuery(from_date=date(2026, 1, 1)),
         PipelineConfig(
             tier1_blacklist_enabled=True,
-            tier1_freq_enabled=False,
-            tier1_always_five_enabled=False,
+            tier2_freq_enabled=False,
+            tier3_always_five_enabled=False,
         ),
         dialect="sqlite",
     )
@@ -66,8 +66,8 @@ def test_build_phase2_sql_includes_always5_when_enabled() -> None:
     sql, params = build_tier_candidate_sql(
         DbSampleQuery(from_date=date(2026, 1, 1)),
         PipelineConfig(
-            tier1_always_five_enabled=True,
-            tier1_always_five_min_n=10,
+            tier3_always_five_enabled=True,
+            tier3_always_five_min_n=10,
         ),
         dialect="sqlite",
     )
@@ -78,7 +78,7 @@ def test_build_phase2_sql_includes_always5_when_enabled() -> None:
 def test_mssql_v1_still_blacklist_only_no_freq() -> None:
     sql, _params = build_tier_candidate_sql(
         DbSampleQuery(from_date=date(2026, 1, 1)),
-        PipelineConfig(tier1_always_five_enabled=True),
+        PipelineConfig(tier3_always_five_enabled=True),
         dialect="mssql",
     )
     assert "freq_groups" not in sql
@@ -175,9 +175,9 @@ def test_phase2_candidates_include_freq_and_always5(tmp_path: Path) -> None:
     engine = create_engine(f"sqlite:///{db_path.as_posix()}")
     cfg = PipelineConfig(
         tier1_blacklist_enabled=True,
-        tier1_freq_threshold=3,
-        tier1_always_five_enabled=True,
-        tier1_always_five_min_n=10,
+        tier2_freq_threshold=3,
+        tier3_always_five_enabled=True,
+        tier3_always_five_min_n=10,
     )
     sample = get_tier_candidate_rows(
         engine, date(2026, 1, 1), None, cfg, dialect="sqlite"
@@ -199,12 +199,12 @@ def test_phase2_pushdown_kpi_parity_with_inline(tmp_path: Path) -> None:
     engine = create_engine(f"sqlite:///{db_path.as_posix()}")
     cfg = PipelineConfig(
         tier1_blacklist_enabled=True,
-        tier1_freq_threshold=3,
-        tier1_always_five_enabled=True,
-        tier1_always_five_min_n=10,
-        tier2_min_volume=30,  # cells small → no Tier2 wipe in this fixture
-        tier2_z_threshold=2.0,
-        tier2_pct_threshold=90.0,
+        tier2_freq_threshold=3,
+        tier3_always_five_enabled=True,
+        tier3_always_five_min_n=10,
+        tier4_min_volume=30,  # cells small → no Tier2 wipe in this fixture
+        tier4_z_threshold=2.0,
+        tier4_pct_threshold=90.0,
     )
 
     baseline = get_actual_baseline_aggregates(
@@ -237,12 +237,11 @@ def test_phase2_pushdown_kpi_parity_with_inline(tmp_path: Path) -> None:
     assert pushed.baseline_top_box_pct == inline.baseline_top_box_pct
     assert pushed.final_top_box_pct == inline.final_top_box_pct
     assert pushed.network_delta_pp == inline.network_delta_pp
-    # Tier1 must drop staff + freq(3) + always5(10) = 14
-    assert pushed.steps[1].rows_dropped == 14
-    reasons = pushed.meta["drop_reasons"]["tier1"]
-    assert reasons.get("blacklist_non_customer", 0) >= 1
-    assert reasons.get("high_freq_store_day", 0) >= 3
-    assert reasons.get("always_topbox", 0) >= 10
+    tiers_123_dropped = sum(s.rows_dropped for s in pushed.steps[1:4])
+    assert tiers_123_dropped == 14
+    assert pushed.meta["drop_reasons"]["tier1"].get("blacklist_non_customer", 0) >= 1
+    assert pushed.meta["drop_reasons"]["tier2"].get("high_freq_store_day", 0) >= 3
+    assert pushed.meta["drop_reasons"]["tier3"].get("always_topbox", 0) >= 10
 
 
 def test_process_db_snapshot_phase2(
@@ -259,10 +258,10 @@ def test_process_db_snapshot_phase2(
         json={
             "source": "db",
             "config": {
-                "tier1_always_five_enabled": True,
-                "tier1_always_five_min_n": 10,
-                "tier1_freq_threshold": 3,
-                "tier2_min_volume": 30,
+                "tier3_always_five_enabled": True,
+                "tier3_always_five_min_n": 10,
+                "tier2_freq_threshold": 3,
+                "tier4_min_volume": 30,
             },
         },
     )
@@ -271,4 +270,4 @@ def test_process_db_snapshot_phase2(
     assert body["meta"]["sanitization_source"] == "snapshot"
     assert body["meta"]["query_b_mode"] == "tier1_full"
     assert body["meta"]["query_b_candidate_rows"] == 14
-    assert body["steps"][1]["rows_dropped"] == 14
+    assert sum(s["rows_dropped"] for s in body["steps"][1:4]) == 14

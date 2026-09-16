@@ -26,17 +26,18 @@ describe('ConfigForm', () => {
     expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 1/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 2/i })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /Tier 3/i })).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Tier 1 frequency filter')).toBeChecked();
+    expect(screen.getByRole('heading', { name: /Tier 3/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Tier 4/i })).toBeInTheDocument();
+    expect(screen.getByLabelText('Tier 2 frequency filter')).toBeChecked();
+    expect(screen.getByLabelText('Tier 4 store-month filter')).toBeChecked();
     expect(screen.getByLabelText('Freq threshold')).toHaveValue(3);
     expect(screen.getByLabelText('Min volume')).toHaveValue(30);
-    expect(screen.queryByRole('checkbox', { name: 'Tier 2 enabled' })).not.toBeInTheDocument();
   });
 
   it('disables freq threshold input when frequency filter is off', async () => {
     renderConfigForm();
 
-    const freqSwitch = screen.getByLabelText('Tier 1 frequency filter');
+    const freqSwitch = screen.getByLabelText('Tier 2 frequency filter');
     fireEvent.click(freqSwitch);
 
     await waitFor(() => {
@@ -53,23 +54,23 @@ describe('ConfigForm', () => {
 
     await waitFor(() => {
       const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
-      expect(lastCall?.tier1_freq_threshold).toBe(5);
-      expect(lastCall?.tier1_freq_enabled).toBe(true);
+      expect(lastCall?.tier2_freq_threshold).toBe(5);
+      expect(lastCall?.tier2_freq_enabled).toBe(true);
     });
 
     const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
     expect(pipelineConfigSchema.safeParse(lastCall).success).toBe(true);
   });
 
-  it('emits tier1_freq_enabled false when frequency switch is turned off', async () => {
+  it('emits tier2_freq_enabled false when frequency switch is turned off', async () => {
     const onValidConfigChange = vi.fn();
     renderConfigForm(onValidConfigChange);
 
-    fireEvent.click(screen.getByLabelText('Tier 1 frequency filter'));
+    fireEvent.click(screen.getByLabelText('Tier 2 frequency filter'));
 
     await waitFor(() => {
       const lastCall = onValidConfigChange.mock.calls.at(-1)?.[0];
-      expect(lastCall?.tier1_freq_enabled).toBe(false);
+      expect(lastCall?.tier2_freq_enabled).toBe(false);
     });
   });
 

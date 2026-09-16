@@ -317,8 +317,8 @@ def _build_tier_candidate_sql_phase2(
         predicates.append("(b.BlackList IS NULL OR b.BlackList <> :customer_bl)")
 
     freq_cte = ""
-    if config.tier1_freq_enabled:
-        params["freq_min"] = int(config.tier1_freq_threshold)
+    if config.tier2_freq_enabled:
+        params["freq_min"] = int(config.tier2_freq_threshold)
         freq_cte = """
 , freq_groups AS (
   SELECT entity_key, PrintStore, day
@@ -340,8 +340,8 @@ def _build_tier_candidate_sql_phase2(
         )
 
     always5_cte = ""
-    if config.tier1_always_five_enabled:
-        params["always_min"] = int(config.tier1_always_five_min_n)
+    if config.tier3_always_five_enabled:
+        params["always_min"] = int(config.tier3_always_five_min_n)
         always5_cte = f"""
 , always5_entities AS (
   SELECT entity_key

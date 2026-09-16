@@ -31,35 +31,60 @@ export function DocumentationPage() {
           </Typography>
           <Typography variant="body1">
             Use the <strong>Sanitization</strong> page to review Q10012 from 2026-01-01 through
-            latest (synthetic presets if the DB is unavailable), tune tier thresholds, and
-            inspect KPI, chart, and flagged store×month cells.
+            latest (synthetic presets if the DB is unavailable), enable/disable each tier, tune
+            thresholds, and inspect KPI, chart, and flagged store×month cells.
           </Typography>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader title="Pipeline tiers" subheader="Rules promoted from notebooks into the sanitization engine" />
+        <CardHeader
+          title="Pipeline tiers"
+          subheader="Four independent filters — toggle each and re-run to see cumulative impact"
+        />
         <CardContent sx={{ p: 0, '&:last-child': { pb: 0 } }}>
           <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight={600}>Tier 1 — deterministic filters</Typography>
+              <Typography fontWeight={600}>Tier 1 — BlackList</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Typography component="ul" sx={{ m: 0, pl: 2.5 }}>
-                <li>BlackList filter — keep regular customers (`BlackList == לא`).</li>
-                <li>Freq ≥ N per store×day — repeat answers from the same entity.</li>
-                <li>Optional always top-box rule for long histories.</li>
+              <Typography>
+                Keep regular customers only (`BlackList == לא`). Staff / non-customer segments are
+                excluded.
               </Typography>
             </AccordionDetails>
           </Accordion>
           <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography fontWeight={600}>Tier 2 — store×month outliers</Typography>
+              <Typography fontWeight={600}>Tier 2 — Frequency</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Typography>
-                Flags cells with unusually high 5% vs the network (z-score and minimum volume /
-                five-percent thresholds). Flagged cells appear in the results table after a run.
+                High frequency on entity×store×day (same person answering too often at the same
+                store on the same day). Threshold defaults to ≥ 3.
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={600}>Tier 3 — Always top-box (optional)</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography>
+                Entities with enough history that are 100% top-box (Answer_Value = 5). Off by
+                default — enable for a stricter what-if.
+              </Typography>
+            </AccordionDetails>
+          </Accordion>
+          <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography fontWeight={600}>Tier 4 — Store×month outliers</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography>
+                Flags store×month cells with unusually high 5% vs the network (z-score and/or five %
+                floor, with a minimum volume). Flagged cells appear in the results table after a
+                run.
               </Typography>
             </AccordionDetails>
           </Accordion>
@@ -74,10 +99,10 @@ export function DocumentationPage() {
               <code>docs/report_exploration_00.md</code> — schema exploration
             </Typography>
             <Typography component="li" variant="body2">
-              <code>docs/report_tier1.md</code> — Tier 1 rules and KPI impact
+              <code>docs/report_tier1.md</code> — respondent-quality rules (now Tiers 1–3)
             </Typography>
             <Typography component="li" variant="body2">
-              <code>docs/report_tier2.md</code> — store×month outliers
+              <code>docs/report_tier2.md</code> — store×month outliers (now Tier 4)
             </Typography>
             <Typography component="li" variant="body2">
               <code>docs/report_tier3.md</code> — IsolationForest research (not in PoC UI)

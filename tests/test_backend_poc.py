@@ -62,9 +62,11 @@ def test_run_pipeline_tier1_drops_staff_and_freq() -> None:
     assert res.baseline_top_box_pct is not None
     assert res.echo_config == req.config
     assert res.network_delta_pp == round(res.final_top_box_pct - res.baseline_top_box_pct, 4)
-    assert len(res.steps) >= 2
+    assert len(res.steps) == 5
     tier1 = next(s for s in res.steps if s.step_name == "tier1")
-    assert tier1.rows_dropped >= 2
+    tier2 = next(s for s in res.steps if s.step_name == "tier2")
+    assert tier1.rows_dropped >= 1
+    assert tier2.rows_dropped >= 2
     assert len(res.store_impact_series) >= 1
     assert res.store_impact_series[0]["actual_five_pct"] is not None
 
@@ -96,6 +98,11 @@ def test_pipeline_ignores_legacy_tier3_config_key() -> None:
     )
     assert "tier3" not in PipelineConfig.model_fields
     res = run_pipeline(req)
-    assert all(s.step_name in {"actual", "tier1", "tier2"} for s in res.steps)
-    assert "tier3" not in {s.step_name for s in res.steps}
+    assert [s.step_name for s in res.steps] == [
+        "actual",
+        "tier1",
+        "tier2",
+        "tier3",
+        "tier4",
+    ]
     SanitizationResponse.model_validate(res.model_dump())
