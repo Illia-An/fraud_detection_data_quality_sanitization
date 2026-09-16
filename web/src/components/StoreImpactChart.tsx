@@ -28,6 +28,7 @@ import {
   buildStoreImpactTraces,
   buildStoreImpactXAxis,
   buildStoreImpactYAxis,
+  buildHighlightedMonthShape,
   buildTier4FlagMarkerTrace,
   buildTier4FlagShapes,
   collectStoreImpactYValues,
@@ -51,6 +52,7 @@ interface StoreImpactChartProps {
 export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactChartProps) {
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
+  const highlightedPeriodLabel = useUiStore((state) => state.highlightedPeriodLabel);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
@@ -84,10 +86,11 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
     [storePoints],
   );
 
-  const shapes = useMemo(
-    () => buildTier4FlagShapes(periodLabels, flaggedForStore),
-    [periodLabels, flaggedForStore],
-  );
+  const shapes = useMemo(() => {
+    const bands = buildTier4FlagShapes(periodLabels, flaggedForStore);
+    const highlight = buildHighlightedMonthShape(periodLabels, highlightedPeriodLabel);
+    return highlight ? [...bands, highlight] : bands;
+  }, [periodLabels, flaggedForStore, highlightedPeriodLabel]);
 
   const yAxis = useMemo(
     () => buildStoreImpactYAxis(yScaleMode, collectStoreImpactYValues(storePoints)),
