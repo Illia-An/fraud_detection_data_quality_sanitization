@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildStoreImpactTraces,
+  buildStoreImpactXAxis,
   buildStoreImpactYAxis,
+  buildTier4FlagMarkerTrace,
+  buildTier4FlagShapes,
   collectStoreImpactYValues,
   defaultSelectedStoreId,
+  filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
   STORE_IMPACT_COLORS,
+  TIER4_BAND_FILL,
 } from './storeImpactChartData';
 
 const series = [
@@ -112,5 +117,100 @@ describe('storeImpactChartData', () => {
     expect(hi).toBeGreaterThan(90);
     expect(hi).toBeLessThanOrEqual(100);
     expect(axis.rangemode).toBeUndefined();
+  });
+
+  it('filters flagged Tier 4 months for one store', () => {
+    const cells = [
+      {
+        store_id: 1,
+        year: 2025,
+        month: 1,
+        volume: 40,
+        five_pct: 95,
+        z: 2.4,
+        flagged: true,
+      },
+      {
+        store_id: 1,
+        year: 2025,
+        month: 2,
+        volume: 38,
+        five_pct: 70,
+        z: 0.2,
+        flagged: false,
+      },
+      {
+        store_id: 2,
+        year: 2025,
+        month: 1,
+        volume: 30,
+        five_pct: 91,
+        z: 2.1,
+        flagged: true,
+      },
+    ];
+    expect(filterFlaggedMonthsForStore(cells, 1)).toHaveLength(1);
+    expect(filterFlaggedMonthsForStore(cells, 1)[0].month).toBe(1);
+  });
+
+  it('builds vertical Tier 4 bands on flagged category indices', () => {
+    const shapes = buildTier4FlagShapes(
+      ['2025-01', '2025-02'],
+      [
+        {
+          store_id: 1,
+          year: 2025,
+          month: 1,
+          volume: 40,
+          five_pct: 95,
+          z: 2.4,
+          flagged: true,
+        },
+      ],
+    );
+    expect(shapes).toHaveLength(1);
+    expect(shapes[0]).toMatchObject({
+      type: 'rect',
+      yref: 'paper',
+      y0: 0,
+      y1: 1,
+      fillcolor: TIER4_BAND_FILL,
+      layer: 'below',
+    });
+    expect(shapes[0].x0).toBeCloseTo(-0.45);
+    expect(shapes[0].x1).toBeCloseTo(0.45);
+  });
+
+  it('forces categorical x-axis so YYYY-MM is not date-parsed', () => {
+    expect(buildStoreImpactXAxis(['2025-01', '2025-02'])).toEqual({
+      title: { text: 'Month' },
+      type: 'category',
+      categoryorder: 'array',
+      categoryarray: ['2025-01', '2025-02'],
+    });
+  });
+
+  it('builds Tier 4 flag marker trace with z/volume tooltip data', () => {
+    const points = filterStoreSeries(series, 1);
+    const trace = buildTier4FlagMarkerTrace(points, [
+      {
+        store_id: 1,
+        year: 2025,
+        month: 1,
+        volume: 40,
+        five_pct: 95,
+        z: 2.4,
+        flagged: true,
+      },
+    ]);
+    expect(trace).not.toBeNull();
+    expect(trace).toMatchObject({
+      name: 'Tier 4 flagged',
+      x: ['2025-01'],
+      y: [95],
+      mode: 'markers',
+      marker: { line: { color: STORE_IMPACT_COLORS.tier4Flag } },
+    });
+    expect(trace!.customdata).toEqual([[2.4, 40, 95]]);
   });
 });

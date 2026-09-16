@@ -1,4 +1,4 @@
-import type { StoreImpactPoint } from '../../schemas/api';
+import type { StoreImpactPoint, StoreMonthCell } from '../../schemas/api';
 
 export const STORE_IMPACT_COLORS = {
   actual: '#4C78A8',
@@ -6,15 +6,39 @@ export const STORE_IMPACT_COLORS = {
   tier2: '#54A24B',
   tier3: '#EECA3B',
   tier4: '#B279A2',
+  tier4Flag: '#EF4444',
 } as const;
+
+export const TIER4_BAND_FILL = 'rgba(239, 68, 68, 0.12)';
 
 export interface PlotTrace {
   name: string;
   x: string[];
   y: (number | null)[];
-  mode: 'lines+markers';
-  line: { color: string; width: number };
-  connectgaps: boolean;
+  mode: 'lines+markers' | 'markers';
+  line?: { color: string; width: number };
+  marker?: {
+    size: number | number[];
+    color: string | string[];
+    line?: { color: string | string[]; width: number | number[] };
+  };
+  connectgaps?: boolean;
+  hovertemplate?: string;
+  customdata?: (string | number)[][];
+  showlegend?: boolean;
+}
+
+export interface PlotShape {
+  type: 'rect';
+  xref: 'x';
+  yref: 'paper';
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  fillcolor: string;
+  line: { width: number };
+  layer: 'below';
 }
 
 export function getStoreIds(series: StoreImpactPoint[]): number[] {
@@ -150,4 +174,116 @@ export function buildStoreImpactYAxis(
   }
 
   return { title: Y_AXIS_TITLE, range: [lo, hi] };
+}
+
+/** Match backend ``_period_label``: YYYY-MM. */
+export function storeMonthPeriodLabel(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+/** Flagged Tier 4 store×months for the selected store. */
+export function filterFlaggedMonthsForStore(
+  cells: StoreMonthCell[],
+  storeId: number,
+): StoreMonthCell[] {
+  return cells.filter((cell) => cell.store_id === storeId && cell.flagged);
+}
+
+/**
+ * Vertical paper-height bands on categorical x (category index ±0.45).
+ * Requires layout.xaxis.type = 'category' — otherwise Plotly date-parses
+ * ``YYYY-MM`` labels and numeric shape coords collapse the axis to ~1970–2030.
+ */
+export function buildTier4FlagShapes(
+  periodLabels: string[],
+  flaggedCells: StoreMonthCell[],
+): PlotShape[] {
+  if (periodLabels.length === 0 || flaggedCells.length === 0) {
+    return [];
+  }
+  const indexByLabel = new Map(periodLabels.map((label, index) => [label, index]));
+  const shapes: PlotShape[] = [];
+  for (const cell of flaggedCells) {
+    const label = storeMonthPeriodLabel(cell.year, cell.month);
+    const index = indexByLabel.get(label);
+    if (index == null) {
+      continue;
+    }
+    shapes.push({
+      type: 'rect',
+      xref: 'x',
+      yref: 'paper',
+      x0: index - 0.45,
+      x1: index + 0.45,
+      y0: 0,
+      y1: 1,
+      fillcolor: TIER4_BAND_FILL,
+      line: { width: 0 },
+      layer: 'below',
+    });
+  }
+  return shapes;
+}
+
+/** Force categorical months so ``YYYY-MM`` is never treated as a date axis. */
+export function buildStoreImpactXAxis(periodLabels: string[]): {
+  title: { text: string };
+  type: 'category';
+  categoryorder: 'array';
+  categoryarray: string[];
+} {
+  return {
+    title: { text: 'Month' },
+    type: 'category',
+    categoryorder: 'array',
+    categoryarray: periodLabels,
+  };
+}
+
+/**
+ * Accent markers on Actual points for Tier 4 flagged months (tooltip: z / volume / 5%).
+ */
+export function buildTier4FlagMarkerTrace(
+  points: StoreImpactPoint[],
+  flaggedCells: StoreMonthCell[],
+): PlotTrace | null {
+  if (points.length === 0 || flaggedCells.length === 0) {
+    return null;
+  }
+  const cellByLabel = new Map(
+    flaggedCells.map((cell) => [storeMonthPeriodLabel(cell.year, cell.month), cell]),
+  );
+  const x: string[] = [];
+  const y: number[] = [];
+  const customdata: (string | number)[][] = [];
+
+  for (const point of points) {
+    const cell = cellByLabel.get(point.period_label);
+    if (!cell) {
+      continue;
+    }
+    x.push(point.period_label);
+    y.push(point.actual_five_pct);
+    customdata.push([cell.z, cell.volume, cell.five_pct]);
+  }
+
+  if (x.length === 0) {
+    return null;
+  }
+
+  return {
+    name: 'Tier 4 flagged',
+    x,
+    y,
+    mode: 'markers',
+    marker: {
+      size: 11,
+      color: 'rgba(239, 68, 68, 0.15)',
+      line: { color: STORE_IMPACT_COLORS.tier4Flag, width: 2 },
+    },
+    customdata,
+    hovertemplate:
+      'Tier 4 flagged<br>z=%{customdata[0]:.2f}<br>volume=%{customdata[1]}<br>5%=%{customdata[2]:.1f}%<extra></extra>',
+    showlegend: true,
+  };
 }
