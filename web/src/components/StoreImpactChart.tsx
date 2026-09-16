@@ -1,4 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent,
+} from 'react';
 import {
   Box,
   Card,
@@ -9,16 +16,29 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   type SelectChangeEvent,
 } from '@mui/material';
+import type { PlotMouseEvent } from 'plotly.js';
 
-import type { StoreImpactPoint } from '../schemas/api';
+import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
+  applyTraceHoverFocus,
   buildStoreImpactTraces,
+  buildStoreImpactXAxis,
+  buildStoreImpactYAxis,
+  buildHighlightedMonthShape,
+  buildTier4FlagMarkerTrace,
+  buildTier4FlagShapes,
+  collectStoreImpactYValues,
   defaultSelectedStoreId,
+  filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
+  type StoreImpactYScaleMode,
 } from './charts/storeImpactChartData';
 
 const Plot = lazy(async () => {
@@ -28,11 +48,15 @@ const Plot = lazy(async () => {
 
 interface StoreImpactChartProps {
   series: StoreImpactPoint[];
+  highStoreMonths?: StoreMonthCell[];
 }
 
-export function StoreImpactChart({ series }: StoreImpactChartProps) {
+export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactChartProps) {
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
+  const highlightedPeriodLabel = useUiStore((state) => state.highlightedPeriodLabel);
+  const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
+  const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
 
@@ -44,11 +68,67 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
   }, [series, selectedStoreId, setSelectedStoreId]);
 
   const activeStoreId = selectedStoreId ?? defaultSelectedStoreId(series, null);
-  const storePoints = activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId);
-  const traces = buildStoreImpactTraces(storePoints);
+  const storePoints = useMemo(
+    () => (activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId)),
+    [series, activeStoreId],
+  );
+  const flaggedForStore = useMemo(
+    () =>
+      activeStoreId == null ? [] : filterFlaggedMonthsForStore(highStoreMonths, activeStoreId),
+    [highStoreMonths, activeStoreId],
+  );
+
+  const baseTraces = useMemo(() => {
+    const base = buildStoreImpactTraces(storePoints);
+    const flagTrace = buildTier4FlagMarkerTrace(storePoints, flaggedForStore);
+    return flagTrace ? [...base, flagTrace] : base;
+  }, [storePoints, flaggedForStore]);
+
+  const traces = useMemo(
+    () => applyTraceHoverFocus(baseTraces, focusedTraceIndex),
+    [baseTraces, focusedTraceIndex],
+  );
+
+  const periodLabels = useMemo(
+    () => storePoints.map((point) => point.period_label),
+    [storePoints],
+  );
+
+  const shapes = useMemo(() => {
+    const bands = buildTier4FlagShapes(periodLabels, flaggedForStore);
+    const highlight = buildHighlightedMonthShape(periodLabels, highlightedPeriodLabel);
+    return highlight ? [...bands, highlight] : bands;
+  }, [periodLabels, flaggedForStore, highlightedPeriodLabel]);
+
+  const yAxis = useMemo(
+    () => buildStoreImpactYAxis(yScaleMode, collectStoreImpactYValues(storePoints)),
+    [yScaleMode, storePoints],
+  );
+  const xAxis = useMemo(() => buildStoreImpactXAxis(periodLabels), [periodLabels]);
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
+    setFocusedTraceIndex(null);
+  };
+
+  const handleYScaleChange = (
+    _event: MouseEvent<HTMLElement>,
+    next: StoreImpactYScaleMode | null,
+  ) => {
+    if (next != null) {
+      setYScaleMode(next);
+    }
+  };
+
+  const handlePlotHover = (event: Readonly<PlotMouseEvent>) => {
+    const curveNumber = event.points?.[0]?.curveNumber;
+    if (typeof curveNumber === 'number') {
+      setFocusedTraceIndex(curveNumber);
+    }
+  };
+
+  const handlePlotUnhover = () => {
+    setFocusedTraceIndex(null);
   };
 
   if (storeIds.length === 0) {
@@ -59,23 +139,39 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
     <Card sx={{ mb: 3 }}>
       <CardHeader
         title="Store impact"
-        subheader="Actual vs sanitized 5% KPI by month"
+        subheader="Actual vs sanitized 5% KPI by month — hover a series to isolate it"
         action={
-          <FormControl size="small" sx={{ minWidth: 140, mt: 0.5 }}>
-            <InputLabel id="store-impact-store-label">Store</InputLabel>
-            <Select
-              labelId="store-impact-store-label"
-              label="Store"
-              value={activeStoreId ?? ''}
-              onChange={handleStoreChange}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={yScaleMode}
+              onChange={handleYScaleChange}
+              aria-label="Y-axis scale"
             >
-              {storeIds.map((storeId) => (
-                <MenuItem key={storeId} value={storeId}>
-                  Store {storeId}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              <ToggleButton value="fit" aria-label="Fit to data">
+                Fit
+              </ToggleButton>
+              <ToggleButton value="full" aria-label="0 to 100 percent">
+                0–100%
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel id="store-impact-store-label">Store</InputLabel>
+              <Select
+                labelId="store-impact-store-label"
+                label="Store"
+                value={activeStoreId ?? ''}
+                onChange={handleStoreChange}
+              >
+                {storeIds.map((storeId) => (
+                  <MenuItem key={storeId} value={storeId}>
+                    Store {storeId}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Stack>
         }
       />
       <CardContent>
@@ -93,13 +189,17 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
                 autosize: true,
                 height: 360,
                 margin: { l: 48, r: 24, t: 16, b: 48 },
-                xaxis: { title: { text: 'Month' } },
-                yaxis: { title: { text: 'Top-box rate (%)' }, rangemode: 'tozero' },
+                xaxis: xAxis,
+                yaxis: yAxis,
+                shapes,
+                hovermode: 'closest',
                 legend: { orientation: 'h', y: -0.15 },
               }}
               config={{ displayModeBar: false, responsive: true }}
               style={{ width: '100%', height: '100%' }}
               useResizeHandler
+              onHover={handlePlotHover}
+              onUnhover={handlePlotUnhover}
             />
           </Suspense>
         </Box>

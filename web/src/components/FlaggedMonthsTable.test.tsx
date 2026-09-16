@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { appTheme } from '../theme';
+import { useUiStore } from '../store/uiStore';
 import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 
 const flaggedRow = {
@@ -26,6 +27,13 @@ const unflaggedRow = {
 };
 
 describe('FlaggedMonthsTable', () => {
+  beforeEach(() => {
+    useUiStore.setState({
+      selectedStoreId: null,
+      highlightedPeriodLabel: null,
+    });
+  });
+
   it('renders nothing when no flagged rows', () => {
     const { container } = render(
       <ThemeProvider theme={appTheme}>
@@ -53,9 +61,9 @@ describe('FlaggedMonthsTable', () => {
 
   it('sorts by volume when header is clicked', () => {
     const flaggedRows = [
-      { ...flaggedRow, store_id: 1, volume: 40 },
-      { ...flaggedRow, store_id: 3, volume: 60 },
-      { ...flaggedRow, store_id: 2, volume: 20 },
+      { ...flaggedRow, store_id: 1, volume: 40, z: 2.1 },
+      { ...flaggedRow, store_id: 3, volume: 60, z: 2.2 },
+      { ...flaggedRow, store_id: 2, volume: 20, z: 2.3 },
     ];
 
     render(
@@ -64,13 +72,32 @@ describe('FlaggedMonthsTable', () => {
       </ThemeProvider>,
     );
 
-    const volumeHeader = screen.getByRole('button', { name: 'Volume' });
-    fireEvent.click(volumeHeader);
-    fireEvent.click(volumeHeader);
+    fireEvent.click(screen.getByRole('button', { name: 'Volume' }));
 
     const tableRows = screen.getAllByRole('row').slice(1);
     const volumeValues = tableRows.map((row) => row.querySelectorAll('td')[3]?.textContent);
 
-    expect(volumeValues).toEqual(['20', '40', '60']);
+    // First click on a new column sorts desc (from prior |z| desc default).
+    expect(volumeValues).toEqual(['60', '40', '20']);
+  });
+
+  it('clicking a row selects store and highlights period in uiStore', () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <FlaggedMonthsTable
+          rows={[
+            flaggedRow,
+            { ...flaggedRow, store_id: 82, year: 2026, month: 3, volume: 55, z: 3.1 },
+          ]}
+        />
+      </ThemeProvider>,
+    );
+
+    const rows = screen.getAllByRole('row').slice(1);
+    // Default sort |z| desc → store 82 (z=3.1) first
+    fireEvent.click(rows[0]);
+
+    expect(useUiStore.getState().selectedStoreId).toBe(82);
+    expect(useUiStore.getState().highlightedPeriodLabel).toBe('2026-03');
   });
 });
