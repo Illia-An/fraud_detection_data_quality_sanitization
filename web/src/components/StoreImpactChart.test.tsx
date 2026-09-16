@@ -62,4 +62,30 @@ describe('StoreImpactChart', () => {
       'false',
     );
   });
+
+  it('accepts highStoreMonths for Tier 4 overlays without crashing', async () => {
+    useUiStore.setState({ selectedStoreId: 1 });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart
+          series={series}
+          highStoreMonths={[
+            {
+              store_id: 1,
+              year: 2025,
+              month: 1,
+              volume: 40,
+              five_pct: 95,
+              z: 2.5,
+              flagged: true,
+            },
+          ]}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
+    });
+  });
 });

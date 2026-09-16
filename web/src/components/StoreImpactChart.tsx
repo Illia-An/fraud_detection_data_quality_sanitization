@@ -22,13 +22,17 @@ import {
   type SelectChangeEvent,
 } from '@mui/material';
 
-import type { StoreImpactPoint } from '../schemas/api';
+import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
   buildStoreImpactTraces,
+  buildStoreImpactXAxis,
   buildStoreImpactYAxis,
+  buildTier4FlagMarkerTrace,
+  buildTier4FlagShapes,
   collectStoreImpactYValues,
   defaultSelectedStoreId,
+  filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
   type StoreImpactYScaleMode,
@@ -41,9 +45,10 @@ const Plot = lazy(async () => {
 
 interface StoreImpactChartProps {
   series: StoreImpactPoint[];
+  highStoreMonths?: StoreMonthCell[];
 }
 
-export function StoreImpactChart({ series }: StoreImpactChartProps) {
+export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactChartProps) {
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
@@ -58,12 +63,37 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
   }, [series, selectedStoreId, setSelectedStoreId]);
 
   const activeStoreId = selectedStoreId ?? defaultSelectedStoreId(series, null);
-  const storePoints = activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId);
-  const traces = buildStoreImpactTraces(storePoints);
+  const storePoints = useMemo(
+    () => (activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId)),
+    [series, activeStoreId],
+  );
+  const flaggedForStore = useMemo(
+    () =>
+      activeStoreId == null ? [] : filterFlaggedMonthsForStore(highStoreMonths, activeStoreId),
+    [highStoreMonths, activeStoreId],
+  );
+
+  const traces = useMemo(() => {
+    const base = buildStoreImpactTraces(storePoints);
+    const flagTrace = buildTier4FlagMarkerTrace(storePoints, flaggedForStore);
+    return flagTrace ? [...base, flagTrace] : base;
+  }, [storePoints, flaggedForStore]);
+
+  const periodLabels = useMemo(
+    () => storePoints.map((point) => point.period_label),
+    [storePoints],
+  );
+
+  const shapes = useMemo(
+    () => buildTier4FlagShapes(periodLabels, flaggedForStore),
+    [periodLabels, flaggedForStore],
+  );
+
   const yAxis = useMemo(
     () => buildStoreImpactYAxis(yScaleMode, collectStoreImpactYValues(storePoints)),
     [yScaleMode, storePoints],
   );
+  const xAxis = useMemo(() => buildStoreImpactXAxis(periodLabels), [periodLabels]);
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
@@ -136,8 +166,9 @@ export function StoreImpactChart({ series }: StoreImpactChartProps) {
                 autosize: true,
                 height: 360,
                 margin: { l: 48, r: 24, t: 16, b: 48 },
-                xaxis: { title: { text: 'Month' } },
+                xaxis: xAxis,
                 yaxis: yAxis,
+                shapes,
                 legend: { orientation: 'h', y: -0.15 },
               }}
               config={{ displayModeBar: false, responsive: true }}
