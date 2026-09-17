@@ -15,26 +15,46 @@ const processResult = {
   store_impact_series: [],
   echo_config: defaultPipelineConfig,
   meta: {
-    execution_time_ms: 10,
-    peak_memory_mb: 0.1,
-    rows_scanned: 1,
+    execution_time_ms: 12.5,
+    peak_memory_mb: 0.5,
+    rows_scanned: 100,
+    db_query_a_time_ms: 4.2,
+    db_query_b_time_ms: 8.1,
   },
 };
 
 describe('KpiCards', () => {
-  it('renders baseline, final, and network delta KPIs', () => {
+  it('renders verdict strip with KPIs and run telemetry', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <KpiCards result={processResult} />
       </ThemeProvider>,
     );
 
+    expect(screen.getByTestId('kpi-telemetry-strip')).toBeInTheDocument();
     expect(screen.getByText('Baseline 5%')).toBeInTheDocument();
     expect(screen.getByText('85.50%')).toBeInTheDocument();
     expect(screen.getByText('Final 5%')).toBeInTheDocument();
     expect(screen.getByText('82.10%')).toBeInTheDocument();
     expect(screen.getByText('Network delta')).toBeInTheDocument();
     expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
+    expect(screen.getByText('Run telemetry')).toBeInTheDocument();
+    expect(screen.getByTestId('run-telemetry-scroll')).toBeInTheDocument();
+    expect(screen.getByText('12.5 ms')).toBeInTheDocument();
+    expect(screen.getByText('0.50 MB')).toBeInTheDocument();
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText(/A 4\.2 ms · B 8\.1 ms/)).toBeInTheDocument();
     expect(screen.queryByText('Tier 3 entities')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pipeline telemetry')).not.toBeInTheDocument();
+  });
+
+  it('colors negative network delta as error', () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <KpiCards result={processResult} />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('-3.40 pp')).toHaveStyle({ color: 'rgb(211, 47, 47)' });
   });
 });
