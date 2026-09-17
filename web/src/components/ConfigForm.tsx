@@ -51,17 +51,18 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   }, [values, isValid, onValidConfigChange]);
 
   return (
-    <Card>
-      <CardHeader title="Pipeline configuration" subheader="Four-tier thresholds (SPEC)" />
+    <Card variant="outlined">
+      <CardHeader
+        title="Pipeline configuration"
+        subheader="Four-tier thresholds (SPEC)"
+        titleTypographyProps={{ variant: 'subtitle1' }}
+        subheaderTypographyProps={{ variant: 'caption' }}
+        sx={{ pb: 0 }}
+      />
       <CardContent>
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          divider={<Divider flexItem orientation="vertical" />}
-          spacing={3}
-          sx={{ alignItems: 'stretch' }}
-        >
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" component="h3">
+        <Stack spacing={1.5} divider={<Divider flexItem />}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" component="h3">
               Tier 1 — BlackList
             </Typography>
             <Controller
@@ -71,6 +72,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                 <FormControlLabel
                   control={
                     <Switch
+                      size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
                       inputProps={{ 'aria-label': 'Tier 1 BlackList filter' }}
@@ -80,8 +82,10 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                 />
               )}
             />
+          </Box>
 
-            <Typography variant="subtitle1" component="h3">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" component="h3">
               Tier 2 — Frequency
             </Typography>
             <Controller
@@ -91,12 +95,13 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                 <FormControlLabel
                   control={
                     <Switch
+                      size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
                       inputProps={{ 'aria-label': 'Tier 2 frequency filter' }}
                     />
                   }
-                  label="Frequency filter (entity×store×day)"
+                  label="Frequency (entity×store×day)"
                 />
               )}
             />
@@ -104,14 +109,17 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Freq threshold"
               type="number"
               size="small"
+              fullWidth
               disabled={!values.tier2_freq_enabled}
               {...register('tier2_freq_threshold', { valueAsNumber: true })}
               error={Boolean(errors.tier2_freq_threshold)}
               helperText={errors.tier2_freq_threshold?.message}
               slotProps={{ htmlInput: { min: 2, max: 20 } }}
             />
+          </Box>
 
-            <Typography variant="subtitle1" component="h3">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" component="h3">
               Tier 3 — Always top-box
             </Typography>
             <Controller
@@ -121,6 +129,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                 <FormControlLabel
                   control={
                     <Switch
+                      size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
                       inputProps={{ 'aria-label': 'Tier 3 always top-box' }}
@@ -134,6 +143,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Always-5 min n"
               type="number"
               size="small"
+              fullWidth
               disabled={!values.tier3_always_five_enabled}
               {...register('tier3_always_five_min_n', { valueAsNumber: true })}
               error={Boolean(errors.tier3_always_five_min_n)}
@@ -142,8 +152,8 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
             />
           </Box>
 
-          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="subtitle1" component="h3">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" component="h3">
               Tier 4 — store×month
             </Typography>
             <Controller
@@ -153,12 +163,13 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                 <FormControlLabel
                   control={
                     <Switch
+                      size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
                       inputProps={{ 'aria-label': 'Tier 4 store-month filter' }}
                     />
                   }
-                  label="Store×month anomaly filter"
+                  label="Store×month anomaly"
                 />
               )}
             />
@@ -166,6 +177,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Min volume"
               type="number"
               size="small"
+              fullWidth
               disabled={!values.tier4_enabled}
               {...register('tier4_min_volume', { valueAsNumber: true })}
               error={Boolean(errors.tier4_min_volume)}
@@ -176,6 +188,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Z high"
               type="number"
               size="small"
+              fullWidth
               disabled={!values.tier4_enabled}
               {...register('tier4_z_threshold', { valueAsNumber: true })}
               error={Boolean(errors.tier4_z_threshold)}
@@ -186,6 +199,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               label="Five % min"
               type="number"
               size="small"
+              fullWidth
               disabled={!values.tier4_enabled}
               {...register('tier4_pct_threshold', { valueAsNumber: true })}
               error={Boolean(errors.tier4_pct_threshold)}

@@ -8,8 +8,9 @@ describe('App', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Survey Sanitization');
   });
 
-  it('renders How it works section', () => {
+  it('exposes Documentation in the side menu (How it works lives there)', () => {
     render(<App />);
-    expect(screen.getByText(/How it works/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Documentation/i })).toBeInTheDocument();
+    expect(screen.queryByText(/How it works/)).not.toBeInTheDocument();
   });
 });

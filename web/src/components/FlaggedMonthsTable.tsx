@@ -11,6 +11,7 @@ import {
   TableRow,
   TableSortLabel,
   Box,
+  Typography,
 } from '@mui/material';
 import {
   createColumnHelper,
@@ -36,15 +37,29 @@ function formatZ(value: number): string {
   return value.toFixed(2);
 }
 
-function buildColumns(maxVolume: number) {
+function buildColumns(maxVolume: number, compact: boolean) {
   return [
     columnHelper.accessor('store_id', { header: 'Store', enableSorting: false }),
-    columnHelper.accessor('year', { header: 'Year', enableSorting: false }),
-    columnHelper.accessor('month', { header: 'Month', enableSorting: false }),
+    columnHelper.accessor('year', {
+      header: 'Year',
+      enableSorting: false,
+      meta: { hideInCompact: true },
+    }),
+    columnHelper.accessor('month', {
+      header: 'Mo',
+      enableSorting: false,
+    }),
     columnHelper.accessor('volume', {
-      header: 'Volume',
+      header: compact ? 'Vol' : 'Volume',
       cell: (info) => {
         const volume = info.getValue();
+        if (compact) {
+          return (
+            <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+              {volume}
+            </Box>
+          );
+        }
         const ratio = maxVolume > 0 ? volume / maxVolume : 0;
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 96 }}>
@@ -74,18 +89,28 @@ function buildColumns(maxVolume: number) {
       cell: (info) => formatZ(info.getValue()),
     }),
     columnHelper.accessor('flagged', {
-      header: 'Flagged',
+      header: compact ? 'Flag' : 'Flagged',
       enableSorting: false,
       cell: (info) => (info.getValue() ? 'Yes' : 'No'),
+      meta: { hideInCompact: true },
     }),
-  ];
+  ].filter((column) => {
+    if (!compact) {
+      return true;
+    }
+    const meta = column.meta as { hideInCompact?: boolean } | undefined;
+    return !meta?.hideInCompact;
+  });
 }
 
 interface FlaggedMonthsTableProps {
   rows: StoreMonthCell[];
+  /** Panel beside the store chart (always visible; denser columns + scroll). */
+  variant?: 'default' | 'panel';
 }
 
-export function FlaggedMonthsTable({ rows }: FlaggedMonthsTableProps) {
+export function FlaggedMonthsTable({ rows, variant = 'default' }: FlaggedMonthsTableProps) {
+  const isPanel = variant === 'panel';
   const [sorting, setSorting] = useState<SortingState>([{ id: 'z', desc: true }]);
   const selectFlaggedStoreMonth = useUiStore((state) => state.selectFlaggedStoreMonth);
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
@@ -96,7 +121,7 @@ export function FlaggedMonthsTable({ rows }: FlaggedMonthsTableProps) {
     () => flaggedRows.reduce((max, row) => Math.max(max, row.volume), 0),
     [flaggedRows],
   );
-  const columns = useMemo(() => buildColumns(maxVolume), [maxVolume]);
+  const columns = useMemo(() => buildColumns(maxVolume, isPanel), [maxVolume, isPanel]);
 
   const table = useReactTable({
     data: flaggedRows,
@@ -107,69 +132,92 @@ export function FlaggedMonthsTable({ rows }: FlaggedMonthsTableProps) {
     getSortedRowModel: getSortedRowModel(),
   });
 
-  if (flaggedRows.length === 0) {
+  if (!isPanel && flaggedRows.length === 0) {
     return null;
   }
 
   return (
-    <Card variant="outlined">
+    <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
         title="Flagged store×months"
-        subheader="Tier 4 store×month cells — click a row to focus the store chart"
+        subheader={
+          isPanel
+            ? 'Click a row to focus the chart'
+            : 'Tier 4 store×month cells — click a row to focus the store chart'
+        }
+        titleTypographyProps={{ variant: isPanel ? 'subtitle1' : 'h6' }}
+        subheaderTypographyProps={{ variant: 'caption' }}
+        sx={{ pb: 0 }}
       />
-      <CardContent sx={{ pt: 0 }}>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const canSort = header.column.getCanSort();
-                    return (
-                      <TableCell key={header.id} sortDirection={header.column.getIsSorted() || false}>
-                        {header.isPlaceholder ? null : canSort ? (
-                          <TableSortLabel
-                            active={header.column.getIsSorted() !== false}
-                            direction={header.column.getIsSorted() === 'desc' ? 'desc' : 'asc'}
-                            onClick={header.column.getToggleSortingHandler()}
-                          >
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableSortLabel>
-                        ) : (
-                          flexRender(header.column.columnDef.header, header.getContext())
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableHead>
-            <TableBody>
-              {table.getRowModel().rows.map((row) => {
-                const cell = row.original;
-                const period = storeMonthPeriodLabel(cell.year, cell.month);
-                const selected =
-                  selectedStoreId === cell.store_id && highlightedPeriodLabel === period;
-                return (
-                  <TableRow
-                    key={row.id}
-                    hover
-                    selected={selected}
-                    onClick={() => selectFlaggedStoreMonth(cell.store_id, cell.year, cell.month)}
-                    sx={{ cursor: 'pointer' }}
-                    aria-selected={selected}
-                  >
-                    {row.getVisibleCells().map((tableCell) => (
-                      <TableCell key={tableCell.id}>
-                        {flexRender(tableCell.column.columnDef.cell, tableCell.getContext())}
-                      </TableCell>
-                    ))}
+      <CardContent sx={{ pt: 1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        {flaggedRows.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            No flagged store×months for this run.
+          </Typography>
+        ) : (
+          <TableContainer
+            sx={{
+              flex: 1,
+              maxHeight: isPanel ? 540 : undefined,
+              overflow: 'auto',
+            }}
+          >
+            <Table size="small" stickyHeader={isPanel}>
+              <TableHead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      const canSort = header.column.getCanSort();
+                      return (
+                        <TableCell
+                          key={header.id}
+                          sortDirection={header.column.getIsSorted() || false}
+                          sx={{ py: isPanel ? 0.75 : undefined }}
+                        >
+                          {header.isPlaceholder ? null : canSort ? (
+                            <TableSortLabel
+                              active={header.column.getIsSorted() !== false}
+                              direction={header.column.getIsSorted() === 'desc' ? 'desc' : 'asc'}
+                              onClick={header.column.getToggleSortingHandler()}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </TableSortLabel>
+                          ) : (
+                            flexRender(header.column.columnDef.header, header.getContext())
+                          )}
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                ))}
+              </TableHead>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => {
+                  const cell = row.original;
+                  const period = storeMonthPeriodLabel(cell.year, cell.month);
+                  const selected =
+                    selectedStoreId === cell.store_id && highlightedPeriodLabel === period;
+                  return (
+                    <TableRow
+                      key={row.id}
+                      hover
+                      selected={selected}
+                      onClick={() => selectFlaggedStoreMonth(cell.store_id, cell.year, cell.month)}
+                      sx={{ cursor: 'pointer' }}
+                      aria-selected={selected}
+                    >
+                      {row.getVisibleCells().map((tableCell) => (
+                        <TableCell key={tableCell.id} sx={{ py: isPanel ? 0.75 : undefined }}>
+                          {flexRender(tableCell.column.columnDef.cell, tableCell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </CardContent>
     </Card>
   );

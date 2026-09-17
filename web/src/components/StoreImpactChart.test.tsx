@@ -131,4 +131,49 @@ describe('StoreImpactChart', () => {
       expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
     });
   });
+
+  it('dispatches window resize when the plot container size changes', async () => {
+    const observers: Array<{ callback: ResizeObserverCallback; el: Element }> = [];
+    class MockResizeObserver {
+      callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+        observers.push({ callback, el: document.body });
+      }
+      observe(el: Element) {
+        observers[observers.length - 1].el = el;
+      }
+      disconnect() {}
+      unobserve() {}
+    }
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+
+    const onResize = vi.fn();
+    window.addEventListener('resize', onResize);
+
+    useUiStore.setState({ selectedStoreId: 1 });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart series={series} />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('store-impact-plot-container')).toBeInTheDocument();
+    });
+    expect(observers.length).toBeGreaterThan(0);
+
+    const entry = {
+      target: observers[0].el,
+      contentRect: { width: 900, height: 560 },
+    } as unknown as ResizeObserverEntry;
+    observers[0].callback([entry], {} as ResizeObserver);
+
+    await waitFor(() => {
+      expect(onResize).toHaveBeenCalled();
+    });
+
+    window.removeEventListener('resize', onResize);
+    vi.unstubAllGlobals();
+  });
 });

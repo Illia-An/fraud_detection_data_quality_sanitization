@@ -82,13 +82,11 @@ describe('SampleDataPanel', () => {
     } as unknown as ReturnType<typeof useSampleDb>);
   });
 
-  it('renders DB as the default source and keeps synthetic disabled', () => {
+  it('renders data source select with DB as default', () => {
     renderPanel();
 
-    expect(screen.getByRole('button', { name: 'small' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'medium' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'stress' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Load from DB' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Data source')).toBeInTheDocument();
+    expect(screen.getByText('Database (Q10012)')).toBeInTheDocument();
     expect(mockUseSample).toHaveBeenCalledWith('small', false);
     expect(mockUseSampleDb).toHaveBeenCalledWith({}, true);
   });
@@ -111,7 +109,7 @@ describe('SampleDataPanel', () => {
     renderPanel();
 
     await waitFor(() => {
-      expect(screen.getByText(/50.*4 stores/)).toBeInTheDocument();
+      expect(screen.getByText(/50 rows · 4 stores/)).toBeInTheDocument();
     });
 
     const state = useUiStore.getState();
@@ -159,7 +157,7 @@ describe('SampleDataPanel', () => {
     renderPanel();
 
     await waitFor(() => {
-      expect(screen.getByText(/120.*2 stores/)).toBeInTheDocument();
+      expect(screen.getByText(/120 rows · 2 stores/)).toBeInTheDocument();
     });
 
     const state = useUiStore.getState();
@@ -218,20 +216,20 @@ describe('SampleDataPanel', () => {
     });
   });
 
-  it('refetches the DB sample when Load from DB is clicked', () => {
+  it('refetches the DB sample when Reload from DB is clicked', () => {
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSampleDb>);
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load from DB' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload from DB' }));
 
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('switches back to db when Load from DB is clicked from a synthetic preset', () => {
-    useUiStore.setState({ lastPreset: 'small' });
+  it('switches to small when selecting synthetic small from the source menu', () => {
+    useUiStore.setState({ lastPreset: 'db' });
     mockUseSample.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSample>);
@@ -241,9 +239,9 @@ describe('SampleDataPanel', () => {
 
     renderPanel();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load from DB' }));
+    fireEvent.mouseDown(screen.getByLabelText('Data source'));
+    fireEvent.click(screen.getByRole('option', { name: 'Synthetic — small' }));
 
-    expect(useUiStore.getState().lastPreset).toBe('db');
-    expect(refetch).not.toHaveBeenCalled();
+    expect(useUiStore.getState().lastPreset).toBe('small');
   });
 });
