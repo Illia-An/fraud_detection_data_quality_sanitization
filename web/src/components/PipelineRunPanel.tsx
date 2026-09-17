@@ -4,153 +4,155 @@ import {
   AccordionSummary,
   Alert,
   Box,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CircularProgress,
   Stack,
   Typography,
 } from '@mui/material';
-import { useEffect, useRef } from 'react';
-
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Grid from '@mui/material/Grid2';
+import { useMemo, useState } from 'react';
 
-import { useProcess } from '../api/hooks';
-import type { PipelineConfig } from '../schemas/api';
-import { useUiStore } from '../store/uiStore';
+import type { PipelineRunner } from '../hooks/usePipelineRunner';
 import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 import { KpiCards } from './KpiCards';
-import { PipelineStepsTable } from './PipelineStepsTable';
+import { PipelineStepsTable, summarizeLargestDelta } from './PipelineStepsTable';
 import { StoreImpactChart } from './StoreImpactChart';
-import { TelemetryMetaCard } from './TelemetryMetaCard';
 
+/** Collapsed accordion summary height reserved so explore content is not covered on md. */
+const STEPS_SUMMARY_RESERVE_PX = 52;
+/** Expanded overlay cap on md — scrolls internally; chart underneath does not move. */
+const STEPS_OVERLAY_MAX_HEIGHT = '45vh';
 
 interface PipelineRunPanelProps {
-  config: PipelineConfig;
+  runner: PipelineRunner;
 }
 
-export function PipelineRunPanel({ config }: PipelineRunPanelProps) {
-  const lastPreset = useUiStore((state) => state.lastPreset);
-  const surveyRows = useUiStore((state) => state.surveyRows);
-  const sampleMeta = useUiStore((state) => state.sampleMeta);
-  const sampleGeneration = useUiStore((state) => state.sampleGeneration);
-  const processResult = useUiStore((state) => state.processResult);
-  const setProcessResult = useUiStore((state) => state.setProcessResult);
+export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
+  const { noData, isPending, isError, error, displayResult } = runner;
+  const [stepsExpanded, setStepsExpanded] = useState(false);
 
-  const { mutate, isPending, isError, error, data, reset } = useProcess();
-  const autoRunKeyRef = useRef<number | null>(null);
+  const largestDeltaHint = useMemo(
+    () => (displayResult ? summarizeLargestDelta(displayResult.steps) : null),
+    [displayResult],
+  );
 
-  const useDbSource = lastPreset === 'db';
-  const canRun = useDbSource
-    ? Boolean(sampleMeta && sampleMeta.row_count > 0)
-    : surveyRows.length > 0;
-
-  useEffect(() => {
-    if (data) {
-      setProcessResult(data);
-    }
-  }, [data, setProcessResult]);
-
-  useEffect(() => {
-    if (!canRun || isPending || sampleGeneration === 0) {
-      return;
-    }
-    if (autoRunKeyRef.current === sampleGeneration) {
-      return;
-    }
-    autoRunKeyRef.current = sampleGeneration;
-    reset();
-    mutate(
-      useDbSource
-        ? { source: 'db', rows: [], config }
-        : { source: 'inline', rows: surveyRows, config },
-    );
-  }, [
-    canRun,
-    isPending,
-    sampleGeneration,
-    reset,
-    mutate,
-    useDbSource,
-    config,
-    surveyRows,
-  ]);
-
-  const handleRun = () => {
-    if (!canRun) {
-      return;
-    }
-    autoRunKeyRef.current = sampleGeneration;
-    reset();
-    mutate(
-      useDbSource
-        ? { source: 'db', rows: [], config }
-        : { source: 'inline', rows: surveyRows, config },
-    );
-  };
-
-  const noData = !canRun;
-  const displayResult = data ?? processResult;
+  const showResults = Boolean(displayResult && !isPending);
 
   return (
-    <Card sx={{ mb: 3 }}>
-      <CardHeader title="Pipeline results" subheader="Run sanitization on loaded survey rows" />
-      <CardContent>
-        <Stack spacing={2}>
-          <Box>
-            <Button
-              variant="contained"
-              onClick={handleRun}
-              disabled={isPending || noData}
-              startIcon={isPending ? <CircularProgress size={18} color="inherit" /> : undefined}
-            >
-              {isPending ? 'Running…' : 'Run pipeline'}
-            </Button>
-          </Box>
+    <Box
+      sx={{
+        position: 'relative',
+        flex: { md: 1 },
+        width: '100%',
+        height: { md: '100%' },
+        minHeight: { md: 0 },
+        overflow: { md: 'hidden' },
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <Stack
+        spacing={1}
+        sx={{
+          flex: { md: 1 },
+          minHeight: { md: 0 },
+          overflowY: { xs: 'visible', md: 'auto' },
+          overflowX: 'hidden',
+          pb: showResults ? { md: `${STEPS_SUMMARY_RESERVE_PX}px` } : 0,
+        }}
+      >
+        {noData && (
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            Waiting for survey data (database sample or synthetic preset).
+          </Alert>
+        )}
 
-          {noData && (
-            <Alert severity="info">Waiting for survey data (database sample or synthetic preset).</Alert>
-          )}
+        {isError && (
+          <Alert severity="error" sx={{ py: 0.5 }}>
+            {error instanceof Error ? error.message : 'Pipeline execution failed'}
+          </Alert>
+        )}
 
-          {isError && (
-            <Alert severity="error">
-              {error instanceof Error ? error.message : 'Pipeline execution failed'}
-            </Alert>
-          )}
+        {showResults && displayResult && (
+          <>
+            <KpiCards result={displayResult} />
 
-          {displayResult && !isPending && (
-            <>
-              <KpiCards result={displayResult} />
-              <TelemetryMetaCard meta={displayResult.meta} />
-              <StoreImpactChart
-                series={displayResult.store_impact_series}
-                highStoreMonths={displayResult.high_store_months}
-              />
-              <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    Pipeline steps
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ px: 0 }}>
-                  <PipelineStepsTable steps={displayResult.steps} />
-                </AccordionDetails>
-              </Accordion>
-              <Accordion disableGutters sx={{ '&:before': { display: 'none' } }}>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    Flagged store×months
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ px: 0 }}>
-                  <FlaggedMonthsTable rows={displayResult.high_store_months} />
-                </AccordionDetails>
-              </Accordion>
-            </>
-          )}
-        </Stack>
-      </CardContent>
-    </Card>
+            <Grid container spacing={1.5} alignItems="stretch" data-testid="explore-split">
+              <Grid size={{ xs: 12, md: 8 }}>
+                <Box sx={{ height: '100%' }}>
+                  <StoreImpactChart
+                    series={displayResult.store_impact_series}
+                    highStoreMonths={displayResult.high_store_months}
+                  />
+                </Box>
+              </Grid>
+              <Grid size={{ xs: 12, md: 4 }}>
+                <Box sx={{ height: '100%' }}>
+                  <FlaggedMonthsTable
+                    rows={displayResult.high_store_months}
+                    variant="panel"
+                  />
+                </Box>
+              </Grid>
+            </Grid>
+          </>
+        )}
+
+        {isPending && (
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            Running scenario…
+          </Alert>
+        )}
+      </Stack>
+
+      {showResults && displayResult && (
+        <Box
+          data-testid="pipeline-steps-overlay"
+          sx={{
+            // xs: normal flow under explore. md: bottom overlay over the pane.
+            position: { xs: 'relative', md: 'absolute' },
+            left: { md: 0 },
+            right: { md: 0 },
+            bottom: { md: 0 },
+            zIndex: { md: 3 },
+            flexShrink: 0,
+            maxHeight: { md: STEPS_OVERLAY_MAX_HEIGHT },
+            overflow: { md: 'auto' },
+            mt: { xs: 1, md: 0 },
+            bgcolor: 'background.paper',
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+            boxShadow: { md: stepsExpanded ? 8 : 2 },
+          }}
+        >
+          <Accordion
+            disableGutters
+            expanded={stepsExpanded}
+            onChange={(_event, expanded) => setStepsExpanded(expanded)}
+            sx={{
+              '&:before': { display: 'none' },
+              boxShadow: 'none',
+              bgcolor: 'transparent',
+            }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, py: 0 }}>
+              <Box>
+                <Typography variant="body2" fontWeight={600}>
+                  Pipeline steps funnel
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {largestDeltaHint
+                    ? `Largest Δ vs prev: ${largestDeltaHint}`
+                    : 'Row counts, top-box %, and Δ vs previous stage'}
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails sx={{ px: 1.5, pt: 0, pb: 1 }}>
+              <PipelineStepsTable steps={displayResult.steps} />
+            </AccordionDetails>
+          </Accordion>
+        </Box>
+      )}
+    </Box>
   );
 }

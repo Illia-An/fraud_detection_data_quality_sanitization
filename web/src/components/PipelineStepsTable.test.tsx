@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { StepMetrics } from '../schemas/api';
 import { appTheme } from '../theme';
-import { PipelineStepsTable } from './PipelineStepsTable';
+import {
+  PipelineStepsTable,
+  buildPipelineStepRows,
+  summarizeLargestDelta,
+} from './PipelineStepsTable';
 
 const steps: StepMetrics[] = [
   {
@@ -62,7 +66,7 @@ describe('PipelineStepsTable', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('Pipeline steps')).toBeInTheDocument();
+    expect(screen.getByTestId('pipeline-steps-funnel')).toBeInTheDocument();
     expect(screen.getByText('Excluded')).toBeInTheDocument();
     expect(screen.getByText('Δ vs prev')).toBeInTheDocument();
 
@@ -84,6 +88,14 @@ describe('PipelineStepsTable', () => {
 
     expect(screen.getByText('85.50%')).toBeInTheDocument();
     expect(screen.getByText('84.00%')).toBeInTheDocument();
-    expect(screen.getByText('-1.50 pp')).toBeInTheDocument();
+    expect(screen.getByText('-1.50 pp ★')).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/excluded share \d+%/).length).toBe(5);
+  });
+
+  it('marks the step with the largest absolute Δ vs prev', () => {
+    const rows = buildPipelineStepRows(steps);
+    const largest = rows.find((row) => row.is_largest_delta);
+    expect(largest?.step_name).toBe('tier1');
+    expect(summarizeLargestDelta(steps)).toBe('Tier 1 — BlackList (-1.50 pp)');
   });
 });

@@ -143,3 +143,39 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
   - `cd web && npm run test:run` / `npm run test:e2e`
   - Manual / snapshot: changing Tier2 freq or Tier3 min n changes Network delta as expected
 - **Do not commit:** `docs/research/*.xlsx` (local manager exports), `data/*.sqlite`, `.env`
+
+## [TASK-12] UX Scenario Workbench (Datadog-inspired layout)
+- **Role:** Frontend Engineer
+- **Status:** Done (Phases 1–5)
+- **Branch:** `feat/ux-scenario-workbench`
+- **Objective:** Reshape the Sanitization page into a Scenario Lab workbench: fixed controls rail + independently scrolling results canvas. Phased experiments; do not regress 4-tier contract / `tier2_freq_threshold` ge=2 / API schemas.
+- **Phases**
+  | Phase | Scope | Status |
+  |-------|--------|--------|
+  | 1 | Shell & grid: left ~340px rail + right results, independent scroll on md+ | Done |
+  | 2 | Controls rail: compact data source + config + Run in left footer | Done |
+  | 3 | KPI + telemetry strip (4 cards) | Done |
+  | 4 | Chart ‖ flagged table ~60/40 split | Done |
+  | 5 | Pipeline steps funnel (collapsed audit) | Done |
+- **Phase 1 delivered**
+  - `DashboardLayout`: viewport-height flex chain (`100dvh`), outlet fills remaining space under header.
+  - `SanitizationPage`: two-pane workbench; left controls scroll independently of right results on `md+`; stacked on `xs`.
+- **Phase 2 delivered**
+  - Left rail ~360px: scrollable Sample + Config; sticky **Run Scenario** footer.
+  - `SampleDataPanel`: compact Data source select (db / small / medium / stress) + Reload from DB.
+  - `ConfigForm`: single-column four-tier layout for narrow rail.
+  - `usePipelineRunner` shared hook; `PipelineRunPanel` is results-only.
+- **Phase 3 delivered**
+  - `KpiCards` verdict strip: Baseline / Final / Network delta (signed color) / Run telemetry (time, RAM, rows; optional Query A/B).
+  - Removed standalone `TelemetryMetaCard`; strip sits above the chart (`grid` 4-col md, 2×2 sm).
+- **Phase 4 delivered**
+  - Explore split (`md` 7/5 ≈ 60/40): `StoreImpactChart` ‖ `FlaggedMonthsTable` (`variant="panel"`).
+  - Flagged table no longer in accordion; click row still focuses store + month on chart via `uiStore`.
+- **Phase 5 delivered**
+  - Pipeline steps **funnel** accordion, **collapsed by default**; summary shows largest |Δ vs prev|.
+  - Micro-bar on Excluded (share of rows_in); largest-Δ row highlighted (★).
+  - Full five steps preserved (`actual` → `tier1`…`tier4`).
+- **Verify**
+  - Manual: funnel collapsed; expand → bars + ★ on biggest KPI step contribution.
+  - `cd web && npm run test:run`
+- **Do not commit:** `.env`, `data/*.sqlite`, `docs/research/*.xlsx`

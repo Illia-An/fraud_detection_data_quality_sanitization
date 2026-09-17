@@ -20,7 +20,15 @@ const API_DOCS_URL = `${API_BASE_URL}/docs`;
 
 export function DocumentationPage() {
   return (
-    <Stack spacing={3}>
+    <Stack
+      spacing={3}
+      sx={{
+        height: { xs: 'auto', md: '100%' },
+        overflow: { xs: 'visible', md: 'auto' },
+        minHeight: 0,
+        pb: 2,
+      }}
+    >
       <Card>
         <CardHeader title="Overview" subheader="Survey sanitization PoC" />
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>

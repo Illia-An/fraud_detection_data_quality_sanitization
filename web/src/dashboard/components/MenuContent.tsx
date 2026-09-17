@@ -7,6 +7,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
+import Tooltip from '@mui/material/Tooltip';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
 const mainListItems = [
@@ -23,34 +24,85 @@ function isSelectedPath(currentPath: string, itemPath: string): boolean {
   return currentPath === itemPath || currentPath.startsWith(`${itemPath}/`);
 }
 
-export default function MenuContent() {
+interface MenuContentProps {
+  collapsed?: boolean;
+}
+
+export default function MenuContent({ collapsed = false }: MenuContentProps) {
   const location = useLocation();
 
   return (
     <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
       <List dense>
-        {mainListItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+        {mainListItems.map((item) => {
+          const button = (
             <ListItemButton
               component={RouterLink}
               to={item.path}
               selected={isSelectedPath(location.pathname, item.path)}
+              sx={{
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                px: collapsed ? 1 : 2,
+              }}
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
+              <ListItemIcon
+                sx={{
+                  minWidth: collapsed ? 0 : 40,
+                  justifyContent: 'center',
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary={item.text} />}
             </ListItemButton>
-          </ListItem>
-        ))}
+          );
+
+          return (
+            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+              {collapsed ? (
+                <Tooltip title={item.text} placement="right">
+                  {button}
+                </Tooltip>
+              ) : (
+                button
+              )}
+            </ListItem>
+          );
+        })}
       </List>
       <List dense>
-        {secondaryListItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton>
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} />
+        {secondaryListItems.map((item) => {
+          const button = (
+            <ListItemButton
+              sx={{
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                px: collapsed ? 1 : 2,
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: collapsed ? 0 : 40,
+                  justifyContent: 'center',
+                }}
+              >
+                {item.icon}
+              </ListItemIcon>
+              {!collapsed && <ListItemText primary={item.text} />}
             </ListItemButton>
-          </ListItem>
-        ))}
+          );
+
+          return (
+            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+              {collapsed ? (
+                <Tooltip title={item.text} placement="right">
+                  {button}
+                </Tooltip>
+              ) : (
+                button
+              )}
+            </ListItem>
+          );
+        })}
       </List>
     </Stack>
   );
