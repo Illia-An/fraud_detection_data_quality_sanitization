@@ -4,7 +4,6 @@ import { useLocation } from 'react-router-dom';
 
 import { ApiStatusChip } from '../../components/layout/ApiStatusChip';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
-import NavbarBreadcrumbs from './NavbarBreadcrumbs';
 
 const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
   '/': {
@@ -31,23 +30,23 @@ export default function DashboardHeader() {
       sx={{
         display: { xs: 'none', md: 'flex' },
         width: '100%',
-        alignItems: { xs: 'flex-start', md: 'center' },
+        alignItems: 'center',
         justifyContent: 'space-between',
         maxWidth: { sm: '100%', md: '1700px' },
-        pt: 1.5,
+        pt: 0.5,
+        pb: 0,
       }}
-      spacing={2}
+      spacing={1}
     >
-      <Stack spacing={0.5} sx={{ flexGrow: 1 }}>
-        <Typography component="h1" variant="h5" sx={{ fontWeight: 600 }}>
+      <Stack spacing={0} sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Typography component="h1" variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
           {title}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" noWrap>
           {subtitle}
         </Typography>
-        <NavbarBreadcrumbs />
       </Stack>
-      <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
+      <Stack direction="row" sx={{ gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
         <ApiStatusChip />
         <ColorModeIconDropdown />
       </Stack>

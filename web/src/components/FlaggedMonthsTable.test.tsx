@@ -81,6 +81,17 @@ describe('FlaggedMonthsTable', () => {
     expect(volumeValues).toEqual(['60', '40', '20']);
   });
 
+  it('panel variant shows empty state when nothing is flagged', () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <FlaggedMonthsTable rows={[unflaggedRow]} variant="panel" />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('Flagged store×months')).toBeInTheDocument();
+    expect(screen.getByText('No flagged store×months for this run.')).toBeInTheDocument();
+  });
+
   it('clicking a row selects store and highlights period in uiStore', () => {
     render(
       <ThemeProvider theme={appTheme}>

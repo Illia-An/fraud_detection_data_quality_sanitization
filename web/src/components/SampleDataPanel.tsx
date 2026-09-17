@@ -4,13 +4,15 @@ import {
   AccordionSummary,
   Alert,
   Box,
-  Button,
-  ButtonGroup,
   Card,
   CardContent,
   CardHeader,
   CircularProgress,
-  Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  type SelectChangeEvent,
   Snackbar,
   Stack,
   Typography,
@@ -21,7 +23,12 @@ import { useSample, useSampleDb } from '../api/hooks';
 import { useUiStore } from '../store/uiStore';
 import type { DataSource, SamplePreset } from '../schemas/api';
 
-const PRESETS: SamplePreset[] = ['small', 'medium', 'stress'];
+const SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
+  { value: 'db', label: 'Database (Q10012)' },
+  { value: 'small', label: 'Synthetic — small' },
+  { value: 'medium', label: 'Synthetic — medium' },
+  { value: 'stress', label: 'Synthetic — stress' },
+];
 
 export function SampleDataPanel() {
   const lastPreset = useUiStore((state) => state.lastPreset);
@@ -93,78 +100,82 @@ export function SampleDataPanel() {
     });
   }, [isSynthetic, synthetic.error, synthetic.isError]);
 
-  const handlePresetClick = (preset: SamplePreset) => {
-    if (preset !== lastPreset) {
-      setLastPreset(preset);
-    }
-  };
-
-  const handleLoadFromDb = () => {
-    if (lastPreset === 'db') {
+  const handleSourceChange = (event: SelectChangeEvent) => {
+    const next = event.target.value as DataSource;
+    if (next === 'db' && lastPreset === 'db') {
       void db.refetch();
       return;
     }
-    setLastPreset('db');
+    if (next !== lastPreset) {
+      setLastPreset(next);
+    }
   };
 
   return (
     <>
-      <Card>
+      <Card variant="outlined">
         <CardHeader
           title="Survey data"
-          subheader="Database first: Q10012 from 2026-01-01 through latest (PII hashed). Synthetic presets if the DB is unavailable."
-          action={loading ? <CircularProgress size={24} sx={{ mt: 1, mr: 1 }} /> : null}
+          subheader="Source for the scenario run"
+          titleTypographyProps={{ variant: 'subtitle1' }}
+          subheaderTypographyProps={{ variant: 'caption' }}
+          action={loading ? <CircularProgress size={20} sx={{ mt: 1, mr: 0.5 }} /> : null}
+          sx={{ pb: 0 }}
         />
         <CardContent>
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Database (Q10012, AnswerTime ≥ 2026-01-01)
-              </Typography>
-              <Button
-                variant={lastPreset === 'db' ? 'contained' : 'outlined'}
-                onClick={handleLoadFromDb}
-                disabled={loading}
+          <Stack spacing={1.5}>
+            <FormControl fullWidth size="small" disabled={loading}>
+              <InputLabel id="survey-source-label">Data source</InputLabel>
+              <Select
+                labelId="survey-source-label"
+                label="Data source"
+                value={lastPreset}
+                onChange={handleSourceChange}
+                inputProps={{ 'aria-label': 'Data source' }}
               >
-                Load from DB
-              </Button>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                Synthetic fallback
-              </Typography>
-              <ButtonGroup variant="outlined" aria-label="Sample preset">
-                {PRESETS.map((preset) => (
-                  <Button
-                    key={preset}
-                    variant={lastPreset === preset ? 'contained' : 'outlined'}
-                    onClick={() => handlePresetClick(preset)}
-                    disabled={loading}
-                    sx={{ textTransform: 'capitalize' }}
-                  >
-                    {preset}
-                  </Button>
+                {SOURCE_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
                 ))}
-              </ButtonGroup>
-            </Box>
+              </Select>
+            </FormControl>
+
+            {lastPreset === 'db' && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                component="button"
+                type="button"
+                onClick={() => void db.refetch()}
+                disabled={loading}
+                sx={{
+                  alignSelf: 'flex-start',
+                  border: 0,
+                  background: 'none',
+                  cursor: loading ? 'default' : 'pointer',
+                  p: 0,
+                  textDecoration: 'underline',
+                  font: 'inherit',
+                }}
+              >
+                Reload from DB
+              </Typography>
+            )}
 
             {sampleMeta ? (
               <Box>
-                <Typography variant="body1">
-                  <strong>Source:</strong> {sampleMeta.preset} · <strong>Rows:</strong>{' '}
-                  {sampleMeta.row_count} · <strong>Stores:</strong> {sampleMeta.store_count} ·{' '}
-                  <strong>Months:</strong> {sampleMeta.month_count}
+                <Typography variant="body2">
+                  <strong>{sampleMeta.preset}</strong> · {sampleMeta.row_count} rows ·{' '}
+                  {sampleMeta.store_count} stores · {sampleMeta.month_count} months
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                   {sampleMeta.description}
                 </Typography>
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                Loading Q10012 from 2026-01-01 through latest, or pick a synthetic preset.
+                Loading source, or pick a synthetic preset.
               </Typography>
             )}
 
@@ -182,7 +193,7 @@ export function SampleDataPanel() {
                       bgcolor: 'grey.100',
                       borderRadius: 1,
                       overflow: 'auto',
-                      maxHeight: 320,
+                      maxHeight: 240,
                       fontSize: 12,
                     }}
                   >

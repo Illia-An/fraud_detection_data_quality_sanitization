@@ -5,15 +5,16 @@ async function waitForApiOk(page: Page) {
 }
 
 async function waitForSourceLoaded(page: Page) {
-  await expect(page.getByText(/Source:\s*(small|medium|stress|db)/i)).toBeVisible({
+  await expect(page.getByText(/(db|small|medium|stress)\s*·\s*\d+\s*rows/i)).toBeVisible({
     timeout: 30_000,
   });
 }
 
 async function useSmallPreset(page: Page) {
-  await page.getByRole('button', { name: 'small' }).click();
-  await expect(page.getByText(/Source:\s*small/i)).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Run pipeline' })).toBeEnabled({
+  await page.getByLabel('Data source').click();
+  await page.getByRole('option', { name: 'Synthetic — small' }).click();
+  await expect(page.getByText(/small\s*·\s*\d+\s*rows/i)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Run Scenario' })).toBeEnabled({
     timeout: 30_000,
   });
 }
@@ -26,7 +27,7 @@ function networkDeltaValue(page: Page) {
 }
 
 async function runPipeline(page: Page) {
-  await page.getByRole('button', { name: 'Run pipeline' }).click();
+  await page.getByRole('button', { name: 'Run Scenario' }).click();
   await expect(page.getByText('Baseline 5%')).toBeVisible();
   await expect(networkDeltaValue(page)).toBeVisible();
 }
@@ -53,7 +54,7 @@ test.describe('Sanitization flow', () => {
     await useSmallPreset(page);
     await expect(page.getByText('Baseline 5%')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('Final 5%')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Pipeline steps/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Pipeline steps funnel/i })).toBeVisible();
   });
 
   test('changing tier2 freq threshold changes network delta on re-run', async ({ page }) => {
