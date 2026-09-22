@@ -19,6 +19,19 @@ async function useSmallPreset(page: Page) {
   });
 }
 
+/**
+ * KPI strip follows chart Store|Network scope (default Store).
+ * Network delta assertions need Network scope selected.
+ */
+async function ensureNetworkKpiScope(page: Page) {
+  const networkScope = page.getByRole('button', { name: 'Network scope' });
+  await expect(networkScope).toBeVisible({ timeout: 30_000 });
+  await networkScope.click();
+  await expect(page.getByText('Network delta', { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+}
+
 /** KPI Network delta card value (not Pipeline steps Δ vs prev cells). */
 function networkDeltaValue(page: Page) {
   return page
@@ -28,7 +41,8 @@ function networkDeltaValue(page: Page) {
 
 async function runPipeline(page: Page) {
   await page.getByRole('button', { name: 'Run Scenario' }).click();
-  await expect(page.getByText('Baseline 5%')).toBeVisible();
+  await ensureNetworkKpiScope(page);
+  await expect(page.getByText('Baseline 5%', { exact: true })).toBeVisible();
   await expect(networkDeltaValue(page)).toBeVisible();
 }
 
@@ -52,14 +66,17 @@ test.describe('Sanitization flow', () => {
 
   test('small preset run shows KPI cards', async ({ page }) => {
     await useSmallPreset(page);
-    await expect(page.getByText('Baseline 5%')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Final 5%')).toBeVisible();
+    await ensureNetworkKpiScope(page);
+    await expect(page.getByText('Baseline 5%', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText('Final 5%', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Pipeline steps funnel/i })).toBeVisible();
   });
 
   test('changing tier2 freq threshold changes network delta on re-run', async ({ page }) => {
     await useSmallPreset(page);
-    await expect(page.getByText('Baseline 5%')).toBeVisible({ timeout: 30_000 });
+    await ensureNetworkKpiScope(page);
     const deltaDefault = await readNetworkDelta(page);
 
     const freq = page.getByLabel('Freq threshold');
