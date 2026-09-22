@@ -83,6 +83,70 @@ describe('StoreImpactChart', () => {
     );
   });
 
+  it('switches chart scope Store ↔ Network and disables store select', () => {
+    useUiStore.setState({ selectedStoreId: 1, chartScope: 'store', chartTimeMode: 'timeline' });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart
+          series={[
+            ...series,
+            {
+              store_id: 2,
+              year: 2025,
+              month: 1,
+              period_label: '2025-01',
+              actual_five_pct: 80,
+              after_tier1_five_pct: 79,
+              after_tier2_five_pct: 78,
+              actual_volume: 30,
+              final_volume: 29,
+              rows_dropped: 1,
+            },
+          ]}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Store scope' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Network scope' }));
+    expect(screen.getByRole('button', { name: 'Network scope' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(useUiStore.getState().chartScope).toBe('network');
+    expect(screen.getByText('Network aggregated')).toBeInTheDocument();
+    expect(screen.getByLabelText('Store')).toHaveAttribute('aria-disabled', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Store scope' }));
+    expect(screen.getByRole('button', { name: 'Store scope' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByText('Network aggregated')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Store')).not.toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('toggles Timeline ↔ YoY time mode', () => {
+    useUiStore.setState({ selectedStoreId: 1, chartScope: 'store', chartTimeMode: 'timeline' });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart series={series} />
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Year over year mode' }));
+    expect(useUiStore.getState().chartTimeMode).toBe('yoy');
+    expect(screen.getByText('YoY overlay')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Timeline mode' }));
+    expect(useUiStore.getState().chartTimeMode).toBe('timeline');
+    expect(screen.queryByText('YoY overlay')).not.toBeInTheDocument();
+  });
+
   it('accepts highStoreMonths for Tier 4 overlays without crashing', async () => {
     useUiStore.setState({ selectedStoreId: 1 });
     render(

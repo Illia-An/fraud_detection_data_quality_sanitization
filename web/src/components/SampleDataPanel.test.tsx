@@ -68,6 +68,9 @@ describe('SampleDataPanel', () => {
     refetch.mockReset();
     useUiStore.setState({
       lastPreset: 'db',
+      periodPreset: 'from_2025',
+      customFromDate: '2025-01-01',
+      customToDate: '',
       surveyRows: [],
       sampleMeta: null,
       selectedStoreId: null,
@@ -87,8 +90,52 @@ describe('SampleDataPanel', () => {
 
     expect(screen.getByLabelText('Data source')).toBeInTheDocument();
     expect(screen.getByText('Database (Q10012)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Period')).toBeInTheDocument();
+    expect(screen.getByText(/Process window:/)).toBeInTheDocument();
     expect(mockUseSample).toHaveBeenCalledWith('small', false);
     expect(mockUseSampleDb).toHaveBeenCalledWith({}, true);
+  });
+
+  it('disables period control for synthetic sources', () => {
+    useUiStore.setState({ lastPreset: 'small' });
+    mockUseSample.mockReturnValue({
+      ...idleQuery(),
+    } as unknown as ReturnType<typeof useSample>);
+    mockUseSampleDb.mockReturnValue({
+      ...idleQuery(),
+    } as unknown as ReturnType<typeof useSampleDb>);
+
+    renderPanel();
+
+    expect(screen.getByLabelText('Period')).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByText(/Period applies to Database source only/i),
+    ).toBeInTheDocument();
+  });
+
+  it('shows custom date inputs when Custom Range is selected', () => {
+    useUiStore.setState({ lastPreset: 'db', periodPreset: 'custom' });
+    mockUseSampleDb.mockReturnValue({
+      ...idleQuery(),
+    } as unknown as ReturnType<typeof useSampleDb>);
+
+    renderPanel();
+
+    expect(screen.getByLabelText('Period from date')).toBeInTheDocument();
+    expect(screen.getByLabelText('Period to date')).toBeInTheDocument();
+  });
+
+  it('updates period preset in uiStore', () => {
+    mockUseSampleDb.mockReturnValue({
+      ...idleQuery(),
+    } as unknown as ReturnType<typeof useSampleDb>);
+
+    renderPanel();
+
+    fireEvent.mouseDown(screen.getByLabelText('Period'));
+    fireEvent.click(screen.getByRole('option', { name: '2026 YTD' }));
+
+    expect(useUiStore.getState().periodPreset).toBe('ytd_2026');
   });
 
   it('stores DB meta after the default query succeeds', async () => {

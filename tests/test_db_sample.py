@@ -34,6 +34,10 @@ def test_hash_pii_stable_and_empty() -> None:
     assert a != "050-1111111"
 
 
+def test_default_from_date_is_2025() -> None:
+    assert DEFAULT_FROM_DATE == date(2025, 1, 1)
+
+
 def test_redact_row_hashes_contacts() -> None:
     row = {
         "UserContact": "secret@example.com",

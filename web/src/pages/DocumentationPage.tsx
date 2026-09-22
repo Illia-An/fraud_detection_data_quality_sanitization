@@ -38,9 +38,10 @@ export function DocumentationPage() {
             suspicious survey answers are removed.
           </Typography>
           <Typography variant="body1">
-            Use the <strong>Sanitization</strong> page to review Q10012 from 2026-01-01 through
-            latest (synthetic presets if the DB is unavailable), enable/disable each tier, tune
-            thresholds, and inspect KPI, chart, and flagged store×month cells.
+            Use the <strong>Sanitization</strong> page to pick an AnswerTime period (e.g. 2025 –
+            Present or 2026 YTD), run Q10012 sanitization (synthetic presets if the DB is
+            unavailable), enable/disable each tier, tune thresholds, and inspect network KPI plus
+            Store or Network chart scope and flagged store×month cells.
           </Typography>
         </CardContent>
       </Card>

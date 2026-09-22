@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aggregateNetworkSeries,
   buildHighlightedMonthShape,
   buildStoreImpactTraces,
   buildStoreImpactXAxis,
   buildStoreImpactYAxis,
   buildTier4FlagMarkerTrace,
   buildTier4FlagShapes,
+  buildYoYImpactTraces,
   collectStoreImpactYValues,
+  computePeriodKpisFromPoints,
   defaultSelectedStoreId,
   filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
   applyTraceHoverFocus,
+  NETWORK_SERIES_STORE_ID,
   STORE_IMPACT_COLORS,
   STORE_IMPACT_HOVER_DIM_OPACITY,
   TIER4_BAND_FILL,
@@ -72,6 +76,56 @@ describe('storeImpactChartData', () => {
     expect(points).toHaveLength(2);
     expect(points[0].period_label).toBe('2025-01');
     expect(points[1].period_label).toBe('2025-02');
+  });
+
+  it('aggregates network series with volume-weighted rates', () => {
+    const network = aggregateNetworkSeries(series);
+    expect(network).toHaveLength(2);
+    expect(network[0].store_id).toBe(NETWORK_SERIES_STORE_ID);
+    expect(network[0].period_label).toBe('2025-01');
+    // (95*40 + 80*30) / (40+30) = 88.5714…
+    expect(network[0].actual_five_pct).toBeCloseTo((95 * 40 + 80 * 30) / 70, 4);
+    // (88*40 + 79*30) / 70
+    expect(network[0].after_tier1_five_pct).toBeCloseTo((88 * 40 + 79 * 30) / 70, 4);
+    expect(network[0].actual_volume).toBe(70);
+    expect(network[0].final_volume).toBe(64);
+    // Only store 1 has 2025-02
+    expect(network[1].period_label).toBe('2025-02');
+    expect(network[1].actual_five_pct).toBe(70);
+    expect(network[1].actual_volume).toBe(38);
+  });
+
+  it('computes store period KPIs from impact points', () => {
+    const storePoints = filterStoreSeries(series, 1).map((point) => ({
+      ...point,
+      after_tier4_five_pct: point.after_tier2_five_pct,
+    }));
+    const kpis = computePeriodKpisFromPoints(storePoints);
+    expect(kpis.baseline_top_box_pct).toBeCloseTo((95 * 40 + 70 * 38) / 78, 4);
+    expect(kpis.final_top_box_pct).toBeCloseTo((85 * 40 + 67 * 38) / 78, 4);
+    expect(kpis.delta_pp).toBeCloseTo(
+      (kpis.final_top_box_pct ?? 0) - (kpis.baseline_top_box_pct ?? 0),
+      4,
+    );
+  });
+
+  it('builds YoY Actual+Final traces per year on shared month axis', () => {
+    const withFinal = series.map((point) => ({
+      ...point,
+      after_tier4_five_pct: point.after_tier2_five_pct,
+    }));
+    const traces = buildYoYImpactTraces(filterStoreSeries(withFinal, 1));
+    expect(traces.map((trace) => trace.name)).toEqual(['2025 · Actual', '2025 · Final']);
+    expect(traces[0].x).toHaveLength(12);
+    expect(traces[0].y[0]).toBe(95);
+    expect(traces[0].y[1]).toBe(70);
+    expect(traces[0].y[2]).toBeNull();
+  });
+
+  it('does not emit one row per store in network aggregation', () => {
+    const network = aggregateNetworkSeries(series);
+    const janPoints = network.filter((point) => point.period_label === '2025-01');
+    expect(janPoints).toHaveLength(1);
   });
 
   it('builds actual and tier traces for all four tiers', () => {
