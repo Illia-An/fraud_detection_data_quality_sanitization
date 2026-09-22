@@ -93,7 +93,14 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_request, exc: RequestValidationError) -> JSONResponse:
-        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+        errors: list[dict] = []
+        for err in exc.errors():
+            item = dict(err)
+            ctx = item.get("ctx")
+            if isinstance(ctx, dict) and "error" in ctx:
+                item["ctx"] = {**ctx, "error": str(ctx["error"])}
+            errors.append(item)
+        return JSONResponse(status_code=422, content={"detail": errors})
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
@@ -176,7 +183,12 @@ def create_app() -> FastAPI:
                 db_query_a_time_ms: float | None = None
                 db_query_b_time_ms: float | None = None
                 if body.source == "db":
-                    db_query = DbSampleQuery(from_date=DEFAULT_FROM_DATE)
+                    period_start = body.from_date or DEFAULT_FROM_DATE
+                    period_end = body.to_date
+                    db_query = DbSampleQuery(
+                        from_date=period_start,
+                        to_date=period_end,
+                    )
 
                     # Query A — aggregated actual baseline (no raw rows).
                     t_a = time.perf_counter()
@@ -188,9 +200,15 @@ def create_app() -> FastAPI:
                         (time.perf_counter() - t_a) * 1000.0, 3
                     )
                     if actual_baseline.total_responses <= 0:
+                        end_label = (
+                            period_end.isoformat() if period_end is not None else "latest"
+                        )
                         raise HTTPException(
                             status_code=422,
-                            detail="No Q10012 rows from 2026-01-01",
+                            detail=(
+                                f"No Q10012 rows from {period_start.isoformat()} "
+                                f"to {end_label}"
+                            ),
                         )
 
                     # Query B — Tier 1 candidate rows only (not full period).
@@ -224,6 +242,10 @@ def create_app() -> FastAPI:
                         ),
                         "query_a_total_responses": actual_baseline.total_responses,
                         "query_b_candidate_rows": len(sample.rows),
+                        "period_start": period_start.isoformat(),
+                        "period_end": (
+                            period_end.isoformat() if period_end is not None else None
+                        ),
                         **process_source_meta_extra(),
                     }
                 else:

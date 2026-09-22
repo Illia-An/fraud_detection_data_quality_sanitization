@@ -1,7 +1,8 @@
 """Pydantic v2 contracts for the sanitization PoC API.
 
 Architecture contract:
-- POST /api/v1/process accepts ``ProcessRequest`` (inline rows, or ``source=db`` for the 2026+ period).
+- POST /api/v1/process accepts ``ProcessRequest`` (inline rows, or ``source=db``
+  for the configured AnswerTime window; optional ``from_date`` / ``to_date``).
 - Returns ``SanitizationResponse`` with step metrics, store-month panel, KPI deltas, and ``echo_config``.
 - GET /health returns ``HealthResponse``.
 - Physical column names match ``SummerCampain.dbo.TargetsByMetrics_RateGetAnswers``.
@@ -11,7 +12,7 @@ Architecture contract:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -33,6 +34,8 @@ class ResponseMeta(TypedDict, total=False):
     source: str
     sample: dict[str, Any]
     drop_reasons: dict[str, Any]
+    period_start: str
+    period_end: str | None
 
 # Transitional aliases for callers not yet migrated off legacy names.
 ProcessResponse = SanitizationResponse
@@ -89,17 +92,32 @@ class ProcessRequest(BaseModel):
     """Payload for POST /api/v1/process.
 
     ``source=inline`` (default): client sends survey ``rows``.
-    ``source=db``: server loads Q10012 from 2026-01-01 through latest.
+    ``source=db``: server loads Q10012 for ``from_date``..``to_date``
+    (defaults: ``DEFAULT_FROM_DATE`` through latest when omitted).
     """
 
     source: Literal["inline", "db"] = "inline"
     rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=500_000)
     config: PipelineConfig = Field(default_factory=PipelineConfig)
+    from_date: date | None = Field(
+        default=None,
+        description="Inclusive AnswerTime lower bound (source=db). Default: 2025-01-01.",
+    )
+    to_date: date | None = Field(
+        default=None,
+        description="Inclusive AnswerTime upper bound (source=db). Omit for open-ended.",
+    )
 
     @model_validator(mode="after")
     def require_rows_for_inline(self) -> ProcessRequest:
         if self.source == "inline" and not self.rows:
             raise ValueError("rows must not be empty")
+        if (
+            self.from_date is not None
+            and self.to_date is not None
+            and self.from_date > self.to_date
+        ):
+            raise ValueError("from_date must be on or before to_date")
         return self
 
 

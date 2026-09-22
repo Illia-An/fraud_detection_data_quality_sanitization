@@ -85,6 +85,36 @@ def test_process_returns_exact_sanitization_response_with_echo_config() -> None:
     assert isinstance(parsed.meta, dict)
 
 
+def test_process_rejects_from_date_after_to_date() -> None:
+    client = TestClient(create_app())
+    res = client.post(
+        "/api/v1/process",
+        json={
+            "source": "inline",
+            "rows": _sample_rows(),
+            "from_date": "2026-06-01",
+            "to_date": "2026-01-01",
+        },
+    )
+    assert res.status_code == 422, res.text
+
+
+def test_process_accepts_optional_period_fields_on_inline() -> None:
+    client = TestClient(create_app())
+    res = client.post(
+        "/api/v1/process",
+        json={
+            "source": "inline",
+            "rows": _sample_rows(),
+            "from_date": "2025-01-01",
+            "to_date": "2025-12-31",
+            "config": {},
+        },
+    )
+    assert res.status_code == 200, res.text
+    SanitizationResponse.model_validate(res.json())
+
+
 def test_process_openapi_response_model_is_sanitization_response() -> None:
     client = TestClient(create_app())
     schema = client.get("/openapi.json").json()

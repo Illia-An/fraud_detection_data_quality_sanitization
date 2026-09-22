@@ -15,6 +15,7 @@ import {
   type SelectChangeEvent,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
@@ -22,6 +23,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useSample, useSampleDb } from '../api/hooks';
 import { useUiStore } from '../store/uiStore';
 import type { DataSource, SamplePreset } from '../schemas/api';
+import {
+  PERIOD_PRESET_OPTIONS,
+  type PeriodPreset,
+  resolvePeriodWindow,
+} from '../schemas/period';
 
 const SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
   { value: 'db', label: 'Database (Q10012)' },
@@ -34,8 +40,13 @@ export function SampleDataPanel() {
   const lastPreset = useUiStore((state) => state.lastPreset);
   const sampleMeta = useUiStore((state) => state.sampleMeta);
   const surveyRows = useUiStore((state) => state.surveyRows);
+  const periodPreset = useUiStore((state) => state.periodPreset);
+  const customFromDate = useUiStore((state) => state.customFromDate);
+  const customToDate = useUiStore((state) => state.customToDate);
   const setLastPreset = useUiStore((state) => state.setLastPreset);
   const setSurveyData = useUiStore((state) => state.setSurveyData);
+  const setPeriodPreset = useUiStore((state) => state.setPeriodPreset);
+  const setCustomPeriod = useUiStore((state) => state.setCustomPeriod);
 
   const isSynthetic = lastPreset !== 'db';
   const syntheticPreset: SamplePreset = isSynthetic ? lastPreset : 'small';
@@ -52,6 +63,8 @@ export function SampleDataPanel() {
 
   const active = isSynthetic ? synthetic : db;
   const loading = synthetic.isFetching || db.isFetching;
+
+  const resolvedWindow = resolvePeriodWindow(periodPreset, customFromDate, customToDate);
 
   useEffect(() => {
     if (!active.isSuccess || !active.data || active.isFetching) {
@@ -111,6 +124,10 @@ export function SampleDataPanel() {
     }
   };
 
+  const handlePeriodPresetChange = (event: SelectChangeEvent) => {
+    setPeriodPreset(event.target.value as PeriodPreset);
+  };
+
   return (
     <>
       <Card variant="outlined">
@@ -140,6 +157,67 @@ export function SampleDataPanel() {
                 ))}
               </Select>
             </FormControl>
+
+            <FormControl fullWidth size="small" disabled={isSynthetic}>
+              <InputLabel id="survey-period-label">Period</InputLabel>
+              <Select
+                labelId="survey-period-label"
+                label="Period"
+                value={periodPreset}
+                onChange={handlePeriodPresetChange}
+                inputProps={{ 'aria-label': 'Period' }}
+              >
+                {PERIOD_PRESET_OPTIONS.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {isSynthetic ? (
+              <Typography variant="caption" color="text.secondary">
+                Period applies to Database source only. Synthetic presets ignore the window.
+              </Typography>
+            ) : (
+              <Typography variant="caption" color="text.secondary">
+                Process window:{' '}
+                <strong>{resolvedWindow.from_date}</strong>
+                {' → '}
+                <strong>{resolvedWindow.to_date ?? 'latest'}</strong>
+                . Click Run Scenario to apply.
+              </Typography>
+            )}
+
+            {!isSynthetic && periodPreset === 'custom' && (
+              <Stack direction="row" spacing={1}>
+                <TextField
+                  label="From"
+                  type="date"
+                  size="small"
+                  fullWidth
+                  value={customFromDate}
+                  onChange={(event) =>
+                    setCustomPeriod(event.target.value, customToDate)
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  inputProps={{ 'aria-label': 'Period from date' }}
+                />
+                <TextField
+                  label="To"
+                  type="date"
+                  size="small"
+                  fullWidth
+                  value={customToDate}
+                  onChange={(event) =>
+                    setCustomPeriod(customFromDate, event.target.value)
+                  }
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  inputProps={{ 'aria-label': 'Period to date' }}
+                  helperText={customToDate ? undefined : 'Empty = through latest'}
+                />
+              </Stack>
+            )}
 
             {lastPreset === 'db' && (
               <Typography

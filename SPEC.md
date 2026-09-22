@@ -37,6 +37,11 @@ class PipelineConfig(BaseModel):
     tier4_z_threshold: float = Field(default=2.0, ge=0.0)
     tier4_pct_threshold: float = Field(default=90.0, ge=0.0, le=100.0)
 
+# ProcessRequest (API layer — backend/schemas.py) also accepts optional:
+#   from_date: date | None  # inclusive AnswerTime lower bound; default 2025-01-01 for source=db
+#   to_date: date | None    # inclusive upper bound; omit = open-ended through latest
+# Effective window is echoed in SanitizationResponse.meta as period_start / period_end.
+
 class StepMetric(BaseModel):
     step_name: Literal["actual", "tier1", "tier2", "tier3", "tier4"]
     rows_in: int
@@ -119,6 +124,7 @@ The SanitizationResponse.meta field must expose telemetry metrics for pipeline p
 - `db_query_a_time_ms`: Execution and aggregation time for Query A.
 - `db_query_b_time_ms` : Execution time for Query B.
 - `rows_scanned` : Total number of rows processed in Python. This value should decrease significantly compared with the baseline.
+- `period_start` / `period_end` (optional, `source=db`): Effective inclusive AnswerTime window used for Query A/B (`period_end` may be null when open-ended).
 
 ### 5.4. Daily Snapshot (Dev / Interim Fast Path)
 While DBA prepares physical SQL Server tables (`Q10012_Sanitization_Answers` / `_StoreMonth`), the app MAY read a **local SQLite daily snapshot** instead of the production VIEW.
@@ -130,7 +136,7 @@ While DBA prepares physical SQL Server tables (`Q10012_Sanitization_Answers` / `
 - `SANITIZATION_SOURCE=snapshot` — Query A/B hit local SQLite via `SNAPSHOT_URL` (default `sqlite:///data/q10012_snapshot.sqlite`).
 
 **Refresh job:** `scripts/refresh_q10012_snapshot.py` full-reloads from the VIEW once per day (or on demand):
-- Filter: `Question_ID = 10012`, `Answer_Value IS NOT NULL`, `AnswerTime >= 2026-01-01`.
+- Filter: `Question_ID = 10012`, `Answer_Value IS NOT NULL`, `AnswerTime >= 2025-01-01` (override with `--from-date`).
 - Tables: `answers` (fact rows + `LoadedAt`), `store_month` (pre-aggregates), `snapshot_meta` (freshness).
 - PII columns may be stored **locally only**; never commit `*.sqlite` or `*_internal_pii*` exports.
 

@@ -12,6 +12,7 @@ import {
   Card,
   CardContent,
   CardHeader,
+  Chip,
   CircularProgress,
   FormControl,
   InputLabel,
@@ -20,13 +21,16 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   type SelectChangeEvent,
 } from '@mui/material';
 import type { PlotMouseEvent } from 'plotly.js';
 
 import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
+import type { ChartScopeMode, ChartTimeMode } from '../schemas/chartUi';
 import { useUiStore } from '../store/uiStore';
 import {
+  aggregateNetworkSeries,
   applyTraceHoverFocus,
   buildStoreImpactTraces,
   buildStoreImpactXAxis,
@@ -34,7 +38,10 @@ import {
   buildHighlightedMonthShape,
   buildTier4FlagMarkerTrace,
   buildTier4FlagShapes,
+  buildYoYImpactTraces,
+  buildYoYImpactXAxis,
   collectStoreImpactYValues,
+  collectYoYImpactYValues,
   defaultSelectedStoreId,
   filterFlaggedMonthsForStore,
   filterStoreSeries,
@@ -91,10 +98,16 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
   const highlightedPeriodLabel = useUiStore((state) => state.highlightedPeriodLabel);
+  const chartScope = useUiStore((state) => state.chartScope);
+  const setChartScope = useUiStore((state) => state.setChartScope);
+  const chartTimeMode = useUiStore((state) => state.chartTimeMode);
+  const setChartTimeMode = useUiStore((state) => state.setChartTimeMode);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
   const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
+  const isNetwork = chartScope === 'network';
+  const isYoY = chartTimeMode === 'yoy';
   const plotContainerRef = usePlotContainerResize(storeIds.length > 0);
 
   useEffect(() => {
@@ -105,21 +118,36 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   }, [series, selectedStoreId, setSelectedStoreId]);
 
   const activeStoreId = selectedStoreId ?? defaultSelectedStoreId(series, null);
+
   const storePoints = useMemo(
     () => (activeStoreId == null ? [] : filterStoreSeries(series, activeStoreId)),
     [series, activeStoreId],
   );
+
+  const networkPoints = useMemo(() => aggregateNetworkSeries(series), [series]);
+
+  const chartPoints = isNetwork ? networkPoints : storePoints;
+
   const flaggedForStore = useMemo(
     () =>
       activeStoreId == null ? [] : filterFlaggedMonthsForStore(highStoreMonths, activeStoreId),
     [highStoreMonths, activeStoreId],
   );
 
+  /** Store+timeline only: per-store Tier 4 overlays. Network/YoY declutter. */
+  const flaggedForChart = useMemo(
+    () => (isNetwork || isYoY ? [] : flaggedForStore),
+    [isNetwork, isYoY, flaggedForStore],
+  );
+
   const baseTraces = useMemo(() => {
-    const base = buildStoreImpactTraces(storePoints);
-    const flagTrace = buildTier4FlagMarkerTrace(storePoints, flaggedForStore);
+    if (isYoY) {
+      return buildYoYImpactTraces(chartPoints);
+    }
+    const base = buildStoreImpactTraces(chartPoints);
+    const flagTrace = buildTier4FlagMarkerTrace(chartPoints, flaggedForChart);
     return flagTrace ? [...base, flagTrace] : base;
-  }, [storePoints, flaggedForStore]);
+  }, [chartPoints, flaggedForChart, isYoY]);
 
   const traces = useMemo(
     () => applyTraceHoverFocus(baseTraces, focusedTraceIndex),
@@ -127,25 +155,55 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   );
 
   const periodLabels = useMemo(
-    () => storePoints.map((point) => point.period_label),
-    [storePoints],
+    () => chartPoints.map((point) => point.period_label),
+    [chartPoints],
   );
 
   const shapes = useMemo(() => {
-    const bands = buildTier4FlagShapes(periodLabels, flaggedForStore);
+    if (isYoY) {
+      return [];
+    }
+    const bands = buildTier4FlagShapes(periodLabels, flaggedForChart);
     const highlight = buildHighlightedMonthShape(periodLabels, highlightedPeriodLabel);
     return highlight ? [...bands, highlight] : bands;
-  }, [periodLabels, flaggedForStore, highlightedPeriodLabel]);
+  }, [periodLabels, flaggedForChart, highlightedPeriodLabel, isYoY]);
 
   const yAxis = useMemo(
-    () => buildStoreImpactYAxis(yScaleMode, collectStoreImpactYValues(storePoints)),
-    [yScaleMode, storePoints],
+    () =>
+      buildStoreImpactYAxis(
+        yScaleMode,
+        isYoY ? collectYoYImpactYValues(chartPoints) : collectStoreImpactYValues(chartPoints),
+      ),
+    [yScaleMode, chartPoints, isYoY],
   );
-  const xAxis = useMemo(() => buildStoreImpactXAxis(periodLabels), [periodLabels]);
+  const xAxis = useMemo(
+    () => (isYoY ? buildYoYImpactXAxis() : buildStoreImpactXAxis(periodLabels)),
+    [isYoY, periodLabels],
+  );
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
     setFocusedTraceIndex(null);
+  };
+
+  const handleScopeChange = (
+    _event: MouseEvent<HTMLElement>,
+    next: ChartScopeMode | null,
+  ) => {
+    if (next != null) {
+      setChartScope(next);
+      setFocusedTraceIndex(null);
+    }
+  };
+
+  const handleTimeModeChange = (
+    _event: MouseEvent<HTMLElement>,
+    next: ChartTimeMode | null,
+  ) => {
+    if (next != null) {
+      setChartTimeMode(next);
+      setFocusedTraceIndex(null);
+    }
   };
 
   const handleYScaleChange = (
@@ -179,7 +237,43 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
         titleTypographyProps={{ variant: 'subtitle1' }}
         sx={{ pb: 0, pt: 1.5, px: 2 }}
         action={
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5, mr: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            justifyContent="flex-end"
+            sx={{ mt: 0.5, mr: 1, maxWidth: { xs: '100%', md: 640 } }}
+          >
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={chartScope}
+              onChange={handleScopeChange}
+              aria-label="Chart scope"
+            >
+              <ToggleButton value="store" aria-label="Store scope">
+                Store
+              </ToggleButton>
+              <ToggleButton value="network" aria-label="Network scope">
+                Network
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={chartTimeMode}
+              onChange={handleTimeModeChange}
+              aria-label="Chart time mode"
+            >
+              <ToggleButton value="timeline" aria-label="Timeline mode">
+                Timeline
+              </ToggleButton>
+              <ToggleButton value="yoy" aria-label="Year over year mode">
+                YoY
+              </ToggleButton>
+            </ToggleButtonGroup>
             <ToggleButtonGroup
               size="small"
               exclusive
@@ -194,21 +288,53 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
                 0–100%
               </ToggleButton>
             </ToggleButtonGroup>
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="store-impact-store-label">Store</InputLabel>
-              <Select
-                labelId="store-impact-store-label"
-                label="Store"
-                value={activeStoreId ?? ''}
-                onChange={handleStoreChange}
-              >
-                {storeIds.map((storeId) => (
-                  <MenuItem key={storeId} value={storeId}>
-                    Store {storeId}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+            {isNetwork ? (
+              <Tooltip title="Volume-weighted network aggregate for the selected period">
+                <Chip
+                  size="small"
+                  label="Network aggregated"
+                  color="default"
+                  variant="outlined"
+                  sx={{ opacity: 0.85 }}
+                />
+              </Tooltip>
+            ) : null}
+            {isYoY ? (
+              <Tooltip title="Actual + Final per year on shared Jan–Dec axis">
+                <Chip size="small" label="YoY overlay" variant="outlined" sx={{ opacity: 0.85 }} />
+              </Tooltip>
+            ) : null}
+            <Tooltip
+              title={isNetwork ? 'Network aggregated — store selector disabled' : ''}
+              disableHoverListener={!isNetwork}
+            >
+              <span>
+                <FormControl
+                  size="small"
+                  sx={{
+                    minWidth: 120,
+                    opacity: isNetwork ? 0.5 : 1,
+                  }}
+                  disabled={isNetwork}
+                >
+                  <InputLabel id="store-impact-store-label">Store</InputLabel>
+                  <Select
+                    labelId="store-impact-store-label"
+                    label="Store"
+                    value={activeStoreId ?? ''}
+                    onChange={handleStoreChange}
+                    inputProps={{ 'aria-label': 'Store' }}
+                    sx={{ cursor: isNetwork ? 'not-allowed' : undefined }}
+                  >
+                    {storeIds.map((storeId) => (
+                      <MenuItem key={storeId} value={storeId}>
+                        Store {storeId}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </span>
+            </Tooltip>
           </Stack>
         }
       />

@@ -75,6 +75,9 @@ describe('usePipelineRunner', () => {
       sampleGeneration: 0,
       lastPreset: 'db',
       selectedStoreId: null,
+      periodPreset: 'from_2025',
+      customFromDate: '2025-01-01',
+      customToDate: '',
     });
     mockUseProcess.mockReturnValue({
       mutate: vi.fn(),
@@ -134,8 +137,37 @@ describe('usePipelineRunner', () => {
         source: 'db',
         rows: [],
         config: defaultPipelineConfig,
+        from_date: '2025-01-01',
       });
     });
+  });
+
+  it('manual db run uses selected period preset', async () => {
+    const mutate = vi.fn();
+    mockUseProcess.mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useProcess>);
+
+    useUiStore.setState({ periodPreset: 'ytd_2026' });
+    useUiStore.getState().setSurveyData([], dbMeta, 'db');
+    renderRunner();
+
+    await waitFor(() => expect(mutate).toHaveBeenCalled());
+    mutate.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run Scenario' }));
+    expect(mutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'db',
+        from_date: '2026-01-01',
+        to_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      }),
+    );
   });
 
   it('manual run calls mutate', async () => {

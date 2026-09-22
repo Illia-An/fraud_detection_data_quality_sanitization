@@ -16,7 +16,7 @@ Angular 17 PoC reference: git tag `poc/angular-concept` (`frontend/`).
 |--------|--------------------|--------------------|-------------------|
 | GET    | `/health`          | —                  | `HealthResponse`  |
 | GET    | `/api/v1/sample/{preset}` | preset: small/medium/stress | `SampleResponse` |
-| GET    | `/api/v1/sample/db` | optional `store`/`year`/`month` | `SampleResponse` meta only; `AnswerTime >= 2026-01-01` through latest |
+| GET    | `/api/v1/sample/db` | optional `store`/`year`/`month` | `SampleResponse` meta only; `AnswerTime >= 2025-01-01` through latest |
 | POST   | `/api/v1/process`  | `ProcessRequest` (`source=inline` + `rows`, or `source=db`) | `ProcessResponse` |
 
 UI: on start, `GET /sample/db` (period counts) then auto `POST /process` with `source=db` (server loads the period). If the DB is unavailable, fall back to synthetic `small`. Preset buttons still call `GET /sample/{preset}` then `POST /process` with rows.
