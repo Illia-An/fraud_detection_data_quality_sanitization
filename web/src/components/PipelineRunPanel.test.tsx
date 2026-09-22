@@ -85,6 +85,8 @@ describe('PipelineRunPanel', () => {
       sampleGeneration: 0,
       lastPreset: 'db',
       selectedStoreId: null,
+      chartScope: 'network',
+      chartTimeMode: 'timeline',
     });
   });
 

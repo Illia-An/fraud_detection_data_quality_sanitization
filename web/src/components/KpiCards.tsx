@@ -1,6 +1,12 @@
 import { Box, Card, CardContent, Grid2 as Grid, Stack, Typography } from '@mui/material';
+import { useMemo } from 'react';
 
-import type { ProcessResponse, ResponseMeta } from '../schemas/api';
+import type { ProcessResponse, ResponseMeta, StoreImpactPoint } from '../schemas/api';
+import { useUiStore } from '../store/uiStore';
+import {
+  computePeriodKpisFromPoints,
+  filterStoreSeries,
+} from './charts/storeImpactChartData';
 
 interface KpiCardsProps {
   result: ProcessResponse;
@@ -116,21 +122,48 @@ function KpiMetricCard({
   );
 }
 
-/** Verdict strip: Baseline / Final / Network delta / Run telemetry (Phase 3). */
+function resolveStoreKpis(
+  series: StoreImpactPoint[],
+  storeId: number | null,
+): ReturnType<typeof computePeriodKpisFromPoints> {
+  if (storeId == null) {
+    return { baseline_top_box_pct: null, final_top_box_pct: null, delta_pp: null };
+  }
+  return computePeriodKpisFromPoints(filterStoreSeries(series, storeId));
+}
+
+/** Verdict strip: Baseline / Final / delta / Run telemetry. Scope follows chart Store|Network. */
 export function KpiCards({ result }: KpiCardsProps) {
-  const delta = result.network_delta_pp;
+  const chartScope = useUiStore((state) => state.chartScope);
+  const selectedStoreId = useUiStore((state) => state.selectedStoreId);
+
+  const storeKpis = useMemo(
+    () => resolveStoreKpis(result.store_impact_series, selectedStoreId),
+    [result.store_impact_series, selectedStoreId],
+  );
+
+  const useStoreScope = chartScope === 'store';
+  const baseline = useStoreScope ? storeKpis.baseline_top_box_pct : result.baseline_top_box_pct;
+  const finalPct = useStoreScope ? storeKpis.final_top_box_pct : result.final_top_box_pct;
+  const delta = useStoreScope ? storeKpis.delta_pp : result.network_delta_pp;
+
+  const baselineLabel = useStoreScope
+    ? `Store ${selectedStoreId ?? '—'} baseline 5%`
+    : 'Baseline 5%';
+  const finalLabel = useStoreScope ? `Store ${selectedStoreId ?? '—'} final 5%` : 'Final 5%';
+  const deltaLabel = useStoreScope ? `Store ${selectedStoreId ?? '—'} delta` : 'Network delta';
 
   return (
     <Grid container spacing={0.75} alignItems="stretch" data-testid="kpi-telemetry-strip">
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard label="Baseline 5%" value={formatPct(result.baseline_top_box_pct)} />
+        <KpiMetricCard label={baselineLabel} value={formatPct(baseline)} />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard label="Final 5%" value={formatPct(result.final_top_box_pct)} />
+        <KpiMetricCard label={finalLabel} value={formatPct(finalPct)} />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiMetricCard
-          label="Network delta"
+          label={deltaLabel}
           value={formatDelta(delta)}
           valueColor={deltaColor(delta)}
         />

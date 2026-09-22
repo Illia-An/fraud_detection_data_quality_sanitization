@@ -89,6 +89,14 @@ export const processRequestSchema = z
     source: z.enum(['inline', 'db']).default('inline'),
     rows: z.array(surveyAnswerRowSchema).max(500_000).default([]),
     config: pipelineConfigSchema.default({}),
+    from_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullish(),
+    to_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .nullish(),
   })
   .superRefine((value, ctx) => {
     if (value.source === 'inline' && value.rows.length < 1) {
@@ -96,6 +104,17 @@ export const processRequestSchema = z
         code: z.ZodIssueCode.custom,
         message: 'rows must not be empty',
         path: ['rows'],
+      });
+    }
+    if (
+      value.from_date &&
+      value.to_date &&
+      value.from_date > value.to_date
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'from_date must be on or before to_date',
+        path: ['to_date'],
       });
     }
   });

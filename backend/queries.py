@@ -112,6 +112,31 @@ def _store_ids_clause(
     return f"  AND PrintStore IN ({', '.join(placeholders)})\n"
 
 
+def _store_month_period_clause(
+    query: DbSampleQuery,
+    params: dict[str, Any],
+) -> str:
+    """Filter pre-aggregated store_month rows by calendar month of from/to dates.
+
+    Snapshot Query A has no AnswerTime column — month granularity is the finest
+    bound available (inclusive on both ends).
+    """
+    clause = (
+        "  AND (Year > :sm_from_year OR "
+        "(Year = :sm_from_year AND Month >= :sm_from_month))\n"
+    )
+    params["sm_from_year"] = query.from_date.year
+    params["sm_from_month"] = query.from_date.month
+    if query.to_date is not None:
+        clause += (
+            "  AND (Year < :sm_to_year OR "
+            "(Year = :sm_to_year AND Month <= :sm_to_month))\n"
+        )
+        params["sm_to_year"] = query.to_date.year
+        params["sm_to_month"] = query.to_date.month
+    return clause
+
+
 def build_actual_baseline_sql(
     query: DbSampleQuery,
     store_ids: Sequence[int | float] | None = None,
@@ -126,8 +151,8 @@ def build_actual_baseline_sql(
     if dialect == "sqlite":
         params: dict[str, Any] = {}
         where = "WHERE 1 = 1\n"
+        where += _store_month_period_clause(query, params)
         where += _store_ids_clause(store_ids, params)
-        # Snapshot is already filtered to AnswerTime >= DEFAULT; optional year/month.
         if query.year is not None:
             where += "  AND Year = :year\n"
             params["year"] = query.year

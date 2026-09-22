@@ -144,6 +144,36 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
   - Manual / snapshot: changing Tier2 freq or Tier3 min n changes Network delta as expected
 - **Do not commit:** `docs/research/*.xlsx` (local manager exports), `data/*.sqlite`, `.env`
 
+## [TASK-13] Period window + Network chart scope
+- **Role:** Contract Engineer + Frontend Engineer + Drift Verifier
+- **Status:** Done (Phases 1–4)
+- **Branch:** `feat/period-and-network-scope`
+- **Objective:** Optional `from_date`/`to_date` on `/process`; default AnswerTime window from 2025-01-01; Survey Data period presets; Store|Network chart scope (UX research v3). Do not regress 4-tier / `tier2_freq_threshold` ge=2.
+- **Phase 1 (backend) — Done**
+  1. `ProcessRequest.from_date` / `to_date` optional; `from_date > to_date` → 422.
+  2. `source=db` wires window into Query A/B; default `DEFAULT_FROM_DATE=2025-01-01`.
+  3. `meta.period_start` / `meta.period_end` echo effective window.
+  4. Snapshot refresh default aligns with 2025-01-01 (`--from-date` override).
+- **Phase 2 (UI period) — Done**
+  1. Survey Data presets: `2026 YTD` · `2025 – Present` · `Custom Range`.
+  2. `usePipelineRunner` sends resolved `from_date`/`to_date` for `source=db`.
+  3. Synthetic sources: period control disabled (no-op).
+- **Phase 3 (chart scope) — Done**
+  1. Toolbar `[ Store | Network ]`; Network = volume-weighted aggregate from `store_impact_series`.
+  2. Network: store select disabled + «Network aggregated»; no per-store Tier 4 overlays.
+  3. Linear multi-year timeline (no YoY overlay).
+- **Phase 4 (verify) — Done**
+  1. Snapshot rebuilt with `--from-date 2025-01-01` (local only; do not commit).
+  2. Backend/frontend tests green; eslint errors = 0 (PipelineStepsTable react-refresh warnings OK).
+  3. Manual: 2025–Present vs 2026 YTD KPI/response counts diverge after refresh.
+- **Out of scope (deferred):** persist nav; CHART_HEIGHT shared constant; store-funnel.
+- **Experiment (branch ``feat/yoy-and-store-kpi``):** Store-scoped KPI strip + YoY overlay — keep or drop after customer feedback.
+- **Verify**
+  - `uv run pytest tests/test_process_api.py tests/test_snapshot.py tests/test_db_sample.py -q`
+  - `cd web && npm run test:run` / `npm run lint`
+  - Manual: period presets + Store|Network on Sanitization page
+- **Do not commit:** `.env`, `data/*.sqlite`, `docs/research/*.xlsx`
+
 ## [TASK-12] UX Scenario Workbench (Datadog-inspired layout)
 - **Role:** Frontend Engineer
 - **Status:** Done (Phases 1–5)
