@@ -2,7 +2,7 @@
 
 Usage (repo root):
   uv run python scripts/refresh_q10012_snapshot.py
-  uv run python scripts/refresh_q10012_snapshot.py --from-date 2026-01-01
+  uv run python scripts/refresh_q10012_snapshot.py --from-date 2025-01-01
   uv run python scripts/refresh_q10012_snapshot.py --out data/q10012_snapshot.sqlite
 
 Requires DATABASE_URL (SQL Server VIEW). Writes local SQLite (may contain PII —

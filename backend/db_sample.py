@@ -1,7 +1,7 @@
 """Read-only DB sample loader for the sanitization PoC.
 
 Pulls Q10012 rows from ``dbo.TargetsByMetrics_RateGetAnswers`` for a
-bounded ``AnswerTime`` window (default ``from_date=2026-01-01``, optional
+bounded ``AnswerTime`` window (default ``from_date=2025-01-01``, optional
 inclusive ``to_date``). Optional store / year / month filters narrow that
 window. Entity PII is hashed so Tier 1 entity keys still work; name
 columns are never selected.
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 VIEW_NAME = "dbo.TargetsByMetrics_RateGetAnswers"
 QUESTION_ID = 10012
-DEFAULT_FROM_DATE = date(2026, 1, 1)
+DEFAULT_FROM_DATE = date(2025, 1, 1)
 
 # Columns needed by Tier 1/2 + UI — never SELECT *.
 _SELECT_COLUMNS = (

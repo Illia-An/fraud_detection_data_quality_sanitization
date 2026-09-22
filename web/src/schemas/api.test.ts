@@ -244,4 +244,26 @@ describe('processRequestSchema', () => {
     expect(parsed.source).toBe('db');
     expect(parsed.rows).toEqual([]);
   });
+
+  it('accepts optional from_date and to_date for db', () => {
+    const parsed = processRequestSchema.parse({
+      source: 'db',
+      from_date: '2026-01-01',
+      to_date: '2026-09-14',
+      config: defaultPipelineConfig,
+    });
+    expect(parsed.from_date).toBe('2026-01-01');
+    expect(parsed.to_date).toBe('2026-09-14');
+  });
+
+  it('rejects from_date after to_date', () => {
+    expect(() =>
+      processRequestSchema.parse({
+        source: 'db',
+        from_date: '2026-06-01',
+        to_date: '2026-01-01',
+        config: defaultPipelineConfig,
+      }),
+    ).toThrow();
+  });
 });

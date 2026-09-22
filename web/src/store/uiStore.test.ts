@@ -8,6 +8,11 @@ describe('useUiStore survey data', () => {
       selectedStoreId: null,
       highlightedPeriodLabel: null,
       lastPreset: 'db',
+      periodPreset: 'from_2025',
+      customFromDate: '2025-01-01',
+      customToDate: '',
+      chartScope: 'store',
+      chartTimeMode: 'timeline',
       surveyRows: [],
       sampleMeta: null,
       sampleGeneration: 0,
@@ -18,11 +23,30 @@ describe('useUiStore survey data', () => {
   it('has default preset db and no selected store', () => {
     const state = useUiStore.getState();
     expect(state.lastPreset).toBe('db');
+    expect(state.periodPreset).toBe('from_2025');
+    expect(state.chartScope).toBe('store');
+    expect(state.chartTimeMode).toBe('timeline');
     expect(state.selectedStoreId).toBeNull();
     expect(state.highlightedPeriodLabel).toBeNull();
     expect(state.surveyRows).toEqual([]);
     expect(state.sampleMeta).toBeNull();
     expect(state.sampleGeneration).toBe(0);
+  });
+
+  it('updates period preset and custom range', () => {
+    useUiStore.getState().setPeriodPreset('custom');
+    useUiStore.getState().setCustomPeriod('2026-02-01', '2026-02-28');
+    const state = useUiStore.getState();
+    expect(state.periodPreset).toBe('custom');
+    expect(state.customFromDate).toBe('2026-02-01');
+    expect(state.customToDate).toBe('2026-02-28');
+  });
+
+  it('updates chart scope and time mode', () => {
+    useUiStore.getState().setChartScope('network');
+    useUiStore.getState().setChartTimeMode('yoy');
+    expect(useUiStore.getState().chartScope).toBe('network');
+    expect(useUiStore.getState().chartTimeMode).toBe('yoy');
   });
 
   it('updates selectedStoreId, lastPreset, and survey data', () => {

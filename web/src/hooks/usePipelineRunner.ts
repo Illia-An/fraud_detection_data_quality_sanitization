@@ -1,7 +1,12 @@
 import { useEffect, useRef } from 'react';
 
 import { useProcess } from '../api/hooks';
-import type { PipelineConfig, ProcessResponse } from '../schemas/api';
+import type { PipelineConfig, ProcessRequest, ProcessResponse } from '../schemas/api';
+import {
+  periodFieldsForProcess,
+  resolvePeriodWindow,
+  type PeriodPreset,
+} from '../schemas/period';
 import { useUiStore } from '../store/uiStore';
 
 export interface PipelineRunner {
@@ -14,11 +19,40 @@ export interface PipelineRunner {
   handleRun: () => void;
 }
 
+function buildProcessRequest(
+  config: PipelineConfig,
+  options: {
+    useDbSource: boolean;
+    surveyRows: ProcessRequest['rows'];
+    periodPreset: PeriodPreset;
+    customFromDate: string;
+    customToDate: string;
+  },
+): ProcessRequest {
+  if (!options.useDbSource) {
+    return { source: 'inline', rows: options.surveyRows, config };
+  }
+  const window = resolvePeriodWindow(
+    options.periodPreset,
+    options.customFromDate,
+    options.customToDate,
+  );
+  return {
+    source: 'db',
+    rows: [],
+    config,
+    ...periodFieldsForProcess(window),
+  };
+}
+
 export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
   const lastPreset = useUiStore((state) => state.lastPreset);
   const surveyRows = useUiStore((state) => state.surveyRows);
   const sampleMeta = useUiStore((state) => state.sampleMeta);
   const sampleGeneration = useUiStore((state) => state.sampleGeneration);
+  const periodPreset = useUiStore((state) => state.periodPreset);
+  const customFromDate = useUiStore((state) => state.customFromDate);
+  const customToDate = useUiStore((state) => state.customToDate);
   const processResult = useUiStore((state) => state.processResult);
   const setProcessResult = useUiStore((state) => state.setProcessResult);
 
@@ -46,9 +80,13 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     autoRunKeyRef.current = sampleGeneration;
     reset();
     mutate(
-      useDbSource
-        ? { source: 'db', rows: [], config }
-        : { source: 'inline', rows: surveyRows, config },
+      buildProcessRequest(config, {
+        useDbSource,
+        surveyRows,
+        periodPreset,
+        customFromDate,
+        customToDate,
+      }),
     );
   }, [
     canRun,
@@ -59,6 +97,9 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     useDbSource,
     config,
     surveyRows,
+    periodPreset,
+    customFromDate,
+    customToDate,
   ]);
 
   const handleRun = () => {
@@ -68,9 +109,13 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     autoRunKeyRef.current = sampleGeneration;
     reset();
     mutate(
-      useDbSource
-        ? { source: 'db', rows: [], config }
-        : { source: 'inline', rows: surveyRows, config },
+      buildProcessRequest(config, {
+        useDbSource,
+        surveyRows,
+        periodPreset,
+        customFromDate,
+        customToDate,
+      }),
     );
   };
 

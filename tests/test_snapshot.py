@@ -53,6 +53,21 @@ def test_build_actual_baseline_sql_snapshot_uses_store_month() -> None:
     assert "GROUP BY" not in sql
     assert "total_count" in sql
     assert params["store_id_0"] == 82
+    assert params["sm_from_year"] == 2026
+    assert params["sm_from_month"] == 1
+    assert "sm_to_year" not in params
+
+
+def test_build_actual_baseline_sql_snapshot_applies_to_date() -> None:
+    sql, params = build_actual_baseline_sql(
+        DbSampleQuery(from_date=date(2026, 2, 1), to_date=date(2026, 2, 28)),
+        dialect="sqlite",
+    )
+    assert "sm_to_year" in sql or ":sm_to_year" in sql
+    assert params["sm_from_year"] == 2026
+    assert params["sm_from_month"] == 2
+    assert params["sm_to_year"] == 2026
+    assert params["sm_to_month"] == 2
 
 
 def test_build_tier_candidate_sql_snapshot_uses_answers() -> None:
@@ -183,6 +198,35 @@ def test_process_db_uses_snapshot(
     assert body["meta"]["execution_time_ms"] > 0
     assert body["meta"]["db_query_a_time_ms"] is not None
     assert body["meta"]["db_query_b_time_ms"] is not None
+    assert body["meta"]["period_start"] == "2025-01-01"
+    assert body["meta"]["period_end"] is None
+
+
+def test_process_db_respects_custom_period(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Narrow window to Feb-2026 only — one store-month cell in the mini snapshot."""
+    db_path = tmp_path / "proc_period.sqlite"
+    _seed_mini_snapshot(db_path)
+    monkeypatch.setenv("SANITIZATION_SOURCE", "snapshot")
+    monkeypatch.setenv("SNAPSHOT_URL", f"sqlite:///{db_path.as_posix()}")
+
+    client = TestClient(create_app())
+    resp = client.post(
+        "/api/v1/process",
+        json={
+            "source": "db",
+            "config": {},
+            "from_date": "2026-02-01",
+            "to_date": "2026-02-28",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["meta"]["period_start"] == "2026-02-01"
+    assert body["meta"]["period_end"] == "2026-02-28"
+    assert body["meta"]["query_a_total_responses"] == 1
+    assert body["baseline_top_box_pct"] == 100.0
 
 
 def test_process_snapshot_missing_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
