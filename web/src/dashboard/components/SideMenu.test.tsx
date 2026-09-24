@@ -22,6 +22,7 @@ describe('SideMenu', () => {
 
     expect(screen.getByText('Survey Sanitization')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Sanitization/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Planner$/i })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }));
 

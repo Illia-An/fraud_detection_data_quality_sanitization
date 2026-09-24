@@ -17,6 +17,7 @@ import {
   type SamplePreset,
   type SampleResponse,
 } from '../schemas/api';
+import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 
 export class ApiError extends Error {
   constructor(
@@ -99,6 +100,14 @@ export function fetchSampleDb(params: SampleDbParams = {}): Promise<SampleRespon
 export function postProcess(request: ProcessRequest): Promise<ProcessResponse> {
   const body = processRequestSchema.parse(request);
   return fetchJson(`${API_BASE_URL}${API_PREFIX}/process`, processResponseSchema, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function postPlan(request: PlanRequest): Promise<PlanResponse> {
+  const body = planRequestSchema.parse(request);
+  return fetchJson(`${API_BASE_URL}${API_PREFIX}/plans`, planResponseSchema, {
     method: 'POST',
     body: JSON.stringify(body),
   });
