@@ -13,4 +13,9 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: /Documentation/i })).toBeInTheDocument();
     expect(screen.queryByText(/How it works/)).not.toBeInTheDocument();
   });
+
+  it('exposes Planner in the side menu', () => {
+    render(<App />);
+    expect(screen.getByRole('link', { name: /^Planner$/i })).toBeInTheDocument();
+  });
 });
