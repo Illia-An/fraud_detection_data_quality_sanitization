@@ -100,6 +100,7 @@ describe('StoreAuditDrawer', () => {
     renderDrawer();
 
     expect(screen.getAllByText(/Store 10/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Session sandbox what-if/i)).toBeInTheDocument();
     expect(screen.getByText(/Plan vs actual/i)).toBeInTheDocument();
     expect(screen.getByText(/as of gap/i)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /Plan vs actual gap/i })).toBeInTheDocument();

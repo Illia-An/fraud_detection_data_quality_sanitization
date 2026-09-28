@@ -11,8 +11,8 @@ interface PlannerSandboxBarProps {
 }
 
 /**
- * V4.2 sticky draft bar — session Commit (Accept) + Export; no DB write-back.
- * Height ~44px, amber treatment.
+ * Datadog-style sticky draft bar — session Commit + Export; no DB write-back.
+ * Height ~44px, amber treatment. Shown only when isDirty.
  */
 export function PlannerSandboxBar({
   targetPct,
@@ -25,6 +25,7 @@ export function PlannerSandboxBar({
   return (
     <Box
       role="status"
+      data-testid="planner-sandbox-bar"
       sx={{
         position: 'sticky',
         top: 0,
@@ -36,14 +37,14 @@ export function PlannerSandboxBar({
         flexWrap: 'wrap',
         px: 1.5,
         py: 0.75,
-        bgcolor: 'rgba(237, 108, 2, 0.12)',
+        bgcolor: 'rgba(237, 108, 2, 0.10)',
         borderBottom: 1,
-        borderColor: 'rgba(237, 108, 2, 0.35)',
+        borderColor: 'rgba(237, 108, 2, 0.20)',
         color: 'warning.dark',
       }}
     >
       <Typography variant="body2" sx={{ flex: 1, minWidth: 200, fontWeight: 600 }}>
-        Draft simulation — unsaved scenario
+        Draft Scenario (Unsaved)
         <Typography component="span" variant="body2" sx={{ fontWeight: 400, ml: 0.75 }}>
           Target {targetPct.toFixed(1)}% · {horizonMonths} mo
           {hasAcceptedSnapshot ? ' · differs from accepted' : ' · no accepted snapshot yet'}
@@ -53,10 +54,10 @@ export function PlannerSandboxBar({
       </Typography>
       <Stack direction="row" spacing={1} alignItems="center">
         <Button color="inherit" size="small" onClick={onDiscard}>
-          Discard changes
+          Discard Draft
         </Button>
         <Button color="warning" size="small" variant="contained" onClick={onCommitSession}>
-          Commit plan
+          Commit to Session
         </Button>
         <Button
           color="inherit"

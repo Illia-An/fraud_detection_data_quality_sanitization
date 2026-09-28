@@ -34,6 +34,7 @@ import { usePlan } from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import { PlannerBaselineBadge } from '../components/planner/PlannerBaselineBadge';
+import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
 import { PlannerSandboxBar } from '../components/planner/PlannerSandboxBar';
 import {
   PLANNER_RUN_BLOCK_TOOLTIPS,
@@ -353,101 +354,31 @@ export function PlannerPage() {
           </Alert>
         )}
 
-        <Card variant="outlined">
-          <CardHeader title="5% Score" subheader="Allocation levers" sx={{ pb: 0.5 }} />
+        <Card variant="outlined" data-testid="allocation-levers">
+          <CardHeader
+            title="Allocation levers"
+            subheader="Q10012 top-box · primary knobs"
+            sx={{ pb: 0.5 }}
+          />
           <CardContent sx={{ pt: 1 }}>
-            <Stack spacing={1}>
+            <Stack spacing={1.25}>
               <PlannerBaselineBadge
                 panel={panel}
                 processResult={processResult}
                 baselineReady={baselineReady}
               />
-              <Typography variant="body2">
-                Current:{' '}
-                <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="body2">Direction:</Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Typography variant="body2">
+                  Current:{' '}
+                  <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+                </Typography>
                 <Chip
                   size="small"
                   label={directionLabel}
                   color={directionLabel.startsWith('Improve') ? 'success' : 'default'}
                 />
               </Stack>
-            </Stack>
-          </CardContent>
-        </Card>
 
-        <Card variant="outlined">
-          <CardHeader title="Data & reference" sx={{ pb: 0.5 }} />
-          <CardContent sx={{ pt: 1 }}>
-            <FormControl fullWidth size="small" disabled={!baselineReady || refs.length === 0}>
-              <InputLabel id="ref-period-label">Reference period</InputLabel>
-              <Select
-                labelId="ref-period-label"
-                label="Reference period"
-                value={
-                  effectiveYear != null && effectiveMonth != null
-                    ? periodLabel(effectiveYear, effectiveMonth)
-                    : ''
-                }
-                onChange={(event) => {
-                  const [y, m] = event.target.value.split('-').map(Number);
-                  setReferenceYear(y);
-                  setReferenceMonth(m);
-                  clearAll();
-                  setAsOfYear(null);
-                  setAsOfMonth(null);
-                }}
-              >
-                {refs.map((ref) => (
-                  <MenuItem key={periodLabel(ref.year, ref.month)} value={periodLabel(ref.year, ref.month)}>
-                    {periodLabel(ref.year, ref.month)}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </CardContent>
-        </Card>
-
-        <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography variant="subtitle2">
-              Stores at reference ({baselineRows.length})
-            </Typography>
-          </AccordionSummary>
-          <AccordionDetails sx={{ maxHeight: 180, overflow: 'auto', pt: 0 }}>
-            {baselineRows.length === 0 ? (
-              <Typography variant="caption" color="text.secondary">
-                No store scores for this reference month.
-              </Typography>
-            ) : (
-              <Stack spacing={0.25}>
-                {baselineRows
-                  .slice()
-                  .sort((a, b) => a.five_percent - b.five_percent)
-                  .map((row) => (
-                    <Stack
-                      key={row.store_id}
-                      direction="row"
-                      justifyContent="space-between"
-                      spacing={1}
-                    >
-                      <Typography variant="caption">{row.store_id}</Typography>
-                      <Typography variant="caption" fontWeight={600}>
-                        {row.five_percent.toFixed(1)}%
-                      </Typography>
-                    </Stack>
-                  ))}
-              </Stack>
-            )}
-          </AccordionDetails>
-        </Accordion>
-
-        <Card variant="outlined">
-          <CardHeader title="Planner parameters" sx={{ pb: 0.5 }} />
-          <CardContent sx={{ pt: 1 }}>
-            <Stack spacing={1.25}>
               <TextField
                 label="Target (%)"
                 type="number"
@@ -458,7 +389,7 @@ export function PlannerPage() {
                 inputProps={{ min: 0, max: 100, step: 0.1 }}
               />
               <TextField
-                label="Months"
+                label="Horizon (months)"
                 type="number"
                 size="small"
                 value={horizon}
@@ -466,35 +397,49 @@ export function PlannerPage() {
                 onChange={(e) => setHorizon(Number(e.target.value))}
                 inputProps={{ min: 1, max: 60 }}
               />
-              <TextField
-                label="Max monthly improve"
-                type="number"
-                size="small"
-                value={params.max_monthly_improve}
-                disabled={!baselineReady}
-                onChange={(e) =>
-                  setParams((p) => ({ ...p, max_monthly_improve: Number(e.target.value) }))
-                }
-                inputProps={{ min: 0.01, step: 0.1 }}
-              />
+              <FormControl fullWidth size="small" disabled={!baselineReady || refs.length === 0}>
+                <InputLabel id="ref-period-label">Reference month</InputLabel>
+                <Select
+                  labelId="ref-period-label"
+                  label="Reference month"
+                  value={
+                    effectiveYear != null && effectiveMonth != null
+                      ? periodLabel(effectiveYear, effectiveMonth)
+                      : ''
+                  }
+                  onChange={(event) => {
+                    const [y, m] = event.target.value.split('-').map(Number);
+                    setReferenceYear(y);
+                    setReferenceMonth(m);
+                    clearAll();
+                    setAsOfYear(null);
+                    setAsOfMonth(null);
+                  }}
+                >
+                  {refs.map((ref) => (
+                    <MenuItem
+                      key={periodLabel(ref.year, ref.month)}
+                      value={periodLabel(ref.year, ref.month)}
+                    >
+                      {periodLabel(ref.year, ref.month)}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
 
-              <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: 'divider' }}>
+              <Accordion
+                disableGutters
+                elevation={0}
+                defaultExpanded={false}
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+              >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption">Advanced (trajectory / priority)</Typography>
+                  <Typography variant="caption" fontWeight={600}>
+                    Advanced allocator options
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={1.25}>
-                    <TextField
-                      label="Priority power"
-                      type="number"
-                      size="small"
-                      value={params.priority_power}
-                      disabled={!baselineReady}
-                      onChange={(e) =>
-                        setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
-                      }
-                      inputProps={{ min: 0.1, step: 0.1 }}
-                    />
                     <FormControl fullWidth size="small" disabled={!baselineReady}>
                       <InputLabel id="traj-label">Trajectory</InputLabel>
                       <Select
@@ -509,10 +454,35 @@ export function PlannerPage() {
                         }
                       >
                         <MenuItem value="uniform">Uniform</MenuItem>
-                        <MenuItem value="front_loaded">Front loaded</MenuItem>
+                        <MenuItem value="front_loaded">Front-loaded</MenuItem>
                         <MenuItem value="accelerated">Accelerated</MenuItem>
                       </Select>
                     </FormControl>
+                    <TextField
+                      label="Lift priority power"
+                      type="number"
+                      size="small"
+                      value={params.priority_power}
+                      disabled={!baselineReady}
+                      onChange={(e) =>
+                        setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
+                      }
+                      inputProps={{ min: 0.1, step: 0.1 }}
+                    />
+                    <TextField
+                      label="Max monthly improve (%)"
+                      type="number"
+                      size="small"
+                      value={params.max_monthly_improve}
+                      disabled={!baselineReady}
+                      onChange={(e) =>
+                        setParams((p) => ({
+                          ...p,
+                          max_monthly_improve: Number(e.target.value),
+                        }))
+                      }
+                      inputProps={{ min: 0.01, step: 0.1 }}
+                    />
                     <TextField
                       label="Trajectory power"
                       type="number"
@@ -536,6 +506,45 @@ export function PlannerPage() {
                       inputProps={{ min: 0, max: 1, step: 0.1 }}
                     />
                   </Stack>
+                </AccordionDetails>
+              </Accordion>
+
+              <Accordion
+                disableGutters
+                elevation={0}
+                defaultExpanded={false}
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="caption" fontWeight={600}>
+                    Stores at reference ({baselineRows.length})
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ maxHeight: 160, overflow: 'auto', pt: 0 }}>
+                  {baselineRows.length === 0 ? (
+                    <Typography variant="caption" color="text.secondary">
+                      No store scores for this reference month.
+                    </Typography>
+                  ) : (
+                    <Stack spacing={0.25}>
+                      {baselineRows
+                        .slice()
+                        .sort((a, b) => a.five_percent - b.five_percent)
+                        .map((row) => (
+                          <Stack
+                            key={row.store_id}
+                            direction="row"
+                            justifyContent="space-between"
+                            spacing={1}
+                          >
+                            <Typography variant="caption">{row.store_id}</Typography>
+                            <Typography variant="caption" fontWeight={600}>
+                              {row.five_percent.toFixed(1)}%
+                            </Typography>
+                          </Stack>
+                        ))}
+                    </Stack>
+                  )}
                 </AccordionDetails>
               </Accordion>
 
@@ -567,7 +576,7 @@ export function PlannerPage() {
                     disabled={!draftPlan}
                     onClick={handleExportCsv}
                   >
-                    Export Excel (CSV)
+                    Export CSV
                   </Button>
                 </span>
               </Tooltip>
@@ -662,6 +671,14 @@ export function PlannerPage() {
             }}
           >
             <Stack spacing={1.5} sx={{ flexShrink: 0 }}>
+              <PlannerContextStrip
+                panel={panel}
+                processResult={processResult}
+                baselineReady={baselineReady}
+                draftPlan={draftPlan}
+                horizonMonths={horizon}
+              />
+
               {isDirty && (
                 <PlannerSandboxBar
                   targetPct={draftPlan.target}
@@ -702,10 +719,12 @@ export function PlannerPage() {
                 sx={{
                   flex: { xs: 'none', md: monitoring ? '3 1 0%' : '1 1 0%' },
                   minWidth: 0,
-                  minHeight: { xs: 'auto', md: 0 },
+                  minHeight: { xs: 360, md: 0 },
                   height: { md: '100%' },
                   display: 'flex',
                   overflow: 'hidden',
+                  position: 'relative',
+                  zIndex: 0,
                 }}
               >
                 <Card
@@ -724,8 +743,8 @@ export function PlannerPage() {
                   }}
                 >
                   <CardHeader
-                    title="Hero simulation"
-                    subheader="Accepted / baseline vs draft · target line"
+                    title="Hero evaluation"
+                    subheader="Cleansed fact left of as-of · draft forecast + cone right · target marker"
                     sx={{ flexShrink: 0, pb: 0 }}
                   />
                   <CardContent
@@ -739,18 +758,37 @@ export function PlannerPage() {
                       '&:last-child': { pb: 1.5 },
                     }}
                   >
-                    <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    {panel ? (
                       <HeroSimulationChart
                         draftPlan={draftPlan}
                         approvedPlan={approvedPlan}
+                        panel={panel}
+                        asOfYear={
+                          monitoring?.as_of_year ??
+                          asOfYear ??
+                          draftPlan.chain_trajectory[0]?.year ??
+                          effectiveYear ??
+                          new Date().getFullYear()
+                        }
+                        asOfMonth={
+                          monitoring?.as_of_month ??
+                          asOfMonth ??
+                          draftPlan.chain_trajectory[0]?.month ??
+                          effectiveMonth ??
+                          1
+                        }
                         slackBandPp={Math.min(2, params.max_monthly_improve * 0.35)}
                       />
-                    </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Cleansed panel required for evaluation view.
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
               </Box>
 
-              {monitoring && (
+              {panel && monitoring && (
                 <Box
                   sx={{
                     flex: { xs: 'none', md: '2 1 0%' },
@@ -759,6 +797,8 @@ export function PlannerPage() {
                     height: { md: '100%' },
                     display: 'flex',
                     overflow: 'hidden',
+                    position: 'relative',
+                    zIndex: 1,
                   }}
                 >
                   <Card
@@ -775,7 +815,7 @@ export function PlannerPage() {
                   >
                     <CardHeader
                       title="At-risk entities"
-                      subheader="Exception list · Inspect opens store audit drawer"
+                      subheader="Exception list · Behind / Gainers / All · Inspect opens sandbox"
                       sx={{ flexShrink: 0, pb: 0.5 }}
                     />
                     <CardContent
@@ -793,6 +833,7 @@ export function PlannerPage() {
                         plan={draftPlan}
                         approvedPlan={approvedPlan}
                         baselineRows={baselineRows}
+                        panel={panel}
                         insights={monitoring}
                         asOfOptions={draftPlan.chain_trajectory.map((m) => ({
                           year: m.year,

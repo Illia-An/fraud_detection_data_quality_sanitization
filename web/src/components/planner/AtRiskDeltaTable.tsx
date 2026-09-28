@@ -5,6 +5,7 @@ import {
   Chip,
   FormControl,
   InputLabel,
+  LinearProgress,
   MenuItem,
   Select,
   Stack,
@@ -23,22 +24,24 @@ import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
 import {
   SIGNAL_COLORS,
-  SIGNAL_LABELS,
   type MonitorSignal,
   type PlanMonitoringInsights,
 } from '../../schemas/planMonitoring';
+import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 
 export interface StoreBaselineRow {
   store_id: number;
   five_percent: number;
 }
 
-export type AtRiskFilter = 'behind' | 'top_gainers' | 'top_losers' | 'all';
+/** DD exception filters — Behind Plan Only | Top Gainers | All Stores. */
+export type AtRiskFilter = 'behind' | 'top_gainers' | 'all';
 
 interface AtRiskDeltaTableProps {
   plan: FivePercentPlan;
   approvedPlan: FivePercentPlan | null;
   baselineRows: StoreBaselineRow[];
+  panel: SanitizedPanel;
   insights: PlanMonitoringInsights;
   asOfOptions: { year: number; month: number }[];
   onAsOfChange: (year: number, month: number) => void;
@@ -52,43 +55,54 @@ function formatPct(value: number | null): string {
   return value.toFixed(1);
 }
 
-function formatDelta(value: number | null): string {
+function formatGapPp(value: number | null): string {
   if (value == null || Number.isNaN(value)) {
     return '—';
   }
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)}`;
+  return `${sign}${value.toFixed(1)} pp`;
 }
 
-function lastScore(plan: FivePercentPlan, storeId: number): number | null {
-  const projection = plan.projections.find((p) => p.store_id === storeId);
-  if (!projection || projection.months.length === 0) {
-    return null;
-  }
-  return projection.months[projection.months.length - 1]?.score ?? null;
+function volumeAtAsOf(
+  panel: SanitizedPanel,
+  storeId: number,
+  year: number,
+  month: number,
+): number | null {
+  const row = panel.rows.find(
+    (r) => r.store_id === storeId && r.year === year && r.month === month,
+  );
+  return row?.survey_volume ?? null;
 }
 
-function statusLabel(signal: MonitorSignal, delta: number | null): string {
+function statusLabel(signal: MonitorSignal): string {
   if (signal === 'behind_plan') {
     return 'Behind Plan';
   }
   if (signal === 'ahead_of_plan') {
-    return 'Recovered';
-  }
-  if (delta != null && delta > 0.5) {
-    return 'Recovered';
+    return 'Ahead';
   }
   if (signal === 'insufficient_history') {
     return 'No actual';
   }
-  return SIGNAL_LABELS[signal];
+  return 'On plan';
 }
 
-/** V4.2 Component E — exception-focused store impact table. */
+/** Deficit strip scale — |gap| capped at 10 pp → 100%. */
+function deficitProgress01(gapPp: number | null): number {
+  if (gapPp == null || gapPp >= 0) {
+    return 0;
+  }
+  return Math.min(1, Math.abs(gapPp) / 10);
+}
+
+/**
+ * Datadog SLO Group Table pattern — Management by Exception.
+ * Columns: Store · Actual as-of · Target as-of · Gap · Volume · Inspect.
+ */
 export function AtRiskDeltaTable({
   plan,
-  approvedPlan,
-  baselineRows,
+  panel,
   insights,
   asOfOptions,
   onAsOfChange,
@@ -96,60 +110,63 @@ export function AtRiskDeltaTable({
 }: AtRiskDeltaTableProps) {
   const [filter, setFilter] = useState<AtRiskFilter>('behind');
   const asOfValue = periodLabel(insights.as_of_year, insights.as_of_month);
-  const lastPeriod = plan.chain_trajectory[plan.chain_trajectory.length - 1];
-  const lastLabel = lastPeriod ? periodLabel(lastPeriod.year, lastPeriod.month) : '—';
 
   const rows = useMemo(() => {
-    const baselineMap = new Map(baselineRows.map((r) => [r.store_id, r.five_percent]));
-    const signalByStore = new Map(insights.stores.map((s) => [s.store_id, s]));
-
     const built = plan.projections.map((projection) => {
       const storeId = projection.store_id;
-      const approvedPct =
-        (approvedPlan ? lastScore(approvedPlan, storeId) : null) ??
-        baselineMap.get(storeId) ??
-        null;
-      const simulatedPct = lastScore(plan, storeId);
-      const delta =
-        approvedPct != null && simulatedPct != null ? simulatedPct - approvedPct : null;
-      const monitor = signalByStore.get(storeId);
+      const monitor = insights.stores.find((s) => s.store_id === storeId);
       const signal = monitor?.signal ?? 'insufficient_history';
+      const actual = monitor?.actual ?? null;
+      const targetAtAsOf = monitor?.planned ?? null;
+      const gapPp = monitor?.deviation ?? null;
+      const volume = volumeAtAsOf(
+        panel,
+        storeId,
+        insights.as_of_year,
+        insights.as_of_month,
+      );
       return {
         storeId,
-        approvedPct,
-        simulatedPct,
-        delta,
+        actual,
+        targetAtAsOf,
+        gapPp,
+        volume,
         signal,
-        status: statusLabel(signal, delta),
+        status: statusLabel(signal),
       };
     });
 
-    let filtered = built;
     if (filter === 'behind') {
-      filtered = built.filter((r) => r.signal === 'behind_plan');
-      filtered = [...filtered].sort((a, b) => (a.delta ?? 0) - (b.delta ?? 0));
-    } else if (filter === 'top_gainers') {
-      filtered = [...built].sort((a, b) => (b.delta ?? -999) - (a.delta ?? -999)).slice(0, 15);
-    } else if (filter === 'top_losers') {
-      filtered = [...built].sort((a, b) => (a.delta ?? 999) - (b.delta ?? 999)).slice(0, 15);
-    } else {
-      filtered = [...built].sort((a, b) => {
-        const rank = (s: MonitorSignal) =>
-          s === 'behind_plan' ? 0 : s === 'insufficient_history' ? 1 : s === 'on_plan' ? 2 : 3;
-        const d = rank(a.signal) - rank(b.signal);
-        return d !== 0 ? d : (a.delta ?? 0) - (b.delta ?? 0);
-      });
+      return built
+        .filter((r) => r.signal === 'behind_plan')
+        .sort((a, b) => (a.gapPp ?? 0) - (b.gapPp ?? 0));
     }
-    return filtered;
-  }, [plan, approvedPlan, baselineRows, insights, filter]);
+    if (filter === 'top_gainers') {
+      return [...built]
+        .sort((a, b) => (b.gapPp ?? -999) - (a.gapPp ?? -999))
+        .slice(0, 15);
+    }
+    return [...built].sort((a, b) => {
+      const rank = (s: MonitorSignal) =>
+        s === 'behind_plan' ? 0 : s === 'insufficient_history' ? 1 : s === 'on_plan' ? 2 : 3;
+      const d = rank(a.signal) - rank(b.signal);
+      return d !== 0 ? d : (a.gapPp ?? 0) - (b.gapPp ?? 0);
+    });
+  }, [plan, panel, insights, filter]);
 
   return (
-    <Stack spacing={1} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+    <Stack spacing={1} sx={{ flex: 1, minHeight: 0, height: '100%' }} data-testid="atrisk-exception-table">
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={1}
         alignItems={{ sm: 'center' }}
-        sx={{ flexShrink: 0 }}
+        sx={{
+          flexShrink: 0,
+          flexWrap: 'wrap',
+          overflowX: 'auto',
+          pb: 0.25,
+          '&::-webkit-scrollbar': { height: 6 },
+        }}
       >
         <ToggleButtonGroup
           size="small"
@@ -161,10 +178,9 @@ export function AtRiskDeltaTable({
             }
           }}
         >
-          <ToggleButton value="behind">At risk (behind)</ToggleButton>
-          <ToggleButton value="top_gainers">Top gainers</ToggleButton>
-          <ToggleButton value="top_losers">Top losers</ToggleButton>
-          <ToggleButton value="all">All</ToggleButton>
+          <ToggleButton value="behind">Behind Plan Only</ToggleButton>
+          <ToggleButton value="top_gainers">Top Gainers</ToggleButton>
+          <ToggleButton value="all">All Stores</ToggleButton>
         </ToggleButtonGroup>
         <FormControl size="small" sx={{ minWidth: 140 }}>
           <InputLabel id="atrisk-as-of">Status as of</InputLabel>
@@ -178,7 +194,10 @@ export function AtRiskDeltaTable({
             }}
           >
             {asOfOptions.map((opt) => (
-              <MenuItem key={periodLabel(opt.year, opt.month)} value={periodLabel(opt.year, opt.month)}>
+              <MenuItem
+                key={periodLabel(opt.year, opt.month)}
+                value={periodLabel(opt.year, opt.month)}
+              >
                 {periodLabel(opt.year, opt.month)}
               </MenuItem>
             ))}
@@ -213,15 +232,15 @@ export function AtRiskDeltaTable({
             <TableRow>
               <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Approved %
+                Actual as-of
               </TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Simulated % ({lastLabel})
+                Target as-of
               </TableCell>
+              <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Gap</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Δ pp
+                Volume
               </TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
                 Action
               </TableCell>
@@ -237,61 +256,86 @@ export function AtRiskDeltaTable({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
-                <TableRow key={row.storeId} hover>
-                  <TableCell>{row.storeId}</TableCell>
-                  <TableCell align="right">{formatPct(row.approvedPct)}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
-                    {formatPct(row.simulatedPct)}
-                  </TableCell>
-                  <TableCell
-                    align="right"
-                    sx={{
-                      color:
-                        row.delta == null
-                          ? undefined
-                          : row.delta >= 0
-                            ? 'success.main'
-                            : 'error.main',
-                    }}
+              rows.map((row) => {
+                const deficit = deficitProgress01(row.gapPp);
+                return (
+                  <TableRow
+                    key={row.storeId}
+                    hover
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => onInspect(row.storeId)}
                   >
-                    <Chip
-                      size="small"
-                      label={formatDelta(row.delta)}
-                      color={
-                        row.delta == null ? 'default' : row.delta >= 0 ? 'success' : 'error'
-                      }
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={row.status}
-                      sx={{
-                        bgcolor: SIGNAL_COLORS[row.signal],
-                        color: '#fff',
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      endIcon={<ArrowForwardIcon />}
-                      onClick={() => onInspect(row.storeId)}
-                    >
-                      Inspect
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
+                    <TableCell>
+                      <Stack spacing={0.25}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {row.storeId}
+                        </Typography>
+                        <Chip
+                          size="small"
+                          label={row.status}
+                          sx={{
+                            bgcolor: SIGNAL_COLORS[row.signal],
+                            color: '#fff',
+                            height: 20,
+                            alignSelf: 'flex-start',
+                          }}
+                        />
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="right">{formatPct(row.actual)}</TableCell>
+                    <TableCell align="right">{formatPct(row.targetAtAsOf)}</TableCell>
+                    <TableCell>
+                      <Stack spacing={0.5}>
+                        <Chip
+                          size="small"
+                          label={formatGapPp(row.gapPp)}
+                          color={
+                            row.gapPp == null
+                              ? 'default'
+                              : row.gapPp >= 0
+                                ? 'success'
+                                : 'error'
+                          }
+                          variant="outlined"
+                          sx={{ alignSelf: 'flex-start' }}
+                        />
+                        {deficit > 0 && (
+                          <LinearProgress
+                            variant="determinate"
+                            value={deficit * 100}
+                            color="error"
+                            aria-label={`Deficit ${Math.abs(row.gapPp ?? 0).toFixed(1)} pp`}
+                            sx={{ height: 4, borderRadius: 1, maxWidth: 120 }}
+                          />
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="right">
+                      {row.volume == null ? '—' : row.volume.toLocaleString()}
+                    </TableCell>
+                    <TableCell align="right" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="small"
+                        endIcon={<ArrowForwardIcon />}
+                        onClick={() => onInspect(row.storeId)}
+                      >
+                        Inspect
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </Box>
-      <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-        Approved = accepted plan end score when present, else cleansed reference. Simulated = draft
-        horizon end. Click Inspect for store audit drawer.
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ flexShrink: 0, pointerEvents: 'none' }}
+      >
+        Management by exception · Gap = actual − plan at as-of ({asOfValue}). Behind ranked by
+        worst negative gap. Row or Inspect opens the session sandbox drawer.
       </Typography>
     </Stack>
   );

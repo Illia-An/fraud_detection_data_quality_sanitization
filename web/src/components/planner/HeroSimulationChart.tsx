@@ -2,23 +2,42 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 import type { FivePercentPlan } from '../../schemas/plan';
-import { periodLabel } from '../../schemas/plan';
+import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import { buildHeroEvaluationSeries } from './heroEvaluationSeries';
 
 const Plot = lazy(async () => {
   const module = await import('react-plotly.js');
   return { default: module.default };
 });
 
-const CHART_MIN_HEIGHT_PX = 200;
-const CHART_FALLBACK_HEIGHT_PX = 280;
+/** Datadog Evaluation View — fixed hero height (~340px plot). */
+export const HERO_PLOT_HEIGHT_PX = 340;
 
-function usePlotContainerHeight(enabled: boolean) {
+interface HeroSimulationChartProps {
+  draftPlan: FivePercentPlan;
+  approvedPlan: FivePercentPlan | null;
+  panel: SanitizedPanel;
+  asOfYear: number;
+  asOfMonth: number;
+  /** Soft envelope half-width (pp); not a statistical CI. */
+  slackBandPp?: number;
+}
+
+/** Dual-trace Evaluation View: cleansed fact | as-of | forecast cone + target. */
+export function HeroSimulationChart({
+  draftPlan,
+  approvedPlan,
+  panel,
+  asOfYear,
+  asOfMonth,
+  slackBandPp = 1.5,
+}: HeroSimulationChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState(CHART_FALLBACK_HEIGHT_PX);
+  const [plotHeight, setPlotHeight] = useState(HERO_PLOT_HEIGHT_PX);
 
   useEffect(() => {
     const node = containerRef.current;
-    if (!enabled || !node || typeof ResizeObserver === 'undefined') {
+    if (!node || typeof ResizeObserver === 'undefined') {
       return;
     }
     let frame = 0;
@@ -26,8 +45,8 @@ function usePlotContainerHeight(enabled: boolean) {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         const next = Math.floor(entries[0]?.contentRect.height ?? 0);
-        if (next >= CHART_MIN_HEIGHT_PX) {
-          setHeight(next);
+        if (next >= 200) {
+          setPlotHeight(next);
         }
         window.dispatchEvent(new Event('resize'));
       });
@@ -37,58 +56,41 @@ function usePlotContainerHeight(enabled: boolean) {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [enabled]);
+  }, []);
 
-  return { containerRef, height };
-}
+  const series = useMemo(
+    () =>
+      buildHeroEvaluationSeries(
+        draftPlan,
+        approvedPlan,
+        panel,
+        { year: asOfYear, month: asOfMonth },
+        slackBandPp,
+      ),
+    [draftPlan, approvedPlan, panel, asOfYear, asOfMonth, slackBandPp],
+  );
 
-interface HeroSimulationChartProps {
-  draftPlan: FivePercentPlan;
-  approvedPlan: FivePercentPlan | null;
-  /** Soft envelope half-width (pp); not a statistical CI. */
-  slackBandPp?: number;
-}
-
-/** V4.2 Component D — Approved vs Draft dual-trace hero (+ soft slack band, not CI). */
-export function HeroSimulationChart({
-  draftPlan,
-  approvedPlan,
-  slackBandPp = 1.5,
-}: HeroSimulationChartProps) {
-  const { containerRef, height: plotHeight } = usePlotContainerHeight(true);
-
-  const { labels, draftYs, approvedYs, upperYs, lowerYs, target } = useMemo(() => {
-    const labelsLocal = draftPlan.chain_trajectory.map((p) => periodLabel(p.year, p.month));
-    const draftLocal = draftPlan.chain_trajectory.map((p) => p.score);
-    const approvedLocal = labelsLocal.map((label) => {
-      if (!approvedPlan) {
-        return draftPlan.current_chain;
-      }
-      const [y, m] = label.split('-').map(Number);
-      const hit = approvedPlan.chain_trajectory.find((p) => p.year === y && p.month === m);
-      return hit?.score ?? null;
-    });
-    const upper = draftLocal.map((v) => Math.min(100, v + slackBandPp));
-    const lower = draftLocal.map((v) => Math.max(0, v - slackBandPp));
-    return {
-      labels: labelsLocal,
-      draftYs: draftLocal,
-      approvedYs: approvedLocal,
-      upperYs: upper,
-      lowerYs: lower,
-      target: draftPlan.target,
-    };
-  }, [draftPlan, approvedPlan, slackBandPp]);
+  const {
+    labels,
+    factYs,
+    draftYs,
+    approvedYs,
+    upperYs,
+    lowerYs,
+    target,
+    asOfLabel,
+  } = series;
 
   const yValues = [
-    ...draftYs,
+    ...factYs.filter((v): v is number => v != null),
+    ...draftYs.filter((v): v is number => v != null),
     ...approvedYs.filter((v): v is number => v != null),
-    ...upperYs,
-    ...lowerYs,
+    ...upperYs.filter((v): v is number => v != null),
+    ...lowerYs.filter((v): v is number => v != null),
     target,
   ];
-  const yMin = Math.max(0, Math.min(...yValues) - 2);
-  const yMax = Math.min(100, Math.max(...yValues) + 2);
+  const yMin = yValues.length ? Math.max(0, Math.min(...yValues) - 2) : 0;
+  const yMax = yValues.length ? Math.min(100, Math.max(...yValues) + 2) : 100;
 
   const data = [
     {
@@ -98,9 +100,10 @@ export function HeroSimulationChart({
       mode: 'lines' as const,
       line: { width: 0 },
       marker: { color: 'rgba(25, 118, 210, 0.15)' },
-      name: 'Slack band',
+      name: 'Forecast cone',
       showlegend: false,
       hoverinfo: 'skip' as const,
+      connectgaps: false,
     },
     {
       x: labels,
@@ -110,8 +113,19 @@ export function HeroSimulationChart({
       line: { width: 0 },
       fill: 'tonexty' as const,
       fillcolor: 'rgba(25, 118, 210, 0.12)',
-      name: 'Slack band (±allocation)',
+      name: 'Forecast cone (±slack)',
       hoverinfo: 'skip' as const,
+      connectgaps: false,
+    },
+    {
+      x: labels,
+      y: factYs,
+      type: 'scatter' as const,
+      mode: 'lines+markers' as const,
+      name: 'Cleansed fact',
+      line: { color: '#212121', width: 2.5 },
+      marker: { size: 7, color: '#212121' },
+      connectgaps: false,
     },
     {
       x: labels,
@@ -121,6 +135,7 @@ export function HeroSimulationChart({
       name: approvedPlan ? 'Accepted plan' : 'Reference baseline',
       line: { color: '#9e9e9e', width: 2, dash: 'dash' },
       marker: { size: 6, color: '#9e9e9e' },
+      connectgaps: false,
     },
     {
       x: labels,
@@ -130,6 +145,7 @@ export function HeroSimulationChart({
       name: 'Draft simulation',
       line: { color: '#1565c0', width: 3 },
       marker: { size: 7, color: '#1565c0' },
+      connectgaps: false,
     },
     {
       x: labels,
@@ -143,13 +159,16 @@ export function HeroSimulationChart({
   ];
 
   return (
-    <Stack spacing={0.75} sx={{ height: '100%', minHeight: 0 }}>
+    <Stack spacing={0.75} sx={{ height: '100%', minHeight: 0 }} data-testid="hero-evaluation-chart">
       <Box
         ref={containerRef}
         sx={{
           flex: 1,
-          minHeight: CHART_MIN_HEIGHT_PX,
+          minHeight: HERO_PLOT_HEIGHT_PX,
           width: '100%',
+          overflow: 'hidden',
+          position: 'relative',
+          isolation: 'isolate',
         }}
       >
         <Suspense
@@ -157,7 +176,7 @@ export function HeroSimulationChart({
             <Box
               sx={{
                 height: '100%',
-                minHeight: CHART_MIN_HEIGHT_PX,
+                minHeight: HERO_PLOT_HEIGHT_PX,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -182,6 +201,30 @@ export function HeroSimulationChart({
                 range: [yMin, yMax],
                 ticksuffix: '%',
               },
+              shapes: [
+                {
+                  type: 'line',
+                  x0: asOfLabel,
+                  x1: asOfLabel,
+                  y0: 0,
+                  y1: 1,
+                  yref: 'paper',
+                  line: { color: '#616161', width: 1.5, dash: 'dash' },
+                },
+              ],
+              annotations: [
+                {
+                  x: asOfLabel,
+                  y: 1,
+                  yref: 'paper',
+                  text: 'as-of',
+                  showarrow: false,
+                  xanchor: 'left',
+                  yanchor: 'bottom',
+                  font: { size: 11, color: '#616161' },
+                  xshift: 4,
+                },
+              ],
               showlegend: true,
             }}
             config={{ displayModeBar: false, responsive: true }}
@@ -191,8 +234,8 @@ export function HeroSimulationChart({
         </Suspense>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-        Dual-trace hero · shaded band is allocation slack (±{slackBandPp.toFixed(1)} pp), not a
-        statistical confidence interval.
+        Evaluation view · solid fact left of as-of ({asOfLabel}) · forecast cone is allocation slack
+        (±{slackBandPp.toFixed(1)} pp), not a statistical confidence interval.
       </Typography>
     </Stack>
   );
