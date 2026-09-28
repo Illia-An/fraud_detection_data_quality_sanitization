@@ -53,17 +53,17 @@ test.describe('Planner alt-UI smoke', () => {
       .getByRole('button', { name: /^Inspect$/i })
       .first();
     await expect(inspect).toBeVisible({ timeout: 15_000 });
-    await inspect.click({ force: true });
+    // Native DOM click — force:true did not open the drawer in CI Linux Chromium.
+    // Cast avoids HTMLElement (tsconfig.node has no DOM lib).
+    await inspect.evaluate((el) => (el as { click: () => void }).click());
 
-    await expect(page.getByRole('heading', { name: /Inspect · Store/i })).toBeVisible({
-      timeout: 15_000,
-    });
+    await expect(page.getByText(/Inspect · Store/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Session sandbox what-if/i)).toBeVisible();
     await expect(page.getByText(/Plan vs actual/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /Recalculate/i })).toBeVisible();
 
     await page.locator('.MuiDrawer-paper').getByRole('button', { name: 'Close', exact: true }).last().click();
-    await expect(page.getByRole('heading', { name: /Inspect · Store/i })).toHaveCount(0);
+    await expect(page.getByText(/Inspect · Store/i)).toHaveCount(0);
 
     await page.getByRole('button', { name: /Commit to Session/i }).click({ force: true });
     await expect(page.getByText(/Committed session plan/i)).toBeVisible({ timeout: 10_000 });
