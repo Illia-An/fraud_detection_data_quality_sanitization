@@ -38,7 +38,9 @@ import {
 } from '../../schemas/sandboxPreview';
 import { PlanActualLens } from './PlanActualLens';
 
-const DRAWER_WIDTH_PX = 460;
+const DRAWER_WIDTH = '40vw';
+const DRAWER_MIN_WIDTH_PX = 320;
+const DRAWER_MAX_WIDTH_PX = 720;
 
 interface StoreAuditDrawerProps {
   open: boolean;
@@ -184,8 +186,9 @@ export function StoreAuditDrawer({
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: { xs: '100%', sm: DRAWER_WIDTH_PX },
-          maxWidth: '100%',
+          width: { xs: '100%', sm: DRAWER_WIDTH },
+          minWidth: { sm: DRAWER_MIN_WIDTH_PX },
+          maxWidth: { xs: '100%', sm: DRAWER_MAX_WIDTH_PX },
         },
       }}
     >
@@ -197,7 +200,7 @@ export function StoreAuditDrawer({
           sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}
         >
           <Typography variant="h6" sx={{ flex: 1 }}>
-            Store {storeId}
+            Inspect · Store {storeId}
           </Typography>
           {monitorRow && (
             <Chip
@@ -213,8 +216,9 @@ export function StoreAuditDrawer({
 
         <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
           <Stack spacing={2}>
-            <Alert severity="info">
-              Draft what-if only — does not mutate the accepted plan, Export CSV, or DB.
+            <Alert severity="warning" variant="outlined">
+              Session sandbox what-if — draft only. Does not mutate the accepted plan, Export CSV, or
+              DB.
             </Alert>
 
             <PlanActualLens

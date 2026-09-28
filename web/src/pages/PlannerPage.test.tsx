@@ -86,6 +86,10 @@ describe('PlannerPage Phase A', () => {
     renderPlanner();
     expect(screen.getByRole('button', { name: /Run simulation/i })).toBeEnabled();
     expect(screen.getByLabelText(/Target/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Horizon \(months\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Reference month/i)).toBeInTheDocument();
+    expect(screen.getByText(/Advanced allocator options/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export CSV/i })).toBeDisabled();
     expect(screen.getByText(/Set levers and Run simulation/i)).toBeInTheDocument();
   });
 });
@@ -96,12 +100,25 @@ describe('PlannerPage controls rail', () => {
     usePlannerScenarioStore.getState().clearAll();
   });
 
+  it('keeps advanced allocator options collapsed until expanded', () => {
+    renderPlanner();
+    const advanced = screen.getByText(/Advanced allocator options/i).closest('button');
+    expect(advanced).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByText(/Advanced allocator options/i));
+    expect(
+      screen.getByText(/Advanced allocator options/i).closest('button'),
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText(/Max monthly improve/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Lift priority power/i)).toBeInTheDocument();
+  });
+
   it('collapses and expands the controls rail without unmounting controls', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     renderPlanner();
 
     const rail = screen.getByTestId('controls-rail');
     expect(rail).toHaveAttribute('data-collapsed', 'false');
+    expect(screen.getByTestId('allocation-levers')).toBeInTheDocument();
     expect(screen.getByText(/Allocation levers/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse controls' }));
@@ -109,7 +126,7 @@ describe('PlannerPage controls rail', () => {
     expect(rail).toHaveAttribute('data-collapsed', 'true');
     expect(screen.getByRole('button', { name: 'Expand controls' })).toBeInTheDocument();
     // Keep-mounted: form stays in the tree (hidden via CSS on md).
-    expect(screen.getByText(/Allocation levers/i)).toBeInTheDocument();
+    expect(screen.getByTestId('allocation-levers')).toBeInTheDocument();
     expect(screen.queryByTestId('collapsed-run')).not.toBeInTheDocument();
 
     act(() => {
@@ -120,7 +137,7 @@ describe('PlannerPage controls rail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand controls' }));
 
     expect(rail).toHaveAttribute('data-collapsed', 'false');
-    expect(screen.getByText(/Allocation levers/i)).toBeInTheDocument();
+    expect(screen.getByTestId('allocation-levers')).toBeInTheDocument();
     expect(screen.queryByTestId('collapsed-run')).not.toBeInTheDocument();
 
     vi.useRealTimers();

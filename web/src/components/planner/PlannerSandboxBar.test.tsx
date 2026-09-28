@@ -24,9 +24,9 @@ describe('PlannerSandboxBar', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText(/unsaved scenario/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Discard changes/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Commit plan/i }));
+    expect(screen.getByText(/Draft Scenario \(Unsaved\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Discard Draft/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Commit to Session/i }));
     fireEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
     expect(onDiscard).toHaveBeenCalled();
     expect(onCommitSession).toHaveBeenCalled();
