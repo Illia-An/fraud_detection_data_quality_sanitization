@@ -209,3 +209,48 @@ The `total_responses` and `top_box_pct` metrics produced by the `actual` step mu
   - Manual: funnel collapsed; expand → bars + ★ on biggest KPI step contribution.
   - `cd web && npm run test:run`
 - **Do not commit:** `.env`, `data/*.sqlite`, `docs/research/*.xlsx`
+
+## [TASK-14] Planner shell + cleansed handoff (experiment)
+- **Role:** Frontend Engineer + Contract Engineer
+- **Status:** In progress (experiment)
+- **Branch:** `feat/planner-shell-handoff`
+- **Objective:** Add a Planner entry in the app shell that consumes a **cleansed Q10012 monthly panel** from a successful Sanitization run; block Plan Run until that baseline exists; CSV/Excel-friendly export only (no DB Save). Validate UX merge of two workflows in one sidebar. If experiment fails → delete branch and replan.
+- **Product contract (locked)**
+  - Variant **C**: plan baseline = data **after** sanitization.
+  - Metric: **Q10012** top-box % — same as sanitization.
+  - TTS: out of scope for cleansed path in this experiment.
+  - Persist plan: **file export only**; DB Save / PlanRun — later branches.
+  - UX: sidebar **Planner** → `/planner`; empty state **A** — Run disabled until Sanitization produced a panel.
+  - Do not regress: 4-tier pipeline, `tier2_freq_threshold` ge=2, period window, Store|Network|YoY.
+- **Non-goals:** full Angular planner port; DB write-back; allocation SQL Question_ID fix in other repo; persist nav; store-funnel.
+- **Phases**
+  | Phase | Scope | Status |
+  |-------|--------|--------|
+  | 0 | Contract doc + this TASK | Done |
+  | 1 | Nav + empty Planner page (block Run) | Done |
+  | 2 | Handoff panel from `processResult` / `store_impact_series` | Done |
+  | 3 | Stub Run + export panel CSV | Done |
+  | 4 | Verify + keep/drop branch | Verify done — await keep/drop |
+- **Follow-up:** TASK-15 Phase A (knobs + heatmap + `/plans`) on same branch
+- **Contract:** `docs/contracts/sanitized_panel_handoff.md`
+- **Verify**
+  - `cd web && npm run test:run && npm run lint`
+  - Manual: empty Planner → Sanitization run → Planner unlocked → export
+- **Do not commit:** `.env`, `data/*.sqlite`, `docs/research/*.xlsx`
+
+## [TASK-15] Planner Phase A/B/C — knobs + heatmap + monitoring + sandbox
+- **Role:** Frontend + Backend
+- **Status:** In progress (Phase A–C on `feat/planner-shell-handoff`)
+- **Depends on:** TASK-14 shell/handoff
+- **Objective:** Recreate allocation Planner for **5% only**. Gate on cleansed panel. Export CSV only (no DB Save).
+- **Delivered**
+  1. Phase A: `src/planner/five_percent.py`, `POST /api/v1/plans`, knobs, `ProjectionHeatmap`, CSV export
+  2. Phase B: `ChainPlanDashboard`, `PlanMonitoringPanel` (signals + scatter), stores-at-ref rail
+  3. Phase C: `ScenarioSandboxDialog` + even-split preview (`sandboxPreview.ts`); click store → sandbox
+- **Still out of scope:** DB Save, TTS / KPI All toolbar, full StorePlanner / counterpart-pool parity
+- **UX source:** `store-score-allocation/docs/ui_ux_discovery_planner_react_port.md`
+- **Verify**
+  - `uv run pytest tests/test_planner_five_percent.py tests/test_plans_api.py -q`
+  - `cd web && npm run test:run && npm run lint`
+  - Manual: Sanitization → Planner Run → heatmap → monitoring → click store → Recalculate sandbox
+- **Do not commit:** `.env`, `data/*.sqlite`, `docs/research/*.xlsx`

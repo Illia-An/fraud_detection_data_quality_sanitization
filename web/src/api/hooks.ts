@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { fetchHealth, fetchSample, fetchSampleDb, postProcess } from './client';
+import { fetchHealth, fetchSample, fetchSampleDb, postPlan, postProcess } from './client';
 import {
   sampleDbParamsSchema,
   type ProcessRequest,
   type SampleDbParams,
   type SamplePreset,
 } from '../schemas/api';
+import type { PlanRequest } from '../schemas/plan';
 
 export const queryKeys = {
   health: ['health'] as const,
@@ -56,5 +57,11 @@ export function useSampleDb(params: SampleDbParams = {}, enabled = true) {
 export function useProcess() {
   return useMutation({
     mutationFn: (request: ProcessRequest) => postProcess(request),
+  });
+}
+
+export function usePlan() {
+  return useMutation({
+    mutationFn: (request: PlanRequest) => postPlan(request),
   });
 }

@@ -37,8 +37,10 @@ from backend.schemas import (
     SamplePresetMeta,
     SurveyAnswerRow,
 )
+from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
 from backend.service import run_pipeline, run_pipeline_pushdown
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
+from planner.five_percent import plan_five_percent
 
 _ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(_ROOT / ".env")
@@ -274,6 +276,55 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.exception("pipeline failed")
             raise HTTPException(status_code=500, detail="Pipeline execution failed") from exc
+
+    @app.post(
+        f"{API_PREFIX}/plans",
+        response_model=PlanResponse,
+        tags=["plans"],
+        responses={
+            422: {"description": "Validation error"},
+        },
+    )
+    def create_plan(body: PlanRequest) -> PlanResponse:
+        """Allocate five_percent store×month projections from a cleansed baseline."""
+        try:
+            baseline = {row.store_id: row.five_percent for row in body.baseline_rows}
+            result = plan_five_percent(
+                baseline=baseline,
+                target=body.target,
+                n_months=body.horizon,
+                max_monthly_improve=body.params.max_monthly_improve,
+                priority_power=body.params.priority_power,
+                trajectory=body.params.trajectory,
+                trajectory_power=body.params.trajectory_power,
+                growth_factor=body.params.growth_factor,
+                reference_year=body.reference_year,
+                reference_month=body.reference_month,
+            )
+            metric = FivePercentPlanOut(
+                target=result.target,
+                current_chain=result.current_chain,
+                required_change=result.required_change,
+                final_chain=result.final_chain,
+                feasible=result.feasible,
+                chain_trajectory=[
+                    MonthScoreOut(year=m.year, month=m.month, score=m.score)
+                    for m in result.chain_trajectory
+                ],
+                projections=[
+                    StoreProjectionOut(
+                        store_id=p.store_id,
+                        months=[
+                            MonthScoreOut(year=m.year, month=m.month, score=m.score)
+                            for m in p.months
+                        ],
+                    )
+                    for p in result.projections
+                ],
+            )
+            return PlanResponse(metrics={"five_percent": metric})
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return app
 

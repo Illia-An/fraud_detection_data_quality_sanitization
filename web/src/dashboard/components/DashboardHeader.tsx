@@ -10,6 +10,10 @@ const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
     title: 'Survey Sanitization',
     subtitle: 'Estimate KPI impact after removing suspicious survey answers',
   },
+  '/planner': {
+    title: 'Planner',
+    subtitle: 'Build a store improvement plan on the cleansed Q10012 baseline',
+  },
   '/documentation': {
     title: 'Documentation',
     subtitle: 'Pipeline tiers, research reports, and API references',
