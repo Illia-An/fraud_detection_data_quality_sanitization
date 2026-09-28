@@ -1,3 +1,4 @@
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
@@ -12,6 +13,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom';
 
 const mainListItems = [
   { text: 'Sanitization', icon: <ScienceRoundedIcon />, path: '/' },
+  { text: 'Planner', icon: <CalendarMonthRoundedIcon />, path: '/planner' },
   { text: 'Documentation', icon: <MenuBookRoundedIcon />, path: '/documentation' },
 ];
 
