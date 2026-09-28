@@ -53,7 +53,7 @@ test.describe('Planner alt-UI smoke', () => {
       .getByRole('button', { name: /^Inspect$/i })
       .first();
     await expect(inspect).toBeVisible({ timeout: 15_000 });
-    await inspect.evaluate((el: HTMLElement) => el.click());
+    await inspect.click({ force: true });
 
     await expect(page.getByRole('heading', { name: /Inspect · Store/i })).toBeVisible({
       timeout: 15_000,

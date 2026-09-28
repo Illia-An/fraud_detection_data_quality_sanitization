@@ -133,7 +133,7 @@ export function HeroSimulationChart({
       type: 'scatter' as const,
       mode: 'lines+markers' as const,
       name: approvedPlan ? 'Accepted plan' : 'Reference baseline',
-      line: { color: '#9e9e9e', width: 2, dash: 'dash' },
+      line: { color: '#9e9e9e', width: 2, dash: 'dash' as const },
       marker: { size: 6, color: '#9e9e9e' },
       connectgaps: false,
     },
@@ -153,8 +153,8 @@ export function HeroSimulationChart({
       type: 'scatter' as const,
       mode: 'lines' as const,
       name: 'Target',
-      line: { color: '#c62828', width: 1.5, dash: 'dot' },
-      hoverinfo: 'name+y' as const,
+      line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
+      hoverinfo: 'y+name' as const,
     },
   ];
 
@@ -195,9 +195,9 @@ export function HeroSimulationChart({
               paper_bgcolor: 'transparent',
               plot_bgcolor: 'transparent',
               legend: { orientation: 'h', y: 1.12, x: 0 },
-              xaxis: { title: '', tickangle: -30, automargin: true },
+              xaxis: { title: { text: '' }, tickangle: -30, automargin: true },
               yaxis: {
-                title: '5% Score',
+                title: { text: '5% Score' },
                 range: [yMin, yMax],
                 ticksuffix: '%',
               },
@@ -209,7 +209,7 @@ export function HeroSimulationChart({
                   y0: 0,
                   y1: 1,
                   yref: 'paper',
-                  line: { color: '#616161', width: 1.5, dash: 'dash' },
+                  line: { color: '#616161', width: 1.5, dash: 'dash' as const },
                 },
               ],
               annotations: [
