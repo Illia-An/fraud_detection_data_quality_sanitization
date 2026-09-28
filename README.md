@@ -74,29 +74,45 @@ Notebooks (from repo root):
 uv run jupyter notebook notebooks/
 ```
 
-## Docker (API)
+## Docker (LAN monolith — UI + API)
 
-Linux containers cannot use Windows **Trusted Connection**. For Docker, use SQL auth
-(see `.env.docker.example`) and point `SERVER` to a host reachable from the container
-(often `host.docker.internal` on Docker Desktop).
+Same pattern as store-score-allocation: **one container**, one port. FastAPI serves
+`/api/v1/*` and the built React SPA. Data default: **SQLite snapshot** (no Windows
+SQL Trusted Connection).
+
+Prerequisites:
+
+1. Docker Desktop running.
+2. Local snapshot file (gitignored): `data/q10012_snapshot.sqlite`  
+   Refresh when you have DB access: `uv run python scripts/refresh_q10012_snapshot.py`
+3. Optional: `copy .env.docker.example .env.docker`
 
 ```powershell
-copy .env.docker.example .env
-# edit DATABASE_URL / DB_* for SQL auth
-
+copy .env.docker.example .env.docker
 docker compose build
 docker compose up -d
 ```
 
-- Health: http://127.0.0.1:8000/api/v1/health
-- Logs: `docker compose logs -f api`
-- Stop: `docker compose down`
-
-Build image only:
+Or without compose:
 
 ```powershell
-docker build -t fraud-dq-sanitization-api:latest .
+docker build -t fraud-dq-sanitization:local .
+docker rm -f fraud-dq 2>$null
+docker run -d --name fraud-dq -p 8000:8000 --env-file .env.docker `
+  -v "${PWD}/data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro" `
+  fraud-dq-sanitization:local
 ```
+
+- UI: http://localhost:8000
+- API docs: http://localhost:8000/docs
+- Health: http://localhost:8000/health
+- Logs: `docker compose logs -f app` (or `docker logs -f fraud-dq`)
+- Stop: `docker compose down` (or `docker rm -f fraud-dq`)
+
+In the UI use **Data source: db** (reads the mounted snapshot) or synthetic
+**small / medium / stress**. Rebuild the image after code changes (no hot-reload).
+
+Synthetic presets work even if the snapshot file is missing; **db** requires the volume.
 
 ## Stack (React v2)
 
