@@ -6,6 +6,9 @@ __pycache__
 .pytest_cache
 .mypy_cache
 .ruff_cache
+node_modules
+web/node_modules
+web/dist
 
 # Git & IDE
 .git
@@ -19,16 +22,24 @@ __pycache__
 .env.*
 !.env.example
 !.env.docker.example
+!web/.env.docker
+!web/.env.example
 
-# Frontend (not part of API image)
-frontend/node_modules
-frontend/dist
-frontend/.angular
+# Local data / PII — mount at runtime; never bake into image
+data/
+*.sqlite
+*_internal_pii*
 
 # Notebooks & local artifacts
 notebooks
-docs/charts
+docs
 *.ipynb
+*.xlsx
+
+# Tests / CI (not needed in runtime image)
+tests
+web/tests
+.github
 
 # OS
 Thumbs.db

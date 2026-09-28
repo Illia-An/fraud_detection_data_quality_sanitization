@@ -39,6 +39,7 @@ from backend.schemas import (
 )
 from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
 from backend.service import run_pipeline, run_pipeline_pushdown
+from backend.static_ui import mount_frontend
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
 from planner.five_percent import plan_five_percent
 
@@ -325,6 +326,10 @@ def create_app() -> FastAPI:
             return PlanResponse(metrics={"five_percent": metric})
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # API routes first; SPA catch-all only when FRONTEND_DIST_DIR / web/dist exists.
+    if mount_frontend(app):
+        logger.info("Mounted frontend SPA from FRONTEND_DIST_DIR / web/dist")
 
     return app
 
