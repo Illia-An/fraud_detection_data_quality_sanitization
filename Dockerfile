@@ -1,48 +1,52 @@
-# syntax=docker/dockerfile:1
+# Monolith image: React (Vite static) + FastAPI/uvicorn.
+# Snapshot demo (LAN) — no Windows SQL auth required:
+#   docker build -t fraud-dq-sanitization:local .
+#   docker run -d --name fraud-dq -p 8000:8000 --env-file .env.docker ^
+#     -v "%CD%/data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro" ^
+#     fraud-dq-sanitization:local
+# Open http://localhost:8000  (UI + /api/v1 + /docs)
+#
+# Builder uses official python + uv binary (same pattern as store-score-allocation),
+# avoiding the full ghcr.io/astral-sh/uv:python* image which often 403s on GHCR.
 
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
+# ---- frontend build ----
+FROM node:20-bookworm-slim AS frontend
+WORKDIR /web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+# Same-origin API calls inside the monolith (web/.env.docker → empty VITE_API_BASE_URL).
+RUN npm run build -- --mode docker
 
-WORKDIR /app
-
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
-
-COPY pyproject.toml uv.lock ./
-COPY src ./src
-
-RUN uv sync --frozen --no-dev --no-editable
-
+# ---- runtime ----
 FROM python:3.12-slim-bookworm AS runtime
-
 WORKDIR /app
 
-# Microsoft ODBC Driver 18 for SQL Server (pyodbc in Linux containers)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl gnupg unixodbc \
-    && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
-        | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" \
-        > /etc/apt/sources.list.d/microsoft-prod.list \
-    && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
-    && apt-get purge -y curl gnupg \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.6.14 /uv /usr/local/bin/uv
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app/.venv/bin:$PATH" \
-    PYTHONPATH="/app:/app/src"
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PYTHONPATH=/app:/app/src \
+    FRONTEND_DIST_DIR=/app/web/dist \
+    SANITIZATION_SOURCE=snapshot \
+    SNAPSHOT_URL=sqlite:///data/q10012_snapshot.sqlite \
+    API_CORS_ORIGINS=http://localhost:8000 \
+    PORT=8000
 
-COPY --from=builder /app/.venv /app/.venv
-COPY api ./api
-COPY db ./db
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
+COPY backend ./backend
+COPY db ./db
+RUN uv sync --frozen --no-dev
+
+COPY --from=frontend /web/dist ./web/dist
+RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')" || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uv run uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
