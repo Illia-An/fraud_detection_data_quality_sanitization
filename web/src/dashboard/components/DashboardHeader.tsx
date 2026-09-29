@@ -3,30 +3,33 @@ import Typography from '@mui/material/Typography';
 import { useLocation } from 'react-router-dom';
 
 import { ApiStatusChip } from '../../components/layout/ApiStatusChip';
+import { LanguageToggle, useT } from '../../i18n';
+import type { MessageKey } from '../../i18n';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
 
-const PAGE_HEADERS: Record<string, { title: string; subtitle: string }> = {
+const PAGE_HEADER_KEYS: Record<string, { title: MessageKey; subtitle: MessageKey }> = {
   '/': {
-    title: 'Survey Sanitization',
-    subtitle: 'Estimate KPI impact after removing suspicious survey answers',
+    title: 'header.sanitization.title',
+    subtitle: 'header.sanitization.subtitle',
   },
   '/planner': {
-    title: 'Planner',
-    subtitle: 'Build a store improvement plan on the cleansed Q10012 baseline',
+    title: 'header.planner.title',
+    subtitle: 'header.planner.subtitle',
   },
   '/documentation': {
-    title: 'Documentation',
-    subtitle: 'Pipeline tiers, research reports, and API references',
+    title: 'header.documentation.title',
+    subtitle: 'header.documentation.subtitle',
   },
 };
 
-function resolvePageHeader(pathname: string): { title: string; subtitle: string } {
-  return PAGE_HEADERS[pathname] ?? PAGE_HEADERS['/'];
+function resolvePageHeaderKeys(pathname: string): { title: MessageKey; subtitle: MessageKey } {
+  return PAGE_HEADER_KEYS[pathname] ?? PAGE_HEADER_KEYS['/'];
 }
 
 export default function DashboardHeader() {
   const { pathname } = useLocation();
-  const { title, subtitle } = resolvePageHeader(pathname);
+  const t = useT();
+  const keys = resolvePageHeaderKeys(pathname);
 
   return (
     <Stack
@@ -44,14 +47,15 @@ export default function DashboardHeader() {
     >
       <Stack spacing={0} sx={{ flexGrow: 1, minWidth: 0 }}>
         <Typography component="h1" variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
-          {title}
+          {t(keys.title)}
         </Typography>
         <Typography variant="caption" color="text.secondary" noWrap>
-          {subtitle}
+          {t(keys.subtitle)}
         </Typography>
       </Stack>
       <Stack direction="row" sx={{ gap: 0.5, alignItems: 'center', flexShrink: 0 }}>
         <ApiStatusChip />
+        <LanguageToggle />
         <ColorModeIconDropdown />
       </Stack>
     </Stack>

@@ -1,6 +1,7 @@
 import { Box, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 
+import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import {
@@ -120,6 +121,7 @@ export function PlanActualLens({
   insights,
   draftLast = null,
 }: PlanActualLensProps) {
+  const t = useT();
   const layout = COMPACT_LAYOUT;
 
   const model = useMemo(() => {
@@ -138,10 +140,10 @@ export function PlanActualLens({
     return (
       <Box>
         <Typography variant="subtitle2" gutterBottom>
-          Plan vs actual
+          {t('planner.lens.title')}
         </Typography>
         <Typography variant="caption" color="text.secondary">
-          No plan series for this store.
+          {t('planner.lens.empty')}
         </Typography>
       </Box>
     );
@@ -173,16 +175,19 @@ export function PlanActualLens({
   return (
     <Box>
       <Typography variant="subtitle2" gutterBottom>
-        Plan vs actual
+        {t('planner.lens.title')}
       </Typography>
       <Typography variant="caption" sx={{ color: gapColor, display: 'block', mb: 0.5 }}>
-        Store {model.storeId} · as of gap {formatPct(model.deviation)} (positive = better than plan)
+        {t('planner.lens.gapCaption', {
+          id: model.storeId,
+          gap: formatPct(model.deviation),
+        })}
       </Typography>
       <Box
         component="svg"
         viewBox={`0 0 ${layout.width} ${layout.height}`}
         role="img"
-        aria-label="Plan vs actual gap"
+        aria-label={t('planner.lens.aria')}
         sx={{ width: '100%', height: 'auto', display: 'block' }}
       >
         {yTicks.map((tick) => (
@@ -217,7 +222,7 @@ export function PlanActualLens({
             strokeWidth={1}
             strokeDasharray="3 3"
           >
-            <title>as of</title>
+            <title>{t('planner.lens.legend.asOf')}</title>
           </line>
         )}
 
@@ -286,10 +291,10 @@ export function PlanActualLens({
         ))}
       </Box>
       <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }} flexWrap="wrap" useFlexGap>
-        <LegendSwatch color={PLAN_STROKE} label="Store plan" />
-        <LegendSwatch color={ACTUAL_STROKE} label="Actual" />
-        <LegendSwatch color={CHAIN_STROKE} label="Chain" dashed />
-        <LegendSwatch color={AS_OF_STROKE} label="as of" dashed />
+        <LegendSwatch color={PLAN_STROKE} label={t('planner.lens.legend.plan')} />
+        <LegendSwatch color={ACTUAL_STROKE} label={t('planner.lens.legend.actual')} />
+        <LegendSwatch color={CHAIN_STROKE} label={t('planner.lens.legend.chain')} dashed />
+        <LegendSwatch color={AS_OF_STROKE} label={t('planner.lens.legend.asOf')} dashed />
       </Stack>
     </Box>
   );

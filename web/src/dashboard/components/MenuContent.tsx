@@ -9,16 +9,20 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
+import type { ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
-const mainListItems = [
-  { text: 'Sanitization', icon: <ScienceRoundedIcon />, path: '/' },
-  { text: 'Planner', icon: <CalendarMonthRoundedIcon />, path: '/planner' },
-  { text: 'Documentation', icon: <MenuBookRoundedIcon />, path: '/documentation' },
+import { useT, type MessageKey } from '../../i18n';
+
+const mainListItems: { textKey: MessageKey; icon: ReactNode; path: string }[] = [
+  { textKey: 'nav.sanitization', icon: <ScienceRoundedIcon />, path: '/' },
+  { textKey: 'nav.planner', icon: <CalendarMonthRoundedIcon />, path: '/planner' },
+  { textKey: 'nav.documentation', icon: <MenuBookRoundedIcon />, path: '/documentation' },
 ];
 
-const secondaryListItems = [{ text: 'About PoC', icon: <InfoRoundedIcon /> }];
-
+const secondaryListItems: { textKey: MessageKey; icon: ReactNode }[] = [
+  { textKey: 'nav.about', icon: <InfoRoundedIcon /> },
+];
 function isSelectedPath(currentPath: string, itemPath: string): boolean {
   if (itemPath === '/') {
     return currentPath === '/';
@@ -32,11 +36,13 @@ interface MenuContentProps {
 
 export default function MenuContent({ collapsed = false }: MenuContentProps) {
   const location = useLocation();
+  const t = useT();
 
   return (
     <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
       <List dense>
         {mainListItems.map((item) => {
+          const label = t(item.textKey);
           const button = (
             <ListItemButton
               component={RouterLink}
@@ -55,14 +61,14 @@ export default function MenuContent({ collapsed = false }: MenuContentProps) {
               >
                 {item.icon}
               </ListItemIcon>
-              {!collapsed && <ListItemText primary={item.text} />}
+              {!collapsed && <ListItemText primary={label} />}
             </ListItemButton>
           );
 
           return (
-            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+            <ListItem key={item.textKey} disablePadding sx={{ display: 'block' }}>
               {collapsed ? (
-                <Tooltip title={item.text} placement="right">
+                <Tooltip title={label} placement="right">
                   {button}
                 </Tooltip>
               ) : (
@@ -74,6 +80,7 @@ export default function MenuContent({ collapsed = false }: MenuContentProps) {
       </List>
       <List dense>
         {secondaryListItems.map((item) => {
+          const label = t(item.textKey);
           const button = (
             <ListItemButton
               sx={{
@@ -89,14 +96,14 @@ export default function MenuContent({ collapsed = false }: MenuContentProps) {
               >
                 {item.icon}
               </ListItemIcon>
-              {!collapsed && <ListItemText primary={item.text} />}
+              {!collapsed && <ListItemText primary={label} />}
             </ListItemButton>
           );
 
           return (
-            <ListItem key={item.text} disablePadding sx={{ display: 'block' }}>
+            <ListItem key={item.textKey} disablePadding sx={{ display: 'block' }}>
               {collapsed ? (
-                <Tooltip title={item.text} placement="right">
+                <Tooltip title={label} placement="right">
                   {button}
                 </Tooltip>
               ) : (

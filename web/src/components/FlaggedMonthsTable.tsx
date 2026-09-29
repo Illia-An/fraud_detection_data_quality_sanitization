@@ -23,6 +23,7 @@ import {
 } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 
+import { useT, type MessageKey, type TranslateParams } from '../i18n';
 import type { StoreMonthCell } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import { storeMonthPeriodLabel } from './charts/storeImpactChartData';
@@ -37,20 +38,22 @@ function formatZ(value: number): string {
   return value.toFixed(2);
 }
 
-function buildColumns(maxVolume: number, compact: boolean) {
+type TranslateFn = (key: MessageKey, params?: TranslateParams) => string;
+
+function buildColumns(maxVolume: number, compact: boolean, t: TranslateFn) {
   return [
-    columnHelper.accessor('store_id', { header: 'Store', enableSorting: false }),
+    columnHelper.accessor('store_id', { header: t('flagged.col.store'), enableSorting: false }),
     columnHelper.accessor('year', {
-      header: 'Year',
+      header: t('flagged.col.year'),
       enableSorting: false,
       meta: { hideInCompact: true },
     }),
     columnHelper.accessor('month', {
-      header: 'Mo',
+      header: t('flagged.col.mo'),
       enableSorting: false,
     }),
     columnHelper.accessor('volume', {
-      header: compact ? 'Vol' : 'Volume',
+      header: compact ? t('flagged.col.vol') : t('flagged.col.volume'),
       cell: (info) => {
         const volume = info.getValue();
         if (compact) {
@@ -79,19 +82,19 @@ function buildColumns(maxVolume: number, compact: boolean) {
       },
     }),
     columnHelper.accessor('five_pct', {
-      header: '5%',
+      header: t('flagged.col.five'),
       cell: (info) => formatPct(info.getValue()),
     }),
     columnHelper.accessor('z', {
-      header: 'z',
+      header: t('flagged.col.z'),
       sortingFn: (rowA, rowB, columnId) =>
         Math.abs(rowA.getValue<number>(columnId)) - Math.abs(rowB.getValue<number>(columnId)),
       cell: (info) => formatZ(info.getValue()),
     }),
     columnHelper.accessor('flagged', {
-      header: compact ? 'Flag' : 'Flagged',
+      header: compact ? t('flagged.col.flag') : t('flagged.col.flagged'),
       enableSorting: false,
-      cell: (info) => (info.getValue() ? 'Yes' : 'No'),
+      cell: (info) => (info.getValue() ? t('common.yes') : t('common.no')),
       meta: { hideInCompact: true },
     }),
   ].filter((column) => {
@@ -110,6 +113,7 @@ interface FlaggedMonthsTableProps {
 }
 
 export function FlaggedMonthsTable({ rows, variant = 'default' }: FlaggedMonthsTableProps) {
+  const t = useT();
   const isPanel = variant === 'panel';
   const [sorting, setSorting] = useState<SortingState>([{ id: 'z', desc: true }]);
   const selectFlaggedStoreMonth = useUiStore((state) => state.selectFlaggedStoreMonth);
@@ -121,7 +125,7 @@ export function FlaggedMonthsTable({ rows, variant = 'default' }: FlaggedMonthsT
     () => flaggedRows.reduce((max, row) => Math.max(max, row.volume), 0),
     [flaggedRows],
   );
-  const columns = useMemo(() => buildColumns(maxVolume, isPanel), [maxVolume, isPanel]);
+  const columns = useMemo(() => buildColumns(maxVolume, isPanel, t), [maxVolume, isPanel, t]);
 
   const table = useReactTable({
     data: flaggedRows,
@@ -139,12 +143,8 @@ export function FlaggedMonthsTable({ rows, variant = 'default' }: FlaggedMonthsT
   return (
     <Card variant="outlined" sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
-        title="Flagged store×months"
-        subheader={
-          isPanel
-            ? 'Click a row to focus the chart'
-            : 'Tier 4 store×month cells — click a row to focus the store chart'
-        }
+        title={t('flagged.title')}
+        subheader={isPanel ? t('flagged.subheaderPanel') : t('flagged.subheaderDefault')}
         titleTypographyProps={{ variant: isPanel ? 'subtitle1' : 'h6' }}
         subheaderTypographyProps={{ variant: 'caption' }}
         sx={{ pb: 0 }}
@@ -152,7 +152,7 @@ export function FlaggedMonthsTable({ rows, variant = 'default' }: FlaggedMonthsT
       <CardContent sx={{ pt: 1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {flaggedRows.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
-            No flagged store×months for this run.
+            {t('flagged.empty')}
           </Typography>
         ) : (
           <TableContainer

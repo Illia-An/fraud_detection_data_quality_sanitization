@@ -1,5 +1,6 @@
 import { Box, Chip, LinearProgress, Stack, Typography } from '@mui/material';
 
+import { useT } from '../../i18n';
 import type { ProcessResponse } from '../../schemas/api';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
@@ -24,6 +25,7 @@ export function PlannerContextStrip({
   draftPlan,
   horizonMonths,
 }: PlannerContextStripProps) {
+  const t = useT();
   const slack = computeNetworkSlack(
     draftPlan.target,
     draftPlan.current_chain,
@@ -33,11 +35,22 @@ export function PlannerContextStrip({
   const barColor =
     slack.remainingPp > 0.05 ? 'warning' : slack.remainingPp < -0.05 ? 'success' : 'primary';
 
+  let slackStatusLabel: string;
+  if (slack.remainingPp > 0.05) {
+    slackStatusLabel = t('planner.strip.slackTo', { pp: slack.remainingPp.toFixed(1) });
+  } else if (slack.remainingPp < -0.05) {
+    slackStatusLabel = t('planner.strip.slackAhead', {
+      pp: Math.abs(slack.remainingPp).toFixed(1),
+    });
+  } else {
+    slackStatusLabel = t('planner.strip.atTarget');
+  }
+
   return (
     <Box
       data-testid="planner-context-strip"
       role="region"
-      aria-label="Planner context"
+      aria-label={t('planner.strip.aria')}
       sx={{
         display: 'flex',
         flexDirection: { xs: 'column', md: 'row' },
@@ -59,13 +72,21 @@ export function PlannerContextStrip({
       />
 
       <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-        <Chip size="small" variant="outlined" label={`Horizon: ${horizonMonths} mo`} />
-        <Chip size="small" variant="outlined" label={`Target: ${draftPlan.target.toFixed(1)}%`} />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={t('planner.strip.horizon', { months: horizonMonths })}
+        />
+        <Chip
+          size="small"
+          variant="outlined"
+          label={t('planner.strip.target', { target: draftPlan.target.toFixed(1) })}
+        />
         <Chip
           size="small"
           color={draftPlan.feasible ? 'success' : 'warning'}
           variant="outlined"
-          label={`Status: Projected ${draftPlan.final_chain.toFixed(1)}%`}
+          label={t('planner.strip.status', { pct: draftPlan.final_chain.toFixed(1) })}
         />
       </Stack>
 
@@ -79,17 +100,17 @@ export function PlannerContextStrip({
       >
         <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.25 }}>
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Network slack
+            {t('planner.strip.slack')}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {slack.statusLabel}
+            {slackStatusLabel}
           </Typography>
         </Stack>
         <LinearProgress
           variant="determinate"
           value={progressPct}
           color={barColor}
-          aria-label={`Network slack progress ${progressPct}%`}
+          aria-label={t('planner.strip.progressAria', { pct: progressPct })}
           sx={{ height: 8, borderRadius: 1 }}
         />
       </Box>

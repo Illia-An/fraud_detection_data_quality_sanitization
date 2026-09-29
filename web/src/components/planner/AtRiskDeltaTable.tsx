@@ -20,6 +20,7 @@ import {
 } from '@mui/material';
 import { useMemo, useState } from 'react';
 
+import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
 import {
@@ -108,6 +109,7 @@ export function AtRiskDeltaTable({
   onAsOfChange,
   onInspect,
 }: AtRiskDeltaTableProps) {
+  const t = useT();
   const [filter, setFilter] = useState<AtRiskFilter>('behind');
   const asOfValue = periodLabel(insights.as_of_year, insights.as_of_month);
 
@@ -178,15 +180,15 @@ export function AtRiskDeltaTable({
             }
           }}
         >
-          <ToggleButton value="behind">Behind Plan Only</ToggleButton>
-          <ToggleButton value="top_gainers">Top Gainers</ToggleButton>
-          <ToggleButton value="all">All Stores</ToggleButton>
+          <ToggleButton value="behind">{t('planner.atRisk.behindOnly')}</ToggleButton>
+          <ToggleButton value="top_gainers">{t('planner.atRisk.topGainers')}</ToggleButton>
+          <ToggleButton value="all">{t('planner.atRisk.all')}</ToggleButton>
         </ToggleButtonGroup>
         <FormControl size="small" sx={{ minWidth: 140 }}>
-          <InputLabel id="atrisk-as-of">Status as of</InputLabel>
+          <InputLabel id="atrisk-as-of">{t('planner.atRisk.asOf')}</InputLabel>
           <Select
             labelId="atrisk-as-of"
-            label="Status as of"
+            label={t('planner.atRisk.asOf')}
             value={asOfValue}
             onChange={(event) => {
               const [y, m] = event.target.value.split('-').map(Number);
@@ -206,12 +208,12 @@ export function AtRiskDeltaTable({
         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
           <Chip
             size="small"
-            label={`Behind ${insights.summary.behind}`}
+            label={t('planner.atRisk.behindChip', { count: insights.summary.behind })}
             sx={{ bgcolor: SIGNAL_COLORS.behind_plan, color: '#fff' }}
           />
           <Chip
             size="small"
-            label={`Ahead ${insights.summary.ahead}`}
+            label={t('planner.atRisk.aheadChip', { count: insights.summary.ahead })}
             sx={{ bgcolor: SIGNAL_COLORS.ahead_of_plan, color: '#fff' }}
           />
         </Stack>
@@ -230,19 +232,21 @@ export function AtRiskDeltaTable({
         <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 700 }}>Store</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>{t('planner.atRisk.col.store')}</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Actual as-of
+                {t('planner.atRisk.col.actual')}
               </TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Target as-of
+                {t('planner.atRisk.col.target')}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Gap</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Volume
+              <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>
+                {t('planner.atRisk.col.gap')}
               </TableCell>
               <TableCell align="right" sx={{ fontWeight: 700 }}>
-                Action
+                {t('planner.atRisk.col.volume')}
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700 }}>
+                {t('planner.atRisk.col.action')}
               </TableCell>
             </TableRow>
           </TableHead>
@@ -251,7 +255,7 @@ export function AtRiskDeltaTable({
               <TableRow>
                 <TableCell colSpan={6}>
                   <Typography variant="body2" color="text.secondary">
-                    No stores match this filter.
+                    {t('planner.atRisk.empty')}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -319,7 +323,7 @@ export function AtRiskDeltaTable({
                         endIcon={<ArrowForwardIcon />}
                         onClick={() => onInspect(row.storeId)}
                       >
-                        Inspect
+                        {t('planner.atRisk.inspect')}
                       </Button>
                     </TableCell>
                   </TableRow>

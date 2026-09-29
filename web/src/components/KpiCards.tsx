@@ -1,6 +1,7 @@
 import { Box, Card, CardContent, Grid2 as Grid, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 
+import { useT } from '../i18n';
 import type { ProcessResponse, ResponseMeta, StoreImpactPoint } from '../schemas/api';
 import { useUiStore } from '../store/uiStore';
 import {
@@ -61,10 +62,11 @@ function deltaColor(value: number | null | undefined): string | undefined {
 }
 
 function TelemetrySummary({ meta }: { meta: ResponseMeta }) {
+  const t = useT();
   const lines = [
-    { label: 'Time', value: formatMs(meta.execution_time_ms) },
-    { label: 'RAM', value: formatMb(meta.peak_memory_mb) },
-    { label: 'Rows', value: String(meta.rows_scanned ?? '—') },
+    { label: t('kpi.time'), value: formatMs(meta.execution_time_ms) },
+    { label: t('kpi.ram'), value: formatMb(meta.peak_memory_mb) },
+    { label: t('kpi.rows'), value: String(meta.rows_scanned ?? '—') },
   ];
 
   const queryBits = [
@@ -134,6 +136,7 @@ function resolveStoreKpis(
 
 /** Verdict strip: Baseline / Final / delta / Run telemetry. Scope follows chart Store|Network. */
 export function KpiCards({ result }: KpiCardsProps) {
+  const t = useT();
   const chartScope = useUiStore((state) => state.chartScope);
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
 
@@ -146,12 +149,17 @@ export function KpiCards({ result }: KpiCardsProps) {
   const baseline = useStoreScope ? storeKpis.baseline_top_box_pct : result.baseline_top_box_pct;
   const finalPct = useStoreScope ? storeKpis.final_top_box_pct : result.final_top_box_pct;
   const delta = useStoreScope ? storeKpis.delta_pp : result.network_delta_pp;
+  const storeId = selectedStoreId ?? '—';
 
   const baselineLabel = useStoreScope
-    ? `Store ${selectedStoreId ?? '—'} baseline 5%`
-    : 'Baseline 5%';
-  const finalLabel = useStoreScope ? `Store ${selectedStoreId ?? '—'} final 5%` : 'Final 5%';
-  const deltaLabel = useStoreScope ? `Store ${selectedStoreId ?? '—'} delta` : 'Network delta';
+    ? t('kpi.baselineStore', { id: storeId })
+    : t('kpi.baselineNetwork');
+  const finalLabel = useStoreScope
+    ? t('kpi.finalStore', { id: storeId })
+    : t('kpi.finalNetwork');
+  const deltaLabel = useStoreScope
+    ? t('kpi.deltaStore', { id: storeId })
+    : t('kpi.deltaNetwork');
 
   return (
     <Grid container spacing={0.75} alignItems="stretch" data-testid="kpi-telemetry-strip">
@@ -172,7 +180,7 @@ export function KpiCards({ result }: KpiCardsProps) {
         <Card variant="outlined" sx={{ height: '100%' }}>
           <CardContent sx={denseCardContentSx}>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0 }}>
-              Run telemetry
+              {t('kpi.telemetry')}
             </Typography>
             <Box
               data-testid="run-telemetry-scroll"
