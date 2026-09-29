@@ -9,12 +9,21 @@ import {
 } from '@mui/material';
 import { useState } from 'react';
 
+import { useT, type MessageKey } from '../../i18n';
 import {
-  PIPELINE_STEP_LABELS,
   sortPipelineSteps,
   type ProcessResponse,
+  type StepName,
 } from '../../schemas/api';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+
+const STEP_I18N_KEYS: Record<StepName, MessageKey> = {
+  actual: 'steps.actual',
+  tier1: 'steps.tier1',
+  tier2: 'steps.tier2',
+  tier3: 'steps.tier3',
+  tier4: 'steps.tier4',
+};
 
 interface PlannerBaselineBadgeProps {
   panel: SanitizedPanel | null;
@@ -28,13 +37,16 @@ export function PlannerBaselineBadge({
   processResult,
   baselineReady,
 }: PlannerBaselineBadgeProps) {
+  const t = useT();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const steps = processResult ? sortPipelineSteps(processResult.steps) : [];
   const rowsLabel =
     processResult?.meta?.rows_scanned != null
-      ? `${processResult.meta.rows_scanned.toLocaleString()} rows scanned`
+      ? t('planner.baseline.rowsScanned', {
+          count: processResult.meta.rows_scanned.toLocaleString(),
+        })
       : panel
-        ? `${panel.row_count} panel cells`
+        ? t('planner.baseline.panelCells', { count: panel.row_count })
         : '—';
 
   return (
@@ -44,14 +56,14 @@ export function PlannerBaselineBadge({
         color={baselineReady ? 'success' : 'default'}
         label={
           baselineReady
-            ? `Baseline: Cleansed Q10012 · ${rowsLabel}`
-            : 'Baseline: Missing — run Sanitization'
+            ? t('planner.baseline.ready', { rows: rowsLabel })
+            : t('planner.baseline.missing')
         }
       />
       {baselineReady && (
         <IconButton
           size="small"
-          aria-label="Baseline sanitization audit"
+          aria-label={t('planner.baseline.auditAria')}
           onClick={(event) => setAnchor(event.currentTarget)}
         >
           <InfoOutlinedIcon fontSize="small" />
@@ -65,11 +77,11 @@ export function PlannerBaselineBadge({
       >
         <Box sx={{ p: 1.5, maxWidth: 320 }}>
           <Typography variant="subtitle2" gutterBottom>
-            Sanitization audit
+            {t('planner.baseline.auditTitle')}
           </Typography>
           {steps.length === 0 ? (
             <Typography variant="caption" color="text.secondary">
-              No pipeline steps in the last process result.
+              {t('planner.baseline.noSteps')}
             </Typography>
           ) : (
             <Stack spacing={0.5}>
@@ -81,10 +93,10 @@ export function PlannerBaselineBadge({
                   spacing={2}
                 >
                   <Typography variant="caption">
-                    {PIPELINE_STEP_LABELS[step.step_name] ?? step.step_name}
+                    {t(STEP_I18N_KEYS[step.step_name])}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
-                    drop {step.rows_dropped}
+                    {t('planner.baseline.drop', { count: step.rows_dropped })}
                     {step.top_box_pct != null ? ` · ${step.top_box_pct.toFixed(1)}%` : ''}
                   </Typography>
                 </Stack>
@@ -93,8 +105,11 @@ export function PlannerBaselineBadge({
           )}
           {panel && (
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-              Panel {panel.row_count} store×month · period {panel.period_start ?? '—'}
-              {panel.period_end ? ` → ${panel.period_end}` : ''}
+              {t('planner.baseline.panelMeta', {
+                count: panel.row_count,
+                start: panel.period_start ?? '—',
+                end: panel.period_end ? ` → ${panel.period_end}` : '',
+              })}
             </Typography>
           )}
         </Box>

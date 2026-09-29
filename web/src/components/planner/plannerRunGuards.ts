@@ -1,3 +1,5 @@
+import type { MessageKey } from '../../i18n';
+
 /** Run-button guard reasons for Planner (V4.2 Step 4). */
 
 export type PlannerRunBlockReason =
@@ -47,13 +49,15 @@ export function plannerRunBlockReason(input: {
   return null;
 }
 
-export const PLANNER_RUN_BLOCK_TOOLTIPS: Record<Exclude<PlannerRunBlockReason, null>, string> = {
-  no_baseline: 'Run Sanitization first to build a cleansed Q10012 baseline.',
-  no_stores: 'No stores at the selected reference month — pick another period.',
-  target_below_current: 'Target must be at or above the current chain score (higher-is-better).',
-  target_out_of_range: 'Target must be between 0 and 100%.',
-  cap_too_tight:
-    'Required lift exceeds Months × Max monthly improve — raise the cap or horizon, or lower Target.',
-  horizon_invalid: 'Months must be between 1 and 60.',
-  running: 'Simulation is running…',
+export const PLANNER_RUN_BLOCK_MESSAGE_KEYS: Record<
+  Exclude<PlannerRunBlockReason, null>,
+  MessageKey
+> = {
+  no_baseline: 'planner.block.noBaseline',
+  no_stores: 'planner.block.noStores',
+  target_below_current: 'planner.block.targetBelow',
+  target_out_of_range: 'planner.block.targetRange',
+  cap_too_tight: 'planner.block.capTight',
+  horizon_invalid: 'planner.block.horizon',
+  running: 'planner.block.running',
 };

@@ -37,9 +37,10 @@ import { PlannerBaselineBadge } from '../components/planner/PlannerBaselineBadge
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
 import { PlannerSandboxBar } from '../components/planner/PlannerSandboxBar';
 import {
-  PLANNER_RUN_BLOCK_TOOLTIPS,
+  PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
 } from '../components/planner/plannerRunGuards';
+import { useT } from '../i18n';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import {
@@ -130,6 +131,7 @@ function downloadPlanCsv(plan: FivePercentPlan): void {
 }
 
 export function PlannerPage() {
+  const t = useT();
   const theme = useTheme();
   const processResult = useUiStore((state) => state.processResult);
   const planMutation = usePlan();
@@ -199,16 +201,24 @@ export function PlannerPage() {
     isPending: planMutation.isPending,
   });
   const canRun = runBlock == null;
-  const runTooltip = runBlock ? PLANNER_RUN_BLOCK_TOOLTIPS[runBlock] : '';
+  const runTooltip = runBlock ? t(PLANNER_RUN_BLOCK_MESSAGE_KEYS[runBlock]) : '';
 
-  const directionLabel =
+  const directionKind =
     currentChain == null
-      ? '—'
+      ? null
       : target > currentChain + 1e-9
-        ? 'Improve ↑'
+        ? ('improve' as const)
         : target < currentChain - 1e-9
-          ? 'Invalid ↓'
-          : 'Hold';
+          ? ('invalid' as const)
+          : ('hold' as const);
+  const directionLabel =
+    directionKind === 'improve'
+      ? t('planner.dir.improve')
+      : directionKind === 'invalid'
+        ? t('planner.dir.invalid')
+        : directionKind === 'hold'
+          ? t('planner.dir.hold')
+          : '—';
 
   const monitoring = useMemo(() => {
     if (!draftPlan || !panel) {
@@ -306,11 +316,16 @@ export function PlannerPage() {
             pb: 0.5,
           }}
         >
-          <Tooltip title={controlsOpen ? 'Collapse controls' : 'Expand controls'} placement="right">
+          <Tooltip
+            title={controlsOpen ? t('common.collapseControls') : t('common.expandControls')}
+            placement="right"
+          >
             <IconButton
               size="small"
               onClick={() => setControlsOpen((open) => !open)}
-              aria-label={controlsOpen ? 'Collapse controls' : 'Expand controls'}
+              aria-label={
+                controlsOpen ? t('common.collapseControls') : t('common.expandControls')
+              }
               aria-expanded={controlsOpen}
             >
               {controlsOpen ? (
@@ -346,18 +361,18 @@ export function PlannerPage() {
                 to="/"
                 startIcon={<ScienceRoundedIcon />}
               >
-                Sanitization
+                {t('planner.goSanitization')}
               </Button>
             }
           >
-            Run Sanitization first. Plan Run stays disabled until a cleansed baseline exists.
+            {t('planner.needSanitization')}
           </Alert>
         )}
 
         <Card variant="outlined" data-testid="allocation-levers">
           <CardHeader
-            title="Allocation levers"
-            subheader="Q10012 top-box · primary knobs"
+            title={t('planner.leversTitle')}
+            subheader={t('planner.leversSub')}
             sx={{ pb: 0.5 }}
           />
           <CardContent sx={{ pt: 1 }}>
@@ -369,18 +384,18 @@ export function PlannerPage() {
               />
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                 <Typography variant="body2">
-                  Current:{' '}
+                  {t('planner.current')}{' '}
                   <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
                 </Typography>
                 <Chip
                   size="small"
                   label={directionLabel}
-                  color={directionLabel.startsWith('Improve') ? 'success' : 'default'}
+                  color={directionKind === 'improve' ? 'success' : 'default'}
                 />
               </Stack>
 
               <TextField
-                label="Target (%)"
+                label={t('planner.target')}
                 type="number"
                 size="small"
                 value={target}
@@ -389,7 +404,7 @@ export function PlannerPage() {
                 inputProps={{ min: 0, max: 100, step: 0.1 }}
               />
               <TextField
-                label="Horizon (months)"
+                label={t('planner.horizon')}
                 type="number"
                 size="small"
                 value={horizon}
@@ -398,10 +413,10 @@ export function PlannerPage() {
                 inputProps={{ min: 1, max: 60 }}
               />
               <FormControl fullWidth size="small" disabled={!baselineReady || refs.length === 0}>
-                <InputLabel id="ref-period-label">Reference month</InputLabel>
+                <InputLabel id="ref-period-label">{t('planner.referenceMonth')}</InputLabel>
                 <Select
                   labelId="ref-period-label"
-                  label="Reference month"
+                  label={t('planner.referenceMonth')}
                   value={
                     effectiveYear != null && effectiveMonth != null
                       ? periodLabel(effectiveYear, effectiveMonth)
@@ -435,16 +450,16 @@ export function PlannerPage() {
               >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography variant="caption" fontWeight={600}>
-                    Advanced allocator options
+                    {t('planner.advanced')}
                   </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={1.25}>
                     <FormControl fullWidth size="small" disabled={!baselineReady}>
-                      <InputLabel id="traj-label">Trajectory</InputLabel>
+                      <InputLabel id="traj-label">{t('planner.trajectory')}</InputLabel>
                       <Select
                         labelId="traj-label"
-                        label="Trajectory"
+                        label={t('planner.trajectory')}
                         value={params.trajectory}
                         onChange={(e) =>
                           setParams((p) => ({
@@ -453,13 +468,13 @@ export function PlannerPage() {
                           }))
                         }
                       >
-                        <MenuItem value="uniform">Uniform</MenuItem>
-                        <MenuItem value="front_loaded">Front-loaded</MenuItem>
-                        <MenuItem value="accelerated">Accelerated</MenuItem>
+                        <MenuItem value="uniform">{t('planner.traj.uniform')}</MenuItem>
+                        <MenuItem value="front_loaded">{t('planner.traj.front')}</MenuItem>
+                        <MenuItem value="accelerated">{t('planner.traj.accel')}</MenuItem>
                       </Select>
                     </FormControl>
                     <TextField
-                      label="Lift priority power"
+                      label={t('planner.priorityPower')}
                       type="number"
                       size="small"
                       value={params.priority_power}
@@ -470,7 +485,7 @@ export function PlannerPage() {
                       inputProps={{ min: 0.1, step: 0.1 }}
                     />
                     <TextField
-                      label="Max monthly improve (%)"
+                      label={t('planner.maxMonthly')}
                       type="number"
                       size="small"
                       value={params.max_monthly_improve}
@@ -484,7 +499,7 @@ export function PlannerPage() {
                       inputProps={{ min: 0.01, step: 0.1 }}
                     />
                     <TextField
-                      label="Trajectory power"
+                      label={t('planner.trajPower')}
                       type="number"
                       size="small"
                       value={params.trajectory_power}
@@ -495,7 +510,7 @@ export function PlannerPage() {
                       inputProps={{ min: 0.1, step: 0.1 }}
                     />
                     <TextField
-                      label="Growth factor"
+                      label={t('planner.growthFactor')}
                       type="number"
                       size="small"
                       value={params.growth_factor}
@@ -517,13 +532,13 @@ export function PlannerPage() {
               >
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography variant="caption" fontWeight={600}>
-                    Stores at reference ({baselineRows.length})
+                    {t('planner.storesAtRef', { count: baselineRows.length })}
                   </Typography>
                 </AccordionSummary>
                 <AccordionDetails sx={{ maxHeight: 160, overflow: 'auto', pt: 0 }}>
                   {baselineRows.length === 0 ? (
                     <Typography variant="caption" color="text.secondary">
-                      No store scores for this reference month.
+                      {t('planner.noStoresAtRef')}
                     </Typography>
                   ) : (
                     <Stack spacing={0.25}>
@@ -563,11 +578,11 @@ export function PlannerPage() {
                     disabled={!canRun}
                     onClick={handleRun}
                   >
-                    {planMutation.isPending ? 'Running...' : 'Run simulation'}
+                    {planMutation.isPending ? t('common.runningDots') : t('planner.run')}
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip title={draftPlan ? '' : 'Run a simulation first to enable export.'}>
+              <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
                 <span>
                   <Button
                     variant="outlined"
@@ -576,28 +591,28 @@ export function PlannerPage() {
                     disabled={!draftPlan}
                     onClick={handleExportCsv}
                   >
-                    Export CSV
+                    {t('planner.exportCsv')}
                   </Button>
                 </span>
               </Tooltip>
               {runBlock === 'no_stores' && (
                 <Typography variant="caption" color="warning.main">
-                  {PLANNER_RUN_BLOCK_TOOLTIPS.no_stores}
+                  {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.no_stores)}
                 </Typography>
               )}
               {runBlock === 'target_below_current' && (
                 <Typography variant="caption" color="error">
-                  {PLANNER_RUN_BLOCK_TOOLTIPS.target_below_current}
+                  {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.target_below_current)}
                 </Typography>
               )}
               {runBlock === 'cap_too_tight' && (
                 <Typography variant="caption" color="warning.main">
-                  {PLANNER_RUN_BLOCK_TOOLTIPS.cap_too_tight}
+                  {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.cap_too_tight)}
                 </Typography>
               )}
               {runBlock === 'target_out_of_range' && (
                 <Typography variant="caption" color="error">
-                  {PLANNER_RUN_BLOCK_TOOLTIPS.target_out_of_range}
+                  {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.target_out_of_range)}
                 </Typography>
               )}
             </Stack>
@@ -616,14 +631,14 @@ export function PlannerPage() {
               flex: 1,
             }}
           >
-            <Tooltip title={canRun ? 'Run simulation' : runTooltip} placement="right">
+            <Tooltip title={canRun ? t('planner.run') : runTooltip} placement="right">
               <span>
                 <IconButton
                   data-testid="collapsed-run"
                   color="primary"
                   onClick={handleRun}
                   disabled={!canRun}
-                  aria-label="Run simulation"
+                  aria-label={t('planner.run')}
                   size="small"
                 >
                   {planMutation.isPending ? (
@@ -655,7 +670,7 @@ export function PlannerPage() {
           <Alert severity="error" sx={{ flexShrink: 0 }}>
             {planMutation.error instanceof Error
               ? planMutation.error.message
-              : 'Plan request failed'}
+              : t('planner.planFailed')}
           </Alert>
         )}
 
@@ -692,8 +707,7 @@ export function PlannerPage() {
 
               {!isDirty && approvedPlan && (
                 <Alert severity="success" icon={false} sx={{ alignItems: 'center' }}>
-                  Committed session plan · Target {approvedPlan.target.toFixed(1)}% · Export anytime
-                  from the left rail (still no DB write-back)
+                  {t('planner.committed', { target: approvedPlan.target.toFixed(1) })}
                 </Alert>
               )}
 
@@ -743,8 +757,8 @@ export function PlannerPage() {
                   }}
                 >
                   <CardHeader
-                    title="Hero evaluation"
-                    subheader="Cleansed fact left of as-of · draft forecast + cone right · target marker"
+                    title={t('planner.heroTitle')}
+                    subheader={t('planner.heroSub')}
                     sx={{ flexShrink: 0, pb: 0 }}
                   />
                   <CardContent
@@ -781,7 +795,7 @@ export function PlannerPage() {
                       />
                     ) : (
                       <Typography variant="body2" color="text.secondary">
-                        Cleansed panel required for evaluation view.
+                        {t('planner.heroNeedPanel')}
                       </Typography>
                     )}
                   </CardContent>
@@ -814,8 +828,8 @@ export function PlannerPage() {
                     }}
                   >
                     <CardHeader
-                      title="At-risk entities"
-                      subheader="Exception list · Behind / Gainers / All · Inspect opens sandbox"
+                      title={t('planner.atRiskTitle')}
+                      subheader={t('planner.atRiskSub')}
                       sx={{ flexShrink: 0, pb: 0.5 }}
                     />
                     <CardContent
@@ -866,9 +880,7 @@ export function PlannerPage() {
           </Box>
         ) : (
           <Alert severity="info" sx={{ flexShrink: 0 }}>
-            {baselineReady
-              ? 'Set levers and Run simulation — canvas shows KPI strip, hero chart, and at-risk stores.'
-              : 'Waiting for cleansed baseline from Sanitization…'}
+            {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
           </Alert>
         )}
       </Box>
