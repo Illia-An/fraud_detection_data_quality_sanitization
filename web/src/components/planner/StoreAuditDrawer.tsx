@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
+import { useT } from '../../i18n';
 import type { ProcessResponse } from '../../schemas/api';
 import { PIPELINE_STEP_LABELS, sortPipelineSteps } from '../../schemas/api';
 import type { FivePercentPlan } from '../../schemas/plan';
@@ -69,6 +70,7 @@ export function StoreAuditDrawer({
   maxMonthlyImprove,
   onClose,
 }: StoreAuditDrawerProps) {
+  const t = useT();
   const projection = plan.projections.find((p) => p.store_id === storeId);
   const monitorRow: StoreMonitorRow | undefined = insights.stores.find(
     (s) => s.store_id === storeId,
@@ -200,7 +202,7 @@ export function StoreAuditDrawer({
           sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}
         >
           <Typography variant="h6" sx={{ flex: 1 }}>
-            Inspect · Store {storeId}
+            {t('planner.inspect.title', { id: storeId })}
           </Typography>
           {monitorRow && (
             <Chip
@@ -209,7 +211,7 @@ export function StoreAuditDrawer({
               sx={{ bgcolor: SIGNAL_COLORS[monitorRow.signal], color: '#fff' }}
             />
           )}
-          <IconButton aria-label="Close" onClick={onClose} size="small">
+          <IconButton aria-label={t('common.close')} onClick={onClose} size="small">
             <CloseIcon />
           </IconButton>
         </Stack>
@@ -217,8 +219,7 @@ export function StoreAuditDrawer({
         <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
           <Stack spacing={2}>
             <Alert severity="warning" variant="outlined">
-              Session sandbox what-if — draft only. Does not mutate the accepted plan, Export CSV, or
-              DB.
+              {t('planner.inspect.sandboxWarn')}
             </Alert>
 
             <PlanActualLens
@@ -231,15 +232,14 @@ export function StoreAuditDrawer({
 
             <Box>
               <Typography variant="subtitle2" gutterBottom>
-                Estimate vs actual
+                {t('planner.inspect.estimateTitle')}
               </Typography>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-                Edit last-month estimate (in range), then Recalculate. Out-of-range values are
-                rejected.
+                {t('planner.inspect.estimateHint')}
               </Typography>
               {originalLast == null || !displayTable ? (
                 <Typography variant="body2" color="text.secondary">
-                  No projection for this store.
+                  {t('planner.inspect.noProjection')}
                 </Typography>
               ) : (
                 <Stack spacing={1}>
@@ -259,14 +259,14 @@ export function StoreAuditDrawer({
                               }}
                             >
                               {col.label}
-                              {col.isAsOf ? ' · as of' : ''}
+                              {col.isAsOf ? t('planner.inspect.asOfSuffix') : ''}
                             </TableCell>
                           ))}
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>estimate</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{t('planner.inspect.estimate')}</TableCell>
                           {displayTable.columns.map((col, index) => {
                             const score = displayTable.estimate[index];
                             const isLast = index === editableCol;
@@ -297,7 +297,7 @@ export function StoreAuditDrawer({
                           })}
                         </TableRow>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>actual</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>{t('planner.inspect.actual')}</TableCell>
                           {displayTable.columns.map((col, index) => {
                             const actual = displayTable.actual[index];
                             return (
@@ -334,11 +334,11 @@ export function StoreAuditDrawer({
                   </Typography>
                   <Stack direction="row" spacing={1}>
                     <Button variant="outlined" onClick={handleRecalculate}>
-                      Recalculate
+                      {t('planner.inspect.recalculate')}
                     </Button>
                     {appliedDraft != null && (
                       <Button variant="text" onClick={handleReset}>
-                        Reset draft
+                        {t('planner.inspect.reset')}
                       </Button>
                     )}
                   </Stack>
@@ -486,7 +486,7 @@ export function StoreAuditDrawer({
 
         <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
           <Button fullWidth variant="contained" onClick={onClose}>
-            Close
+            {t('common.close')}
           </Button>
         </Box>
       </Box>

@@ -1,6 +1,7 @@
 import { Box, Card, CardContent, Chip, Grid2 as Grid, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
+import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
@@ -45,6 +46,7 @@ export function SimulationSummaryKpis({
   approvedPlan,
   monitoring,
 }: SimulationSummaryKpisProps) {
+  const t = useT();
   const baselineFinal = approvedPlan?.final_chain ?? draftPlan.current_chain;
   const projected = draftPlan.final_chain;
   const networkDelta = projected - baselineFinal;
@@ -56,17 +58,17 @@ export function SimulationSummaryKpis({
   return (
     <Grid container spacing={1.5}>
       <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label="Target KPI">
+        <MetricCard label={t('planner.kpi.target')}>
           <Typography variant="h6" fontWeight={700}>
             {formatPct(draftPlan.target)}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Static goal
+            {t('planner.kpi.targetHint')}
           </Typography>
         </MetricCard>
       </Grid>
       <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label="Projected network KPI">
+        <MetricCard label={t('planner.kpi.projected')}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <Typography variant="body1" fontWeight={600}>
               {formatPct(baselineFinal)} → {formatPct(projected)}
@@ -78,12 +80,12 @@ export function SimulationSummaryKpis({
             />
           </Stack>
           <Typography variant="caption" color="text.secondary">
-            {approvedPlan ? 'Accepted → draft' : 'Current → draft final'}
+            {approvedPlan ? t('planner.kpi.acceptedDraft') : t('planner.kpi.currentDraft')}
           </Typography>
         </MetricCard>
       </Grid>
       <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label="Stores behind plan">
+        <MetricCard label={t('planner.kpi.behind')}>
           <Typography
             variant="h6"
             fontWeight={700}
@@ -92,21 +94,21 @@ export function SimulationSummaryKpis({
             {behindDraft == null ? '—' : behindDraft}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            As of {asOfLabel}
+            {t('planner.kpi.asOf', { label: asOfLabel })}
           </Typography>
         </MetricCard>
       </Grid>
       <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label="Feasibility">
+        <MetricCard label={t('planner.kpi.feasibility')}>
           <Box>
             <Chip
               size="small"
-              label={draftPlan.feasible ? 'On path' : 'May miss target'}
+              label={draftPlan.feasible ? t('planner.kpi.onPath') : t('planner.kpi.mayMiss')}
               color={draftPlan.feasible ? 'success' : 'warning'}
             />
           </Box>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            Required lift {formatDeltaPp(draftPlan.required_change)} · quota N/A
+            {t('planner.kpi.liftQuota', { lift: formatDeltaPp(draftPlan.required_change) })}
           </Typography>
         </MetricCard>
       </Grid>

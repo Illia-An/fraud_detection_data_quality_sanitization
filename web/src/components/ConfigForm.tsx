@@ -14,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { useEffect } from 'react';
 
+import { useT } from '../i18n';
 import {
   configFormSchema,
   defaultConfigFormValues,
@@ -27,6 +28,7 @@ interface ConfigFormProps {
 }
 
 export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
+  const t = useT();
   const {
     control,
     register,
@@ -53,8 +55,8 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   return (
     <Card variant="outlined">
       <CardHeader
-        title="Pipeline configuration"
-        subheader="Four-tier thresholds (SPEC)"
+        title={t('config.title')}
+        subheader={t('config.subheader')}
         titleTypographyProps={{ variant: 'subtitle1' }}
         subheaderTypographyProps={{ variant: 'caption' }}
         sx={{ pb: 0 }}
@@ -63,7 +65,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
         <Stack spacing={1.5} divider={<Divider flexItem />}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="subtitle2" component="h3">
-              Tier 1 — BlackList
+              {t('config.tier1.title')}
             </Typography>
             <Controller
               name="tier1_blacklist_enabled"
@@ -75,10 +77,10 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                       size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 1 BlackList filter' }}
+                      inputProps={{ 'aria-label': t('config.tier1.aria') }}
                     />
                   }
-                  label="BlackList filter (keep לא)"
+                  label={t('config.tier1.label')}
                 />
               )}
             />
@@ -86,7 +88,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="subtitle2" component="h3">
-              Tier 2 — Frequency
+              {t('config.tier2.title')}
             </Typography>
             <Controller
               name="tier2_freq_enabled"
@@ -98,15 +100,15 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                       size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 2 frequency filter' }}
+                      inputProps={{ 'aria-label': t('config.tier2.aria') }}
                     />
                   }
-                  label="Frequency (entity×store×day)"
+                  label={t('config.tier2.label')}
                 />
               )}
             />
             <TextField
-              label="Freq threshold"
+              label={t('config.tier2.threshold')}
               type="number"
               size="small"
               fullWidth
@@ -120,7 +122,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="subtitle2" component="h3">
-              Tier 3 — Always top-box
+              {t('config.tier3.title')}
             </Typography>
             <Controller
               name="tier3_always_five_enabled"
@@ -132,15 +134,15 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                       size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 3 always top-box' }}
+                      inputProps={{ 'aria-label': t('config.tier3.aria') }}
                     />
                   }
-                  label="Always top-box (optional)"
+                  label={t('config.tier3.label')}
                 />
               )}
             />
             <TextField
-              label="Always-5 min n"
+              label={t('config.tier3.minN')}
               type="number"
               size="small"
               fullWidth
@@ -154,7 +156,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Typography variant="subtitle2" component="h3">
-              Tier 4 — store×month
+              {t('config.tier4.title')}
             </Typography>
             <Controller
               name="tier4_enabled"
@@ -166,15 +168,15 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
                       size="small"
                       checked={field.value}
                       onChange={(_, checked) => field.onChange(checked)}
-                      inputProps={{ 'aria-label': 'Tier 4 store-month filter' }}
+                      inputProps={{ 'aria-label': t('config.tier4.aria') }}
                     />
                   }
-                  label="Store×month anomaly"
+                  label={t('config.tier4.label')}
                 />
               )}
             />
             <TextField
-              label="Min volume"
+              label={t('config.tier4.minVolume')}
               type="number"
               size="small"
               fullWidth
@@ -185,7 +187,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               slotProps={{ htmlInput: { min: 1 } }}
             />
             <TextField
-              label="Z high"
+              label={t('config.tier4.zHigh')}
               type="number"
               size="small"
               fullWidth
@@ -196,7 +198,7 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
               slotProps={{ htmlInput: { min: 0, max: 5, step: 0.1 } }}
             />
             <TextField
-              label="Five % min"
+              label={t('config.tier4.fiveMin')}
               type="number"
               size="small"
               fullWidth

@@ -4,6 +4,7 @@ import { ConfigForm } from '../components/ConfigForm';
 import { PipelineRunPanel } from '../components/PipelineRunPanel';
 import { SampleDataPanel } from '../components/SampleDataPanel';
 import { usePipelineRunner } from '../hooks/usePipelineRunner';
+import { useT } from '../i18n';
 import { defaultPipelineConfig, type PipelineConfig } from '../schemas/api';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -23,6 +24,7 @@ const CONTROLS_RAIL_COLLAPSED_PX = 40;
 const COLLAPSED_PLAY_REVEAL_MS = 250;
 
 export function SanitizationPage() {
+  const t = useT();
   const theme = useTheme();
   const [pipelineConfig, setPipelineConfig] = useState<PipelineConfig>(defaultPipelineConfig);
   const [controlsOpen, setControlsOpen] = useState(true);
@@ -82,11 +84,16 @@ export function SanitizationPage() {
             pb: 0.5,
           }}
         >
-          <Tooltip title={controlsOpen ? 'Collapse controls' : 'Expand controls'} placement="right">
+          <Tooltip
+            title={controlsOpen ? t('common.collapseControls') : t('common.expandControls')}
+            placement="right"
+          >
             <IconButton
               size="small"
               onClick={() => setControlsOpen((open) => !open)}
-              aria-label={controlsOpen ? 'Collapse controls' : 'Expand controls'}
+              aria-label={
+                controlsOpen ? t('common.collapseControls') : t('common.expandControls')
+              }
               aria-expanded={controlsOpen}
             >
               {controlsOpen ? (
@@ -140,7 +147,7 @@ export function SanitizationPage() {
                 runner.isPending ? <CircularProgress size={18} color="inherit" /> : undefined
               }
             >
-              {runner.isPending ? 'Running…' : 'Run Scenario'}
+              {runner.isPending ? t('common.running') : t('sanitization.run')}
             </Button>
           </Box>
         </Box>
@@ -156,14 +163,14 @@ export function SanitizationPage() {
               flex: 1,
             }}
           >
-            <Tooltip title="Run Scenario" placement="right">
+            <Tooltip title={t('sanitization.run')} placement="right">
               <span>
                 <IconButton
                   data-testid="collapsed-run"
                   color="primary"
                   onClick={runner.handleRun}
                   disabled={runner.isPending || runner.noData}
-                  aria-label="Run Scenario"
+                  aria-label={t('sanitization.run')}
                   size="small"
                 >
                   {runner.isPending ? (

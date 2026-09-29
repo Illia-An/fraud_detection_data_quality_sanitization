@@ -26,6 +26,7 @@ import {
 } from '@mui/material';
 import type { PlotMouseEvent } from 'plotly.js';
 
+import { useT } from '../i18n';
 import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
 import type { ChartScopeMode, ChartTimeMode } from '../schemas/chartUi';
 import { useUiStore } from '../store/uiStore';
@@ -95,6 +96,7 @@ interface StoreImpactChartProps {
 }
 
 export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactChartProps) {
+  const t = useT();
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
   const highlightedPeriodLabel = useUiStore((state) => state.highlightedPeriodLabel);
@@ -233,7 +235,7 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   return (
     <Card variant="outlined" sx={{ height: '100%', mb: 0 }}>
       <CardHeader
-        title="Store impact"
+        title={t('chart.title')}
         titleTypographyProps={{ variant: 'subtitle1' }}
         sx={{ pb: 0, pt: 1.5, px: 2 }}
         action={
@@ -251,13 +253,13 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
               exclusive
               value={chartScope}
               onChange={handleScopeChange}
-              aria-label="Chart scope"
+              aria-label={t('chart.scopeAria')}
             >
-              <ToggleButton value="store" aria-label="Store scope">
-                Store
+              <ToggleButton value="store" aria-label={t('chart.scopeStoreAria')}>
+                {t('chart.scopeStore')}
               </ToggleButton>
-              <ToggleButton value="network" aria-label="Network scope">
-                Network
+              <ToggleButton value="network" aria-label={t('chart.scopeNetworkAria')}>
+                {t('chart.scopeNetwork')}
               </ToggleButton>
             </ToggleButtonGroup>
             <ToggleButtonGroup
@@ -265,13 +267,13 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
               exclusive
               value={chartTimeMode}
               onChange={handleTimeModeChange}
-              aria-label="Chart time mode"
+              aria-label={t('chart.timeAria')}
             >
-              <ToggleButton value="timeline" aria-label="Timeline mode">
-                Timeline
+              <ToggleButton value="timeline" aria-label={t('chart.timelineAria')}>
+                {t('chart.timeline')}
               </ToggleButton>
-              <ToggleButton value="yoy" aria-label="Year over year mode">
-                YoY
+              <ToggleButton value="yoy" aria-label={t('chart.yoyAria')}>
+                {t('chart.yoy')}
               </ToggleButton>
             </ToggleButtonGroup>
             <ToggleButtonGroup
@@ -279,20 +281,20 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
               exclusive
               value={yScaleMode}
               onChange={handleYScaleChange}
-              aria-label="Y-axis scale"
+              aria-label={t('chart.yScaleAria')}
             >
-              <ToggleButton value="fit" aria-label="Fit to data">
-                Fit
+              <ToggleButton value="fit" aria-label={t('chart.fitAria')}>
+                {t('chart.fit')}
               </ToggleButton>
-              <ToggleButton value="full" aria-label="0 to 100 percent">
-                0–100%
+              <ToggleButton value="full" aria-label={t('chart.fullAria')}>
+                {t('chart.full')}
               </ToggleButton>
             </ToggleButtonGroup>
             {isNetwork ? (
-              <Tooltip title="Volume-weighted network aggregate for the selected period">
+              <Tooltip title={t('chart.networkChipTip')}>
                 <Chip
                   size="small"
-                  label="Network aggregated"
+                  label={t('chart.networkChip')}
                   color="default"
                   variant="outlined"
                   sx={{ opacity: 0.85 }}
@@ -300,12 +302,12 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
               </Tooltip>
             ) : null}
             {isYoY ? (
-              <Tooltip title="Actual + Final per year on shared Jan–Dec axis">
-                <Chip size="small" label="YoY overlay" variant="outlined" sx={{ opacity: 0.85 }} />
+              <Tooltip title={t('chart.yoyChipTip')}>
+                <Chip size="small" label={t('chart.yoyChip')} variant="outlined" sx={{ opacity: 0.85 }} />
               </Tooltip>
             ) : null}
             <Tooltip
-              title={isNetwork ? 'Network aggregated — store selector disabled' : ''}
+              title={isNetwork ? t('chart.storeDisabledTip') : ''}
               disableHoverListener={!isNetwork}
             >
               <span>
@@ -317,18 +319,18 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
                   }}
                   disabled={isNetwork}
                 >
-                  <InputLabel id="store-impact-store-label">Store</InputLabel>
+                  <InputLabel id="store-impact-store-label">{t('common.store')}</InputLabel>
                   <Select
                     labelId="store-impact-store-label"
-                    label="Store"
+                    label={t('common.store')}
                     value={activeStoreId ?? ''}
                     onChange={handleStoreChange}
-                    inputProps={{ 'aria-label': 'Store' }}
+                    inputProps={{ 'aria-label': t('common.store') }}
                     sx={{ cursor: isNetwork ? 'not-allowed' : undefined }}
                   >
                     {storeIds.map((storeId) => (
                       <MenuItem key={storeId} value={storeId}>
-                        Store {storeId}
+                        {t('common.storeN', { id: storeId })}
                       </MenuItem>
                     ))}
                   </Select>

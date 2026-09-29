@@ -17,8 +17,19 @@ import {
 } from '@tanstack/react-table';
 import { useMemo } from 'react';
 
-import type { StepMetrics } from '../schemas/api';
+import { useT, type MessageKey, type TranslateParams } from '../i18n';
+import type { StepMetrics, StepName } from '../schemas/api';
 import { formatPipelineStepLabel, sortPipelineSteps } from '../schemas/api';
+
+const STEP_I18N_KEYS: Record<StepName, MessageKey> = {
+  actual: 'steps.actual',
+  tier1: 'steps.tier1',
+  tier2: 'steps.tier2',
+  tier3: 'steps.tier3',
+  tier4: 'steps.tier4',
+};
+
+type TranslateFn = (key: MessageKey, params?: TranslateParams) => string;
 
 type StepRow = StepMetrics & {
   delta_pp: number | null;
@@ -43,16 +54,16 @@ function formatDeltaPp(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)} pp`;
 }
 
-function buildColumns() {
+function buildColumns(t: TranslateFn) {
   return [
     columnHelper.accessor('step_name', {
-      header: 'Step',
-      cell: (info) => formatPipelineStepLabel(info.getValue()),
+      header: t('steps.col.step'),
+      cell: (info) => t(STEP_I18N_KEYS[info.getValue()]),
     }),
-    columnHelper.accessor('rows_in', { header: 'Rows in' }),
-    columnHelper.accessor('rows_out', { header: 'Rows out' }),
+    columnHelper.accessor('rows_in', { header: t('steps.col.rowsIn') }),
+    columnHelper.accessor('rows_out', { header: t('steps.col.rowsOut') }),
     columnHelper.accessor('rows_dropped', {
-      header: 'Excluded',
+      header: t('steps.col.excluded'),
       cell: (info) => {
         const row = info.row.original;
         const sharePct = Math.round(row.drop_share * 100);
@@ -79,11 +90,11 @@ function buildColumns() {
       },
     }),
     columnHelper.accessor('top_box_pct', {
-      header: 'Top-box %',
+      header: t('steps.col.topBox'),
       cell: (info) => formatPct(info.getValue()),
     }),
     columnHelper.accessor('delta_pp', {
-      header: 'Δ vs prev',
+      header: t('steps.col.delta'),
       cell: (info) => {
         const value = info.getValue();
         const largest = info.row.original.is_largest_delta;
@@ -103,8 +114,6 @@ function buildColumns() {
     }),
   ];
 }
-
-const columns = buildColumns();
 
 export function buildPipelineStepRows(steps: StepMetrics[]): StepRow[] {
   const ordered = sortPipelineSteps(steps);
@@ -150,7 +159,9 @@ interface PipelineStepsTableProps {
 }
 
 export function PipelineStepsTable({ steps }: PipelineStepsTableProps) {
+  const t = useT();
   const data = useMemo(() => buildPipelineStepRows(steps), [steps]);
+  const columns = useMemo(() => buildColumns(t), [t]);
 
   const table = useReactTable({
     data,

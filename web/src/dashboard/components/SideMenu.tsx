@@ -9,6 +9,7 @@ import Typography from '@mui/material/Typography';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
+import { useT } from '../../i18n';
 import { BrandLogo } from './BrandLogo';
 import MenuContent from './MenuContent';
 
@@ -16,6 +17,7 @@ export const DRAWER_WIDTH = 240;
 export const DRAWER_WIDTH_COLLAPSED = 64;
 
 export default function SideMenu() {
+  const t = useT();
   const theme = useTheme();
   const [open, setOpen] = useState(true);
   const width = open ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED;
@@ -74,7 +76,7 @@ export default function SideMenu() {
         <IconButton
           size="small"
           onClick={() => setOpen((current) => !current)}
-          aria-label={open ? 'Collapse navigation' : 'Expand navigation'}
+          aria-label={open ? t('nav.collapse') : t('nav.expand')}
           aria-expanded={open}
         >
           {open ? <ChevronLeftIcon fontSize="small" /> : <ChevronRightIcon fontSize="small" />}
