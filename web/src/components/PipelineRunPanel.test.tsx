@@ -83,6 +83,7 @@ describe('PipelineRunPanel', () => {
       processResult: null,
       sampleMeta: null,
       sampleGeneration: 0,
+      sampleDataKey: null,
       lastPreset: 'db',
       selectedStoreId: null,
       chartScope: 'network',

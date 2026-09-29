@@ -103,6 +103,7 @@ describe('SanitizationPage controls rail', () => {
       sampleMeta: null,
       processResult: null,
       sampleGeneration: 0,
+      sampleDataKey: null,
     });
   });
 

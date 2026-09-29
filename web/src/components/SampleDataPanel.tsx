@@ -54,6 +54,7 @@ export function SampleDataPanel() {
   const customToDate = useUiStore((state) => state.customToDate);
   const setLastPreset = useUiStore((state) => state.setLastPreset);
   const setSurveyData = useUiStore((state) => state.setSurveyData);
+  const beginSampleReload = useUiStore((state) => state.beginSampleReload);
   const setPeriodPreset = useUiStore((state) => state.setPeriodPreset);
   const setCustomPeriod = useUiStore((state) => state.setCustomPeriod);
 
@@ -85,7 +86,16 @@ export function SampleDataPanel() {
       return;
     }
     lastLoadedKey.current = loadKey;
-    setSurveyData(active.data.rows, active.data.meta, active.data.preset as DataSource);
+    const applied = setSurveyData(
+      active.data.rows,
+      active.data.meta,
+      active.data.preset as DataSource,
+      active.dataUpdatedAt,
+    );
+    // Skip snackbar when store rejected a duplicate (remount / cached query).
+    if (!applied) {
+      return;
+    }
     setSnackbar({
       open: true,
       message: t('sample.loaded', {
@@ -135,6 +145,8 @@ export function SampleDataPanel() {
   const handleSourceChange = (event: SelectChangeEvent) => {
     const next = event.target.value as DataSource;
     if (next === 'db' && lastPreset === 'db') {
+      beginSampleReload();
+      lastLoadedKey.current = null;
       void db.refetch();
       return;
     }
@@ -243,7 +255,11 @@ export function SampleDataPanel() {
                 color="text.secondary"
                 component="button"
                 type="button"
-                onClick={() => void db.refetch()}
+                onClick={() => {
+                  beginSampleReload();
+                  lastLoadedKey.current = null;
+                  void db.refetch();
+                }}
                 disabled={loading}
                 sx={{
                   alignSelf: 'flex-start',

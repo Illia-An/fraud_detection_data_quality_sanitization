@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { FivePercentPlan } from '../schemas/plan';
-import { usePlannerScenarioStore } from './plannerScenarioStore';
+import {
+  PLANNER_SESSION_STORAGE_KEY,
+  usePlannerScenarioStore,
+} from './plannerScenarioStore';
 
 const samplePlan = (final: number): FivePercentPlan => ({
   metric_id: 'five_percent',
@@ -18,6 +21,7 @@ const samplePlan = (final: number): FivePercentPlan => ({
 
 describe('usePlannerScenarioStore', () => {
   beforeEach(() => {
+    sessionStorage.removeItem(PLANNER_SESSION_STORAGE_KEY);
     usePlannerScenarioStore.getState().clearAll();
   });
 
@@ -41,5 +45,14 @@ describe('usePlannerScenarioStore', () => {
     usePlannerScenarioStore.getState().discardDraft();
     expect(usePlannerScenarioStore.getState().isDirty).toBe(false);
     expect(usePlannerScenarioStore.getState().draftPlan?.final_chain).toBe(74);
+  });
+
+  it('persists draft plan to sessionStorage', () => {
+    usePlannerScenarioStore.getState().setDraftFromRun(samplePlan(71));
+    const raw = sessionStorage.getItem(PLANNER_SESSION_STORAGE_KEY);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw!) as { draftPlan: FivePercentPlan | null; isDirty: boolean };
+    expect(parsed.draftPlan?.final_chain).toBe(71);
+    expect(parsed.isDirty).toBe(true);
   });
 });
