@@ -12,6 +12,7 @@ import Grid from '@mui/material/Grid2';
 import { useMemo, useState } from 'react';
 
 import type { PipelineRunner } from '../hooks/usePipelineRunner';
+import { useT } from '../i18n';
 import { FlaggedMonthsTable } from './FlaggedMonthsTable';
 import { KpiCards } from './KpiCards';
 import { PipelineStepsTable, summarizeLargestDelta } from './PipelineStepsTable';
@@ -27,6 +28,7 @@ interface PipelineRunPanelProps {
 }
 
 export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
+  const t = useT();
   const { noData, isPending, isError, error, displayResult } = runner;
   const [stepsExpanded, setStepsExpanded] = useState(false);
 
@@ -62,13 +64,13 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
       >
         {noData && (
           <Alert severity="info" sx={{ py: 0.5 }}>
-            Waiting for survey data (database sample or synthetic preset).
+            {t('sanitization.waitingData')}
           </Alert>
         )}
 
         {isError && (
           <Alert severity="error" sx={{ py: 0.5 }}>
-            {error instanceof Error ? error.message : 'Pipeline execution failed'}
+            {error instanceof Error ? error.message : t('sanitization.runFailed')}
           </Alert>
         )}
 
@@ -99,7 +101,7 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
 
         {isPending && (
           <Alert severity="info" sx={{ py: 0.5 }}>
-            Running scenario…
+            {t('sanitization.runningAlert')}
           </Alert>
         )}
       </Stack>
@@ -138,12 +140,12 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
             <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, py: 0 }}>
               <Box>
                 <Typography variant="body2" fontWeight={600}>
-                  Pipeline steps funnel
+                  {t('sanitization.stepsTitle')}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {largestDeltaHint
-                    ? `Largest Δ vs prev: ${largestDeltaHint}`
-                    : 'Row counts, top-box %, and Δ vs previous stage'}
+                    ? t('sanitization.largestDelta', { hint: largestDeltaHint })
+                    : t('sanitization.stepsHint')}
                 </Typography>
               </Box>
             </AccordionSummary>

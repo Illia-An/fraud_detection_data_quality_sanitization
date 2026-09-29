@@ -7,6 +7,7 @@ import { tabsClasses } from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 
+import { LanguageToggle, useT } from '../../i18n';
 import ColorModeIconDropdown from '../../shared-theme/ColorModeIconDropdown';
 import { BrandLogo } from './BrandLogo';
 import MenuButton from './MenuButton';
@@ -29,6 +30,7 @@ const Toolbar = styled(MuiToolbar)({
 });
 
 export default function AppNavbar() {
+  const t = useT();
   const [open, setOpen] = useState(false);
 
   const toggleDrawer = (newOpen: boolean) => () => {
@@ -61,11 +63,12 @@ export default function AppNavbar() {
           <Stack direction="row" spacing={1} sx={{ justifyContent: 'center', mr: 'auto' }}>
             <BrandLogo />
             <Typography variant="h4" component="div" sx={{ color: 'text.primary' }}>
-              Survey Sanitization PoC
+              {t('brand.mobileTitle')}
             </Typography>
           </Stack>
+          <LanguageToggle />
           <ColorModeIconDropdown />
-          <MenuButton aria-label="menu" onClick={toggleDrawer(true)}>
+          <MenuButton aria-label={t('nav.menu')} onClick={toggleDrawer(true)}>
             <MenuRoundedIcon />
           </MenuButton>
           <SideMenuMobile open={open} toggleDrawer={toggleDrawer} />

@@ -1,6 +1,8 @@
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import { Box, Button, Stack, Typography } from '@mui/material';
 
+import { useT } from '../../i18n';
+
 interface PlannerSandboxBarProps {
   targetPct: number;
   horizonMonths: number;
@@ -22,6 +24,8 @@ export function PlannerSandboxBar({
   onCommitSession,
   onExportCsv,
 }: PlannerSandboxBarProps) {
+  const t = useT();
+
   return (
     <Box
       role="status"
@@ -44,20 +48,21 @@ export function PlannerSandboxBar({
       }}
     >
       <Typography variant="body2" sx={{ flex: 1, minWidth: 200, fontWeight: 600 }}>
-        Draft Scenario (Unsaved)
+        {t('planner.sandbox.draft')}
         <Typography component="span" variant="body2" sx={{ fontWeight: 400, ml: 0.75 }}>
-          Target {targetPct.toFixed(1)}% · {horizonMonths} mo
-          {hasAcceptedSnapshot ? ' · differs from accepted' : ' · no accepted snapshot yet'}
-          {' · '}
-          session only (no DB)
+          {t('planner.sandbox.meta', { target: targetPct.toFixed(1), months: horizonMonths })}
+          {hasAcceptedSnapshot
+            ? t('planner.sandbox.differs')
+            : t('planner.sandbox.noAccepted')}
+          {t('planner.sandbox.sessionOnly')}
         </Typography>
       </Typography>
       <Stack direction="row" spacing={1} alignItems="center">
         <Button color="inherit" size="small" onClick={onDiscard}>
-          Discard Draft
+          {t('planner.sandbox.discard')}
         </Button>
         <Button color="warning" size="small" variant="contained" onClick={onCommitSession}>
-          Commit to Session
+          {t('planner.sandbox.commit')}
         </Button>
         <Button
           color="inherit"
@@ -66,7 +71,7 @@ export function PlannerSandboxBar({
           startIcon={<DownloadRoundedIcon />}
           onClick={onExportCsv}
         >
-          Export CSV
+          {t('planner.exportCsv')}
         </Button>
       </Stack>
     </Box>

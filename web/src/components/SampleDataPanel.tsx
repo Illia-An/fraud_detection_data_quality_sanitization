@@ -21,6 +21,8 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 import { useSample, useSampleDb } from '../api/hooks';
+import { useT } from '../i18n';
+import type { MessageKey } from '../i18n';
 import { useUiStore } from '../store/uiStore';
 import type { DataSource, SamplePreset } from '../schemas/api';
 import {
@@ -29,14 +31,21 @@ import {
   resolvePeriodWindow,
 } from '../schemas/period';
 
-const SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
-  { value: 'db', label: 'Database (Q10012)' },
-  { value: 'small', label: 'Synthetic — small' },
-  { value: 'medium', label: 'Synthetic — medium' },
-  { value: 'stress', label: 'Synthetic — stress' },
+const SOURCE_KEYS: { value: DataSource; labelKey: MessageKey }[] = [
+  { value: 'db', labelKey: 'sample.source.db' },
+  { value: 'small', labelKey: 'sample.source.small' },
+  { value: 'medium', labelKey: 'sample.source.medium' },
+  { value: 'stress', labelKey: 'sample.source.stress' },
 ];
 
+const PERIOD_KEYS: Record<PeriodPreset, MessageKey> = {
+  ytd_2026: 'sample.period.ytd2026',
+  from_2025: 'sample.period.from2025',
+  custom: 'sample.period.custom',
+};
+
 export function SampleDataPanel() {
+  const t = useT();
   const lastPreset = useUiStore((state) => state.lastPreset);
   const sampleMeta = useUiStore((state) => state.sampleMeta);
   const surveyRows = useUiStore((state) => state.surveyRows);
@@ -79,7 +88,11 @@ export function SampleDataPanel() {
     setSurveyData(active.data.rows, active.data.meta, active.data.preset as DataSource);
     setSnackbar({
       open: true,
-      message: `Loaded ${active.data.meta.preset}: ${active.data.meta.row_count} rows, ${active.data.meta.store_count} stores`,
+      message: t('sample.loaded', {
+        preset: active.data.meta.preset,
+        rows: active.data.meta.row_count,
+        stores: active.data.meta.store_count,
+      }),
       severity: 'success',
     });
   }, [
@@ -88,19 +101,22 @@ export function SampleDataPanel() {
     active.isFetching,
     active.isSuccess,
     setSurveyData,
+    t,
   ]);
 
   useEffect(() => {
     if (isSynthetic || db.isFetching || !db.isError) {
       return;
     }
+    const errorMsg =
+      db.error instanceof Error ? db.error.message : t('sample.dbFailDefault');
     setSnackbar({
       open: true,
-      message: `${db.error instanceof Error ? db.error.message : 'Failed to load from database'}. Falling back to synthetic small.`,
+      message: t('sample.dbFailFallback', { error: errorMsg }),
       severity: 'error',
     });
     setLastPreset('small');
-  }, [db.error, db.isError, db.isFetching, isSynthetic, setLastPreset]);
+  }, [db.error, db.isError, db.isFetching, isSynthetic, setLastPreset, t]);
 
   useEffect(() => {
     if (!isSynthetic || !synthetic.isError || !synthetic.error) {
@@ -108,10 +124,13 @@ export function SampleDataPanel() {
     }
     setSnackbar({
       open: true,
-      message: synthetic.error instanceof Error ? synthetic.error.message : 'Failed to load sample data',
+      message:
+        synthetic.error instanceof Error
+          ? synthetic.error.message
+          : t('sample.sampleFailDefault'),
       severity: 'error',
     });
-  }, [isSynthetic, synthetic.error, synthetic.isError]);
+  }, [isSynthetic, synthetic.error, synthetic.isError, t]);
 
   const handleSourceChange = (event: SelectChangeEvent) => {
     const next = event.target.value as DataSource;
@@ -132,8 +151,8 @@ export function SampleDataPanel() {
     <>
       <Card variant="outlined">
         <CardHeader
-          title="Survey data"
-          subheader="Source for the scenario run"
+          title={t('sample.title')}
+          subheader={t('sample.subheader')}
           titleTypographyProps={{ variant: 'subtitle1' }}
           subheaderTypographyProps={{ variant: 'caption' }}
           action={loading ? <CircularProgress size={20} sx={{ mt: 1, mr: 0.5 }} /> : null}
@@ -142,34 +161,34 @@ export function SampleDataPanel() {
         <CardContent>
           <Stack spacing={1.5}>
             <FormControl fullWidth size="small" disabled={loading}>
-              <InputLabel id="survey-source-label">Data source</InputLabel>
+              <InputLabel id="survey-source-label">{t('sample.dataSource')}</InputLabel>
               <Select
                 labelId="survey-source-label"
-                label="Data source"
+                label={t('sample.dataSource')}
                 value={lastPreset}
                 onChange={handleSourceChange}
-                inputProps={{ 'aria-label': 'Data source' }}
+                inputProps={{ 'aria-label': t('sample.dataSource') }}
               >
-                {SOURCE_OPTIONS.map((option) => (
+                {SOURCE_KEYS.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
             <FormControl fullWidth size="small" disabled={isSynthetic}>
-              <InputLabel id="survey-period-label">Period</InputLabel>
+              <InputLabel id="survey-period-label">{t('sample.period')}</InputLabel>
               <Select
                 labelId="survey-period-label"
-                label="Period"
+                label={t('sample.period')}
                 value={periodPreset}
                 onChange={handlePeriodPresetChange}
-                inputProps={{ 'aria-label': 'Period' }}
+                inputProps={{ 'aria-label': t('sample.period') }}
               >
                 {PERIOD_PRESET_OPTIONS.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(PERIOD_KEYS[option.value])}
                   </MenuItem>
                 ))}
               </Select>
@@ -177,22 +196,21 @@ export function SampleDataPanel() {
 
             {isSynthetic ? (
               <Typography variant="caption" color="text.secondary">
-                Period applies to Database source only. Synthetic presets ignore the window.
+                {t('sample.periodSyntheticHint')}
               </Typography>
             ) : (
               <Typography variant="caption" color="text.secondary">
-                Process window:{' '}
-                <strong>{resolvedWindow.from_date}</strong>
-                {' → '}
-                <strong>{resolvedWindow.to_date ?? 'latest'}</strong>
-                . Click Run Scenario to apply.
+                {t('sample.processWindow', {
+                  from: resolvedWindow.from_date,
+                  to: resolvedWindow.to_date ?? t('common.latest'),
+                })}
               </Typography>
             )}
 
             {!isSynthetic && periodPreset === 'custom' && (
               <Stack direction="row" spacing={1}>
                 <TextField
-                  label="From"
+                  label={t('sample.from')}
                   type="date"
                   size="small"
                   fullWidth
@@ -201,10 +219,10 @@ export function SampleDataPanel() {
                     setCustomPeriod(event.target.value, customToDate)
                   }
                   slotProps={{ inputLabel: { shrink: true } }}
-                  inputProps={{ 'aria-label': 'Period from date' }}
+                  inputProps={{ 'aria-label': t('sample.fromAria') }}
                 />
                 <TextField
-                  label="To"
+                  label={t('sample.to')}
                   type="date"
                   size="small"
                   fullWidth
@@ -213,8 +231,8 @@ export function SampleDataPanel() {
                     setCustomPeriod(customFromDate, event.target.value)
                   }
                   slotProps={{ inputLabel: { shrink: true } }}
-                  inputProps={{ 'aria-label': 'Period to date' }}
-                  helperText={customToDate ? undefined : 'Empty = through latest'}
+                  inputProps={{ 'aria-label': t('sample.toAria') }}
+                  helperText={customToDate ? undefined : t('sample.toEmptyHint')}
                 />
               </Stack>
             )}
@@ -237,15 +255,19 @@ export function SampleDataPanel() {
                   font: 'inherit',
                 }}
               >
-                Reload from DB
+                {t('sample.reloadDb')}
               </Typography>
             )}
 
             {sampleMeta ? (
               <Box>
                 <Typography variant="body2">
-                  <strong>{sampleMeta.preset}</strong> · {sampleMeta.row_count} rows ·{' '}
-                  {sampleMeta.store_count} stores · {sampleMeta.month_count} months
+                  {t('sample.metaLine', {
+                    preset: sampleMeta.preset,
+                    rows: sampleMeta.row_count,
+                    stores: sampleMeta.store_count,
+                    months: sampleMeta.month_count,
+                  })}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
                   {sampleMeta.description}
@@ -253,14 +275,16 @@ export function SampleDataPanel() {
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary">
-                Loading source, or pick a synthetic preset.
+                {t('sample.loadingHint')}
               </Typography>
             )}
 
             {lastPreset === 'small' && surveyRows.length > 0 && (
               <Accordion disableGutters>
                 <AccordionSummary>
-                  <Typography variant="body2">JSON preview ({surveyRows.length} rows)</Typography>
+                  <Typography variant="body2">
+                    {t('sample.jsonPreview', { count: surveyRows.length })}
+                  </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Box
