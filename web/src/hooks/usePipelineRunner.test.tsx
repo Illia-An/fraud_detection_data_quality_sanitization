@@ -73,6 +73,7 @@ describe('usePipelineRunner', () => {
       processResult: null,
       sampleMeta: null,
       sampleGeneration: 0,
+      sampleDataKey: null,
       lastPreset: 'db',
       selectedStoreId: null,
       periodPreset: 'from_2025',
@@ -193,5 +194,29 @@ describe('usePipelineRunner', () => {
       rows: [sampleRow],
       config: defaultPipelineConfig,
     });
+  });
+
+  it('does not auto-run on remount when processResult already exists', async () => {
+    const mutate = vi.fn();
+    mockUseProcess.mockReturnValue({
+      mutate,
+      isPending: false,
+      isError: false,
+      error: null,
+      data: undefined,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useProcess>);
+
+    useUiStore.getState().setSurveyData([sampleRow], smallMeta, 'small');
+    useUiStore.setState({
+      processResult: { summary: { total_rows: 1 } } as never,
+    });
+
+    renderRunner();
+
+    await waitFor(() => {
+      expect(useUiStore.getState().sampleGeneration).toBeGreaterThan(0);
+    });
+    expect(mutate).not.toHaveBeenCalled();
   });
 });
