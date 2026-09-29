@@ -75,6 +75,8 @@ describe('SampleDataPanel', () => {
       sampleMeta: null,
       selectedStoreId: null,
       processResult: null,
+      sampleGeneration: 0,
+      sampleDataKey: null,
     });
     mockUseSample.mockReturnValue({
       ...idleQuery(),
@@ -267,12 +269,50 @@ describe('SampleDataPanel', () => {
     mockUseSampleDb.mockReturnValue({
       ...idleQuery(),
     } as unknown as ReturnType<typeof useSampleDb>);
+    useUiStore.setState({ sampleDataKey: 'db:1:50:4:3:0' });
 
     renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: 'Reload from DB' }));
 
     expect(refetch).toHaveBeenCalled();
+    expect(useUiStore.getState().sampleDataKey).toBeNull();
+  });
+
+  it('does not re-apply survey data on remount with the same load token', async () => {
+    const dbPayload = {
+      data: {
+        preset: 'db' as const,
+        rows: [] as typeof sampleRow[],
+        meta: dbMeta,
+      },
+      dataUpdatedAt: 42,
+      isFetching: false,
+      isError: false,
+      error: null,
+      isSuccess: true,
+      refetch,
+    };
+
+    mockUseSampleDb.mockReturnValue(dbPayload as unknown as ReturnType<typeof useSampleDb>);
+
+    const { unmount } = renderPanel();
+
+    await waitFor(() => {
+      expect(useUiStore.getState().sampleGeneration).toBe(1);
+    });
+    useUiStore.getState().setProcessResult({ summary: { total_rows: 9 } } as never);
+    const generationAfterLoad = useUiStore.getState().sampleGeneration;
+
+    unmount();
+    renderPanel();
+
+    await waitFor(() => {
+      expect(screen.getByText(/50 rows · 4 stores/)).toBeInTheDocument();
+    });
+
+    expect(useUiStore.getState().sampleGeneration).toBe(generationAfterLoad);
+    expect(useUiStore.getState().processResult).not.toBeNull();
   });
 
   it('switches to small when selecting synthetic small from the source menu', () => {

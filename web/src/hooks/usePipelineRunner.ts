@@ -77,6 +77,11 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     if (autoRunKeyRef.current === sampleGeneration) {
       return;
     }
+    // Remount with the same sample generation must not re-POST /process.
+    if (processResult != null) {
+      autoRunKeyRef.current = sampleGeneration;
+      return;
+    }
     autoRunKeyRef.current = sampleGeneration;
     reset();
     mutate(
@@ -92,6 +97,7 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     canRun,
     isPending,
     sampleGeneration,
+    processResult,
     reset,
     mutate,
     useDbSource,

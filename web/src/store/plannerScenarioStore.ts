@@ -1,8 +1,12 @@
 /** V4.2 Step 1 — approved vs draft scenario isolation (session only, no DB). */
 
 import { create } from 'zustand';
+import { z } from 'zod';
 
-import type { FivePercentPlan } from '../schemas/plan';
+import { fivePercentPlanSchema, type FivePercentPlan } from '../schemas/plan';
+import { readSessionJson, removeSessionKey, writeSessionJson } from './sessionPersist';
+
+export const PLANNER_SESSION_STORAGE_KEY = 'fraud-guard-planner-session';
 
 interface PlannerScenarioState {
   approvedPlan: FivePercentPlan | null;
@@ -25,11 +29,51 @@ function plansEqual(a: FivePercentPlan | null, b: FivePercentPlan | null): boole
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+const plannerSessionSchema = z.object({
+  approvedPlan: fivePercentPlanSchema.nullable(),
+  draftPlan: fivePercentPlanSchema.nullable(),
+  isDirty: z.boolean(),
+  selectedStoreId: z.number().nullable(),
+});
+
+type PlannerSessionSlice = z.infer<typeof plannerSessionSchema>;
+
+function defaultPlannerSession(): PlannerSessionSlice {
+  return {
+    approvedPlan: null,
+    draftPlan: null,
+    isDirty: false,
+    selectedStoreId: null,
+  };
+}
+
+function loadPlannerSession(): PlannerSessionSlice {
+  const raw = readSessionJson<unknown>(PLANNER_SESSION_STORAGE_KEY);
+  if (raw == null) {
+    return defaultPlannerSession();
+  }
+  const parsed = plannerSessionSchema.safeParse(raw);
+  if (!parsed.success) {
+    removeSessionKey(PLANNER_SESSION_STORAGE_KEY);
+    return defaultPlannerSession();
+  }
+  return parsed.data;
+}
+
+function persistPlannerSession(state: PlannerScenarioState): void {
+  const slice: PlannerSessionSlice = {
+    approvedPlan: state.approvedPlan,
+    draftPlan: state.draftPlan,
+    isDirty: state.isDirty,
+    selectedStoreId: state.selectedStoreId,
+  };
+  writeSessionJson(PLANNER_SESSION_STORAGE_KEY, slice);
+}
+
+const hydrated = loadPlannerSession();
+
 export const usePlannerScenarioStore = create<PlannerScenarioState>((set, get) => ({
-  approvedPlan: null,
-  draftPlan: null,
-  isDirty: false,
-  selectedStoreId: null,
+  ...hydrated,
 
   setDraftFromRun: (plan) => {
     const { approvedPlan } = get();
@@ -78,3 +122,7 @@ export const usePlannerScenarioStore = create<PlannerScenarioState>((set, get) =
 
   selectStore: (storeId) => set({ selectedStoreId: storeId }),
 }));
+
+usePlannerScenarioStore.subscribe((state) => {
+  persistPlannerSession(state);
+});
