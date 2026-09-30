@@ -21,6 +21,7 @@ import {
   STORE_IMPACT_HOVER_DIM_OPACITY,
   TIER4_BAND_FILL,
   TIER4_HIGHLIGHT_BAND_FILL,
+  toggleLegendHiddenName,
 } from './storeImpactChartData';
 
 const series = [
@@ -153,10 +154,51 @@ describe('storeImpactChartData', () => {
     });
   });
 
+  it('omits disabled tier traces when echo_config turns them off', () => {
+    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1), {
+      tier1_blacklist_enabled: true,
+      tier2_freq_enabled: true,
+      tier2_freq_threshold: 3,
+      tier3_always_five_enabled: false,
+      tier3_always_five_min_n: 10,
+      tier4_enabled: true,
+      tier4_min_volume: 30,
+      tier4_z_threshold: 2,
+      tier4_pct_threshold: 90,
+    });
+    expect(traces.map((trace) => trace.name)).toEqual([
+      'Actual',
+      'After Tier 1 (BlackList)',
+      'After Tier 2 (Frequency)',
+      'After Tier 4 (Store×month)',
+    ]);
+  });
+
   it('collects numeric y values across tiers', () => {
     expect(collectStoreImpactYValues(filterStoreSeries(series, 1))).toEqual([
       95, 88, 85, 70, 68, 67,
     ]);
+  });
+
+  it('collects y values only for enabled tiers', () => {
+    const points = filterStoreSeries(series, 1).map((point) => ({
+      ...point,
+      after_tier3_five_pct: 84,
+      after_tier4_five_pct: 80,
+    }));
+    expect(
+      collectStoreImpactYValues(points, {
+        tier1_blacklist_enabled: true,
+        tier2_freq_enabled: true,
+        tier2_freq_threshold: 3,
+        tier3_always_five_enabled: false,
+        tier3_always_five_min_n: 10,
+        tier4_enabled: true,
+        tier4_min_volume: 30,
+        tier4_z_threshold: 2,
+        tier4_pct_threshold: 90,
+      }),
+    ).toEqual([95, 88, 85, 80, 70, 68, 67, 80]);
   });
 
   it('builds full 0–100 y-axis', () => {
@@ -286,10 +328,29 @@ describe('storeImpactChartData', () => {
     const traces = buildStoreImpactTraces(filterStoreSeries(series, 1));
     const focused = applyTraceHoverFocus(traces, 0);
     expect(focused[0].opacity).toBe(1);
+    expect(focused[0].visible).toBe(true);
     expect(focused[1].opacity).toBe(STORE_IMPACT_HOVER_DIM_OPACITY);
     expect(focused[4].opacity).toBe(STORE_IMPACT_HOVER_DIM_OPACITY);
 
     const clear = applyTraceHoverFocus(traces, null);
-    expect(clear.every((trace) => trace.opacity === 1)).toBe(true);
+    expect(clear.every((trace) => trace.opacity === 1 && trace.visible === true)).toBe(true);
+  });
+
+  it('keeps legend-hidden traces as legendonly across hover focus', () => {
+    const traces = buildStoreImpactTraces(filterStoreSeries(series, 1));
+    const hidden = new Set(['After Tier 2 (Frequency)', 'After Tier 3 (Always top-box)']);
+    const focused = applyTraceHoverFocus(traces, 0, hidden);
+    expect(focused[0].visible).toBe(true);
+    expect(focused[0].opacity).toBe(1);
+    expect(focused[2].visible).toBe('legendonly');
+    expect(focused[3].visible).toBe('legendonly');
+    expect(focused[1].opacity).toBe(STORE_IMPACT_HOVER_DIM_OPACITY);
+  });
+
+  it('toggles legend hidden names', () => {
+    const once = toggleLegendHiddenName(new Set(), 'Actual');
+    expect([...once]).toEqual(['Actual']);
+    const twice = toggleLegendHiddenName(once, 'Actual');
+    expect([...twice]).toEqual([]);
   });
 });

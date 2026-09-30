@@ -162,6 +162,7 @@ export const en = {
   'steps.tier2': 'Tier 2 — Frequency',
   'steps.tier3': 'Tier 3 — Always top-box',
   'steps.tier4': 'Tier 4 — Store×month',
+  'steps.skippedSuffix': '(skipped)',
 
   // —— Planner ——
   'planner.needSanitization':

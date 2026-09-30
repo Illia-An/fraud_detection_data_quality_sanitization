@@ -18,8 +18,12 @@ import {
 import { useMemo } from 'react';
 
 import { useT, type MessageKey, type TranslateParams } from '../i18n';
-import type { StepMetrics, StepName } from '../schemas/api';
-import { formatPipelineStepLabel, sortPipelineSteps } from '../schemas/api';
+import type { PipelineConfig, StepMetrics, StepName } from '../schemas/api';
+import {
+  formatPipelineStepLabel,
+  isPipelineStepEnabled,
+  sortPipelineSteps,
+} from '../schemas/api';
 
 const STEP_I18N_KEYS: Record<StepName, MessageKey> = {
   actual: 'steps.actual',
@@ -35,6 +39,7 @@ type StepRow = StepMetrics & {
   delta_pp: number | null;
   drop_share: number;
   is_largest_delta: boolean;
+  skipped: boolean;
 };
 
 const columnHelper = createColumnHelper<StepRow>();
@@ -58,7 +63,11 @@ function buildColumns(t: TranslateFn) {
   return [
     columnHelper.accessor('step_name', {
       header: t('steps.col.step'),
-      cell: (info) => t(STEP_I18N_KEYS[info.getValue()]),
+      cell: (info) => {
+        const row = info.row.original;
+        const label = t(STEP_I18N_KEYS[info.getValue()]);
+        return row.skipped ? `${label} ${t('steps.skippedSuffix')}` : label;
+      },
     }),
     columnHelper.accessor('rows_in', { header: t('steps.col.rowsIn') }),
     columnHelper.accessor('rows_out', { header: t('steps.col.rowsOut') }),
@@ -115,20 +124,24 @@ function buildColumns(t: TranslateFn) {
   ];
 }
 
-export function buildPipelineStepRows(steps: StepMetrics[]): StepRow[] {
+export function buildPipelineStepRows(
+  steps: StepMetrics[],
+  echoConfig?: PipelineConfig | null,
+): StepRow[] {
   const ordered = sortPipelineSteps(steps);
   const withDelta = ordered.map((step, index) => {
     const prev = index > 0 ? ordered[index - 1] : null;
     const delta_pp =
       prev == null ? null : Number((step.top_box_pct - prev.top_box_pct).toFixed(4));
     const drop_share = step.rows_in > 0 ? step.rows_dropped / step.rows_in : 0;
-    return { ...step, delta_pp, drop_share, is_largest_delta: false };
+    const skipped = !isPipelineStepEnabled(step.step_name, echoConfig);
+    return { ...step, delta_pp, drop_share, is_largest_delta: false, skipped };
   });
 
   let maxAbs = -1;
   let maxIndex = -1;
   withDelta.forEach((row, index) => {
-    if (row.delta_pp == null) {
+    if (row.delta_pp == null || row.skipped) {
       return;
     }
     const abs = Math.abs(row.delta_pp);
@@ -145,8 +158,11 @@ export function buildPipelineStepRows(steps: StepMetrics[]): StepRow[] {
   return withDelta;
 }
 
-export function summarizeLargestDelta(steps: StepMetrics[]): string | null {
-  const rows = buildPipelineStepRows(steps);
+export function summarizeLargestDelta(
+  steps: StepMetrics[],
+  echoConfig?: PipelineConfig | null,
+): string | null {
+  const rows = buildPipelineStepRows(steps, echoConfig);
   const largest = rows.find((row) => row.is_largest_delta);
   if (!largest || largest.delta_pp == null) {
     return null;
@@ -156,11 +172,12 @@ export function summarizeLargestDelta(steps: StepMetrics[]): string | null {
 
 interface PipelineStepsTableProps {
   steps: StepMetrics[];
+  echoConfig?: PipelineConfig | null;
 }
 
-export function PipelineStepsTable({ steps }: PipelineStepsTableProps) {
+export function PipelineStepsTable({ steps, echoConfig = null }: PipelineStepsTableProps) {
   const t = useT();
-  const data = useMemo(() => buildPipelineStepRows(steps), [steps]);
+  const data = useMemo(() => buildPipelineStepRows(steps, echoConfig), [steps, echoConfig]);
   const columns = useMemo(() => buildColumns(t), [t]);
 
   const table = useReactTable({
@@ -194,6 +211,12 @@ export function PipelineStepsTable({ steps }: PipelineStepsTableProps) {
             <TableRow
               key={row.id}
               selected={row.original.is_largest_delta}
+              sx={
+                row.original.skipped
+                  ? { opacity: 0.55, '& td': { color: 'text.secondary' } }
+                  : undefined
+              }
+              data-skipped={row.original.skipped ? 'true' : 'false'}
             >
               {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id}>

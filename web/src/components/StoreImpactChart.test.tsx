@@ -10,11 +10,13 @@ vi.mock('react-plotly.js', () => ({
   default: ({
     onHover,
     onUnhover,
+    onLegendClick,
     data,
   }: {
     onHover?: (event: { points: { curveNumber: number }[] }) => void;
     onUnhover?: () => void;
-    data?: { opacity?: number }[];
+    onLegendClick?: (event: { curveNumber: number }) => boolean | void;
+    data?: { opacity?: number; visible?: boolean | 'legendonly'; name?: string }[];
   }) => (
     <div data-testid="plotly-chart">
       <button type="button" data-testid="plotly-hover-tier1" onClick={() => onHover?.({ points: [{ curveNumber: 1 }] })}>
@@ -23,8 +25,18 @@ vi.mock('react-plotly.js', () => ({
       <button type="button" data-testid="plotly-unhover" onClick={() => onUnhover?.()}>
         unhover
       </button>
+      <button
+        type="button"
+        data-testid="plotly-legend-tier2"
+        onClick={() => onLegendClick?.({ curveNumber: 2 })}
+      >
+        legend-tier2
+      </button>
       <span data-testid="plotly-opacities">
         {(data ?? []).map((trace) => trace.opacity ?? 1).join(',')}
+      </span>
+      <span data-testid="plotly-visibility">
+        {(data ?? []).map((trace) => String(trace.visible ?? true)).join(',')}
       </span>
     </div>
   ),
@@ -193,6 +205,34 @@ describe('StoreImpactChart', () => {
     fireEvent.click(screen.getByTestId('plotly-unhover'));
     await waitFor(() => {
       expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
+    });
+  });
+
+  it('keeps legend-hidden traces off after hover focus refresh', async () => {
+    useUiStore.setState({ selectedStoreId: 1, chartScope: 'store', chartTimeMode: 'timeline' });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart series={series} />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('plotly-legend-tier2'));
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-visibility').textContent).toBe(
+        'true,true,legendonly,true,true',
+      );
+    });
+
+    fireEvent.click(screen.getByTestId('plotly-hover-tier1'));
+    await waitFor(() => {
+      expect(screen.getByTestId('plotly-visibility').textContent).toBe(
+        'true,true,legendonly,true,true',
+      );
+      expect(screen.getByTestId('plotly-opacities').textContent).toBe('0.25,1,1,0.25,0.25');
     });
   });
 

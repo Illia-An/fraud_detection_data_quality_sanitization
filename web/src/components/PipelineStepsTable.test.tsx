@@ -98,4 +98,28 @@ describe('PipelineStepsTable', () => {
     expect(largest?.step_name).toBe('tier1');
     expect(summarizeLargestDelta(steps)).toBe('Tier 1 — BlackList (-1.50 pp)');
   });
+
+  it('labels skipped tiers from echo_config and excludes them from largest Δ', () => {
+    const echoConfig = {
+      tier1_blacklist_enabled: true,
+      tier2_freq_enabled: true,
+      tier2_freq_threshold: 3,
+      tier3_always_five_enabled: false,
+      tier3_always_five_min_n: 10,
+      tier4_enabled: true,
+      tier4_min_volume: 30,
+      tier4_z_threshold: 2,
+      tier4_pct_threshold: 90,
+    };
+    const rows = buildPipelineStepRows(steps, echoConfig);
+    expect(rows.find((row) => row.step_name === 'tier3')?.skipped).toBe(true);
+    expect(rows.find((row) => row.step_name === 'tier1')?.skipped).toBe(false);
+
+    render(
+      <ThemeProvider theme={appTheme}>
+        <PipelineStepsTable steps={steps} echoConfig={echoConfig} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText('Tier 3 — Always top-box (skipped)')).toBeInTheDocument();
+  });
 });
