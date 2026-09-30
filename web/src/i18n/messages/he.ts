@@ -156,6 +156,7 @@ export const he: Record<MessageKey, string> = {
   'steps.tier2': 'שכבה 2 — תדירות',
   'steps.tier3': 'שכבה 3 — תמיד top-box',
   'steps.tier4': 'שכבה 4 — סניף×חודש',
+  'steps.skippedSuffix': '(דולג)',
 
   'planner.needSanitization':
     'הרץ סניטציה קודם. הרצת התוכנית מושבתת עד שקיים בסיס מנוקה.',

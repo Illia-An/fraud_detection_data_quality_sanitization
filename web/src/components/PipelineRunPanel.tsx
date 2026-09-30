@@ -33,7 +33,10 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
   const [stepsExpanded, setStepsExpanded] = useState(false);
 
   const largestDeltaHint = useMemo(
-    () => (displayResult ? summarizeLargestDelta(displayResult.steps) : null),
+    () =>
+      displayResult
+        ? summarizeLargestDelta(displayResult.steps, displayResult.echo_config)
+        : null,
     [displayResult],
   );
 
@@ -84,6 +87,7 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
                   <StoreImpactChart
                     series={displayResult.store_impact_series}
                     highStoreMonths={displayResult.high_store_months}
+                    echoConfig={displayResult.echo_config}
                   />
                 </Box>
               </Grid>
@@ -150,7 +154,10 @@ export function PipelineRunPanel({ runner }: PipelineRunPanelProps) {
               </Box>
             </AccordionSummary>
             <AccordionDetails sx={{ px: 1.5, pt: 0, pb: 1 }}>
-              <PipelineStepsTable steps={displayResult.steps} />
+              <PipelineStepsTable
+                steps={displayResult.steps}
+                echoConfig={displayResult.echo_config}
+              />
             </AccordionDetails>
           </Accordion>
         </Box>
