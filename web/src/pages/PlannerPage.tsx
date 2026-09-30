@@ -64,6 +64,8 @@ const RAIL_WIDTH_PX = 320;
 const RAIL_COLLAPSED_PX = 40;
 /** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
 const COLLAPSED_PLAY_REVEAL_MS = 250;
+/** Prefer this month when present in the cleansed panel (DB demo path). */
+const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
 
 function baselineRowsAtReference(
   panel: SanitizedPanel,
@@ -164,8 +166,8 @@ export function PlannerPage() {
   const refs = useMemo(() => (panel ? availableReferences(panel) : []), [panel]);
   const suggested = refs.length ? refs[refs.length - 1] : null;
 
-  const [referenceYear, setReferenceYear] = useState<number | null>(2025);
-  const [referenceMonth, setReferenceMonth] = useState<number | null>(12);
+  const [referenceYear, setReferenceYear] = useState<number | null>(PREFERRED_REFERENCE.year);
+  const [referenceMonth, setReferenceMonth] = useState<number | null>(PREFERRED_REFERENCE.month);
   const [target, setTarget] = useState(75);
   const [horizon, setHorizon] = useState(12);
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
@@ -182,6 +184,26 @@ export function PlannerPage() {
     const timerId = window.setTimeout(() => setShowCollapsedPlay(true), COLLAPSED_PLAY_REVEAL_MS);
     return () => window.clearTimeout(timerId);
   }, [controlsOpen]);
+
+  useEffect(() => {
+    if (refs.length === 0) {
+      return;
+    }
+    const selectionOk =
+      referenceYear != null &&
+      referenceMonth != null &&
+      refs.some((ref) => ref.year === referenceYear && ref.month === referenceMonth);
+    if (selectionOk) {
+      return;
+    }
+    const preferred = refs.find(
+      (ref) =>
+        ref.year === PREFERRED_REFERENCE.year && ref.month === PREFERRED_REFERENCE.month,
+    );
+    const next = preferred ?? refs[refs.length - 1];
+    setReferenceYear(next.year);
+    setReferenceMonth(next.month);
+  }, [refs, referenceYear, referenceMonth]);
 
   const effectiveYear = referenceYear ?? suggested?.year ?? null;
   const effectiveMonth = referenceMonth ?? suggested?.month ?? null;
