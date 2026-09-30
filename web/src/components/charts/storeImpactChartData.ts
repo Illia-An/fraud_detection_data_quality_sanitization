@@ -95,12 +95,16 @@ export interface PeriodKpiSummary {
 }
 
 function roundPct(value: number): number {
-  return Math.round(value * 10000) / 10000;
+  return Math.round(value * 100) / 100;
 }
 
+/** Plotly hover: always show top-box % to hundredths (matches KPI / Planner Current). */
+export const STORE_IMPACT_HOVER_TEMPLATE =
+  '%{x}<br>%{fullData.name}: %{y:.2f}%<extra></extra>';
+
 /**
- * Volume-weighted top-box % across stores for one period.
- * Weights by ``actual_volume`` so funnel lines share the same mix (rate change, not mix shift).
+ * Volume-weighted top-box % across points (e.g. one store's months).
+ * Weights by ``actual_volume`` so period KPIs reflect response mix.
  */
 function weightedFivePct(
   points: StoreImpactPoint[],
@@ -121,6 +125,30 @@ function weightedFivePct(
     return null;
   }
   return roundPct(weightedSum / volumeSum);
+}
+
+/**
+ * Equal-weight mean of store top-box % for one period (matches Planner Current).
+ * Each store with a non-null pct counts as 1 — no volume influence.
+ */
+function equalMeanFivePct(
+  points: StoreImpactPoint[],
+  getPct: (point: StoreImpactPoint) => number | null | undefined,
+): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const point of points) {
+    const pct = getPct(point);
+    if (pct == null) {
+      continue;
+    }
+    sum += pct;
+    count += 1;
+  }
+  if (count === 0) {
+    return null;
+  }
+  return roundPct(sum / count);
 }
 
 /**
@@ -149,6 +177,7 @@ export function computePeriodKpisFromPoints(points: StoreImpactPoint[]): PeriodK
 
 /**
  * Aggregate ``store_impact_series`` into one point per month for Network scope.
+ * Equal-mean store rates (product lock: same aggregation as Planner Current at ref month).
  * Does not emit per-store traces — caller must not mix with store series.
  */
 export function aggregateNetworkSeries(series: StoreImpactPoint[]): StoreImpactPoint[] {
@@ -173,7 +202,7 @@ export function aggregateNetworkSeries(series: StoreImpactPoint[]): StoreImpactP
     const actualVolume = points.reduce((sum, point) => sum + point.actual_volume, 0);
     const finalVolume = points.reduce((sum, point) => sum + point.final_volume, 0);
     const sample = points[0];
-    const actual = weightedFivePct(points, (point) => point.actual_five_pct);
+    const actual = equalMeanFivePct(points, (point) => point.actual_five_pct);
     if (actual == null) {
       continue;
     }
@@ -183,10 +212,10 @@ export function aggregateNetworkSeries(series: StoreImpactPoint[]): StoreImpactP
       month: sample.month,
       period_label: label,
       actual_five_pct: actual,
-      after_tier1_five_pct: weightedFivePct(points, (point) => point.after_tier1_five_pct),
-      after_tier2_five_pct: weightedFivePct(points, (point) => point.after_tier2_five_pct),
-      after_tier3_five_pct: weightedFivePct(points, (point) => point.after_tier3_five_pct),
-      after_tier4_five_pct: weightedFivePct(points, (point) => point.after_tier4_five_pct),
+      after_tier1_five_pct: equalMeanFivePct(points, (point) => point.after_tier1_five_pct),
+      after_tier2_five_pct: equalMeanFivePct(points, (point) => point.after_tier2_five_pct),
+      after_tier3_five_pct: equalMeanFivePct(points, (point) => point.after_tier3_five_pct),
+      after_tier4_five_pct: equalMeanFivePct(points, (point) => point.after_tier4_five_pct),
       actual_volume: actualVolume,
       final_volume: finalVolume,
       rows_dropped: Math.max(actualVolume - finalVolume, 0),
@@ -235,6 +264,7 @@ export function buildYoYImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
       mode: 'lines+markers',
       line: { color, width: 2.5, dash: 'solid' },
       connectgaps: false,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
     traces.push({
       name: `${year} · Final`,
@@ -243,6 +273,7 @@ export function buildYoYImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
       mode: 'lines+markers',
       line: { color, width: 2, dash: 'dash' },
       connectgaps: false,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
   });
 
@@ -296,6 +327,7 @@ export function buildStoreImpactTraces(
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.actual, width: 2.5, dash: 'solid' },
       connectgaps: true,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     },
   ];
   if (isPipelineStepEnabled('tier1', echoConfig)) {
@@ -306,6 +338,7 @@ export function buildStoreImpactTraces(
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier1, width: 1.5, dash: 'dash' },
       connectgaps: true,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
   }
   if (isPipelineStepEnabled('tier2', echoConfig)) {
@@ -316,6 +349,7 @@ export function buildStoreImpactTraces(
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier2, width: 1.5, dash: 'dashdot' },
       connectgaps: true,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
   }
   if (isPipelineStepEnabled('tier3', echoConfig)) {
@@ -326,6 +360,7 @@ export function buildStoreImpactTraces(
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier3, width: 1.5, dash: 'dot' },
       connectgaps: true,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
   }
   if (isPipelineStepEnabled('tier4', echoConfig)) {
@@ -336,6 +371,7 @@ export function buildStoreImpactTraces(
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier4, width: 2.5, dash: 'solid' },
       connectgaps: true,
+      hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     });
   }
   return traces;
@@ -559,7 +595,7 @@ export function buildTier4FlagMarkerTrace(
     },
     customdata,
     hovertemplate:
-      'Tier 4 flagged<br>z=%{customdata[0]:.2f}<br>volume=%{customdata[1]}<br>5%=%{customdata[2]:.1f}%<extra></extra>',
+      'Tier 4 flagged<br>z=%{customdata[0]:.2f}<br>volume=%{customdata[1]}<br>5%=%{customdata[2]:.2f}%<extra></extra>',
     showlegend: true,
   };
 }

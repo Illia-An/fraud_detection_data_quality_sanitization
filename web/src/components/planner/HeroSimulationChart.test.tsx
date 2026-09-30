@@ -65,6 +65,7 @@ describe('HeroSimulationChart', () => {
     });
     const payload = screen.getByTestId('hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
+    expect(payload).toContain('Cumulative mean');
     expect(payload).toContain('Draft simulation');
     expect(payload).toContain('as-of');
     expect(payload).toContain('2025-03');

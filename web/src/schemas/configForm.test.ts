@@ -11,10 +11,10 @@ describe('configFormSchema', () => {
     const config = toPipelineConfig(defaultConfigFormValues);
     expect(config.tier1_blacklist_enabled).toBe(true);
     expect(config.tier2_freq_enabled).toBe(true);
-    expect(config.tier2_freq_threshold).toBe(3);
-    expect(config.tier3_always_five_enabled).toBe(false);
-    expect(config.tier3_always_five_min_n).toBe(10);
-    expect(config.tier4_enabled).toBe(true);
+    expect(config.tier2_freq_threshold).toBe(2);
+    expect(config.tier3_always_five_enabled).toBe(true);
+    expect(config.tier3_always_five_min_n).toBe(25);
+    expect(config.tier4_enabled).toBe(false);
     expect(config.tier4_min_volume).toBe(30);
   });
 

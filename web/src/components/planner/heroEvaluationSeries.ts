@@ -7,6 +7,8 @@ import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 export interface HeroEvaluationSeries {
   labels: string[];
   factYs: (number | null)[];
+  /** Running mean of monthly network equal-means from first fact month (product lock). */
+  cumulativeYs: (number | null)[];
   draftYs: (number | null)[];
   approvedYs: (number | null)[];
   upperYs: (number | null)[];
@@ -32,6 +34,10 @@ function atOrAfter(a: PeriodPoint, b: PeriodPoint): boolean {
   return periodCmp(a, b) >= 0;
 }
 
+function roundPct(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function networkActual(
   panel: SanitizedPanel,
   year: number,
@@ -51,12 +57,30 @@ function networkActual(
   if (scores.length === 0) {
     return null;
   }
-  return scores.reduce((a, b) => a + b, 0) / scores.length;
+  return roundPct(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+/**
+ * Running equal-mean of monthly network scores: c_t = mean(m_1 … m_t).
+ * Null months (after as-of / missing) are skipped and stay null.
+ */
+export function cumulativeMeanSeries(monthly: (number | null)[]): (number | null)[] {
+  let sum = 0;
+  let count = 0;
+  return monthly.map((value) => {
+    if (value == null) {
+      return null;
+    }
+    sum += value;
+    count += 1;
+    return roundPct(sum / count);
+  });
 }
 
 /**
  * Timeline = cleansed panel months ≤ as-of ∪ plan trajectory months.
  * Fact solid left of / on as-of; draft/approved/cone from as-of onward (soft slack, not CI).
+ * Cumulative = running mean of monthly fact equal-means from the first panel month.
  */
 export function buildHeroEvaluationSeries(
   draftPlan: FivePercentPlan,
@@ -105,6 +129,7 @@ export function buildHeroEvaluationSeries(
     }
     return networkActual(panel, p.year, p.month, storeIds);
   });
+  const cumulativeYs = cumulativeMeanSeries(factYs);
 
   const draftYs = periods.map((p) => {
     if (!atOrAfter(p, asOf)) {
@@ -141,6 +166,7 @@ export function buildHeroEvaluationSeries(
   return {
     labels,
     factYs,
+    cumulativeYs,
     draftYs,
     approvedYs,
     upperYs,

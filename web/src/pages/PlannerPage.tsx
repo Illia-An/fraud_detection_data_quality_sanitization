@@ -91,6 +91,7 @@ function availableReferences(panel: SanitizedPanel): { year: number; month: numb
 }
 
 function meanChain(rows: { five_percent: number }[]): number | null {
+  // Product lock: equal-weight store mean at reference month (not volume / Final period).
   if (rows.length === 0) {
     return null;
   }
@@ -163,10 +164,10 @@ export function PlannerPage() {
   const refs = useMemo(() => (panel ? availableReferences(panel) : []), [panel]);
   const suggested = refs.length ? refs[refs.length - 1] : null;
 
-  const [referenceYear, setReferenceYear] = useState<number | null>(null);
-  const [referenceMonth, setReferenceMonth] = useState<number | null>(null);
+  const [referenceYear, setReferenceYear] = useState<number | null>(2025);
+  const [referenceMonth, setReferenceMonth] = useState<number | null>(12);
   const [target, setTarget] = useState(75);
-  const [horizon, setHorizon] = useState(6);
+  const [horizon, setHorizon] = useState(12);
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
@@ -382,16 +383,21 @@ export function PlannerPage() {
                 processResult={processResult}
                 baselineReady={baselineReady}
               />
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Typography variant="body2">
-                  {t('planner.current')}{' '}
-                  <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+              <Stack spacing={0.25}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography variant="body2" data-testid="planner-current-chain">
+                    {t('planner.current')}{' '}
+                    <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={directionLabel}
+                    color={directionKind === 'improve' ? 'success' : 'default'}
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {t('planner.currentHint')}
                 </Typography>
-                <Chip
-                  size="small"
-                  label={directionLabel}
-                  color={directionKind === 'improve' ? 'success' : 'default'}
-                />
               </Stack>
 
               <TextField
@@ -418,7 +424,9 @@ export function PlannerPage() {
                   labelId="ref-period-label"
                   label={t('planner.referenceMonth')}
                   value={
-                    effectiveYear != null && effectiveMonth != null
+                    effectiveYear != null &&
+                    effectiveMonth != null &&
+                    refs.some((ref) => ref.year === effectiveYear && ref.month === effectiveMonth)
                       ? periodLabel(effectiveYear, effectiveMonth)
                       : ''
                   }
@@ -441,6 +449,9 @@ export function PlannerPage() {
                   ))}
                 </Select>
               </FormControl>
+              <Typography variant="caption" color="text.secondary">
+                {t('planner.referenceMonthHint')}
+              </Typography>
 
               <Accordion
                 disableGutters
