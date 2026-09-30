@@ -137,6 +137,34 @@ export function formatPipelineStepLabel(stepName: StepName): string {
   return PIPELINE_STEP_LABELS[stepName] ?? stepName;
 }
 
+/**
+ * Whether a pipeline step was active in the run that produced ``echo_config``.
+ * ``actual`` is always on. Missing config → treat all tiers as enabled (legacy).
+ */
+export function isPipelineStepEnabled(
+  stepName: StepName,
+  config: PipelineConfig | null | undefined,
+): boolean {
+  if (stepName === 'actual') {
+    return true;
+  }
+  if (config == null) {
+    return true;
+  }
+  switch (stepName) {
+    case 'tier1':
+      return config.tier1_blacklist_enabled;
+    case 'tier2':
+      return config.tier2_freq_enabled;
+    case 'tier3':
+      return config.tier3_always_five_enabled;
+    case 'tier4':
+      return config.tier4_enabled;
+    default:
+      return true;
+  }
+}
+
 export const stepMetricsSchema = z.object({
   step_name: stepNameSchema,
   rows_in: z.number().int().min(0),
