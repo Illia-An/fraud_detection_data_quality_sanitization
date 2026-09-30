@@ -20,7 +20,7 @@ export const planBaselineRowSchema = z.object({
 export const planRequestSchema = z.object({
   reference_year: z.number().int(),
   reference_month: z.number().int().min(1).max(12),
-  horizon: z.number().int().min(1).max(60).default(6),
+  horizon: z.number().int().min(1).max(60).default(12),
   target: z.number().min(0).max(100).default(75),
   params: planParamsSchema.default({}),
   baseline_rows: z.array(planBaselineRowSchema).min(1),

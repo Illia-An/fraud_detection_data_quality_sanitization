@@ -13,10 +13,10 @@ def test_pipeline_config_defaults_match_spec() -> None:
     cfg = PipelineConfig()
     assert cfg.tier1_blacklist_enabled is True
     assert cfg.tier2_freq_enabled is True
-    assert cfg.tier2_freq_threshold == 3
-    assert cfg.tier3_always_five_enabled is False
-    assert cfg.tier3_always_five_min_n == 10
-    assert cfg.tier4_enabled is True
+    assert cfg.tier2_freq_threshold == 2
+    assert cfg.tier3_always_five_enabled is True
+    assert cfg.tier3_always_five_min_n == 25
+    assert cfg.tier4_enabled is False
     assert cfg.tier4_min_volume == 30
     assert cfg.tier4_z_threshold == 2.0
     assert cfg.tier4_pct_threshold == 90.0

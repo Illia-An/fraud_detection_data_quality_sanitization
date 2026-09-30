@@ -10,6 +10,13 @@
 2. Panel scores are **cleansed** (after tiers), not raw actual.
 3. v1 persist = **file export** of the panel (CSV, Excel-openable). No DB Save.
 4. TTS / plan engine port / DB write-back = out of scope for this experiment.
+5. **Chain aggregation (product lock):** Planner `Current` / `/plans` `current_chain` =
+   **equal-weight mean** of cleansed store `five_percent` at the **reference month**
+   (each store weight `1/n`). No volume / response influence yet.
+   - Sanitization **Final** KPI remains whole-period **response-weighted** — a different
+     question; do **not** force Final = Current unless product explicitly revisits this.
+   - Network chart month series uses the **same equal-mean** aggregation, so the
+     tooltip at the reference month matches Planner Current (same cleansed scores).
 
 ## Panel grain (v1)
 

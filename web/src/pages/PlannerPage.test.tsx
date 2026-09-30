@@ -21,8 +21,8 @@ const sampleResult: ProcessResponse = {
     {
       store_id: 10,
       year: 2025,
-      month: 3,
-      period_label: '2025-03',
+      month: 12,
+      period_label: '2025-12',
       actual_five_pct: 80,
       after_tier1_five_pct: 78,
       after_tier2_five_pct: 76,
@@ -35,8 +35,8 @@ const sampleResult: ProcessResponse = {
     {
       store_id: 20,
       year: 2025,
-      month: 3,
-      period_label: '2025-03',
+      month: 12,
+      period_label: '2025-12',
       actual_five_pct: 70,
       after_tier4_five_pct: 68,
       actual_volume: 80,
@@ -110,6 +110,16 @@ describe('PlannerPage controls rail', () => {
     ).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText(/Max monthly improve/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Lift priority power/i)).toBeInTheDocument();
+  });
+
+  it('labels Current as equal-mean at the reference month', () => {
+    renderPlanner();
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent(/Current:/);
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('71.00%');
+    expect(
+      screen.getByText(/Equal mean of cleansed store scores at the reference month/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/each store weighted equally/i)).toBeInTheDocument();
   });
 
   it('collapses and expands the controls rail without unmounting controls', () => {

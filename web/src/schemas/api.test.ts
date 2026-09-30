@@ -118,7 +118,7 @@ describe('processResponseSchema / SanitizationResponse', () => {
   it('parses SPEC response with echo_config and telemetry meta', () => {
     const parsed = processResponseSchema.parse(processApiResponse);
     expect(parsed.baseline_top_box_pct).toBe(85.5);
-    expect(parsed.echo_config.tier2_freq_threshold).toBe(3);
+    expect(parsed.echo_config.tier2_freq_threshold).toBe(2);
     expect(parsed.meta.execution_time_ms).toBe(12.5);
     expect(parsed.meta.peak_memory_mb).toBe(1.2);
     expect(parsed.meta.rows_scanned).toBe(100);
@@ -198,10 +198,12 @@ describe('isPipelineStepEnabled', () => {
 
 describe('pipelineConfigSchema', () => {
   it('applies SPEC flat defaults', () => {
-    expect(defaultPipelineConfig.tier2_freq_threshold).toBe(3);
+    expect(defaultPipelineConfig.tier2_freq_threshold).toBe(2);
     expect(defaultPipelineConfig.tier2_freq_enabled).toBe(true);
     expect(defaultPipelineConfig.tier1_blacklist_enabled).toBe(true);
-    expect(defaultPipelineConfig.tier4_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier3_always_five_enabled).toBe(true);
+    expect(defaultPipelineConfig.tier3_always_five_min_n).toBe(25);
+    expect(defaultPipelineConfig.tier4_enabled).toBe(false);
     expect(defaultPipelineConfig.tier4_min_volume).toBe(30);
   });
 

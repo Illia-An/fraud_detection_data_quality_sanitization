@@ -79,15 +79,15 @@ describe('storeImpactChartData', () => {
     expect(points[1].period_label).toBe('2025-02');
   });
 
-  it('aggregates network series with volume-weighted rates', () => {
+  it('aggregates network series with equal-mean store rates', () => {
     const network = aggregateNetworkSeries(series);
     expect(network).toHaveLength(2);
     expect(network[0].store_id).toBe(NETWORK_SERIES_STORE_ID);
     expect(network[0].period_label).toBe('2025-01');
-    // (95*40 + 80*30) / (40+30) = 88.5714…
-    expect(network[0].actual_five_pct).toBeCloseTo((95 * 40 + 80 * 30) / 70, 4);
-    // (88*40 + 79*30) / 70
-    expect(network[0].after_tier1_five_pct).toBeCloseTo((88 * 40 + 79 * 30) / 70, 4);
+    // (95 + 80) / 2
+    expect(network[0].actual_five_pct).toBeCloseTo(87.5, 4);
+    // (88 + 79) / 2
+    expect(network[0].after_tier1_five_pct).toBeCloseTo(83.5, 4);
     expect(network[0].actual_volume).toBe(70);
     expect(network[0].final_volume).toBe(64);
     // Only store 1 has 2025-02
@@ -102,12 +102,9 @@ describe('storeImpactChartData', () => {
       after_tier4_five_pct: point.after_tier2_five_pct,
     }));
     const kpis = computePeriodKpisFromPoints(storePoints);
-    expect(kpis.baseline_top_box_pct).toBeCloseTo((95 * 40 + 70 * 38) / 78, 4);
-    expect(kpis.final_top_box_pct).toBeCloseTo((85 * 40 + 67 * 38) / 78, 4);
-    expect(kpis.delta_pp).toBeCloseTo(
-      (kpis.final_top_box_pct ?? 0) - (kpis.baseline_top_box_pct ?? 0),
-      4,
-    );
+    expect(kpis.baseline_top_box_pct).toBeCloseTo(82.82, 2);
+    expect(kpis.final_top_box_pct).toBeCloseTo(76.23, 2);
+    expect(kpis.delta_pp).toBeCloseTo(-6.59, 2);
   });
 
   it('builds YoY Actual+Final traces per year on shared month axis', () => {

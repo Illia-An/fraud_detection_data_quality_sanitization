@@ -66,6 +66,7 @@ describe('KpiCards', () => {
     expect(screen.getByText('Baseline 5%')).toBeInTheDocument();
     expect(screen.getByText('85.50%')).toBeInTheDocument();
     expect(screen.getByText('Final 5%')).toBeInTheDocument();
+    expect(screen.getByText('Whole period · response-weighted')).toBeInTheDocument();
     expect(screen.getByText('82.10%')).toBeInTheDocument();
     expect(screen.getByText('Network delta')).toBeInTheDocument();
     expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
@@ -100,6 +101,7 @@ describe('KpiCards', () => {
     expect(screen.getByText('Store 1 baseline 5%')).toBeInTheDocument();
     expect(screen.getByText('80.00%')).toBeInTheDocument(); // (90+70)/2
     expect(screen.getByText('Store 1 final 5%')).toBeInTheDocument();
+    expect(screen.getByText('Store months · response-weighted')).toBeInTheDocument();
     expect(screen.getByText('70.00%')).toBeInTheDocument(); // (80+60)/2
     expect(screen.getByText('Store 1 delta')).toBeInTheDocument();
     expect(screen.getByText('-10.00 pp')).toBeInTheDocument();

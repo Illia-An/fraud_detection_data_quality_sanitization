@@ -66,9 +66,9 @@ def test_process_returns_exact_sanitization_response_with_echo_config() -> None:
     assert set(body["echo_config"].keys()) == set(PipelineConfig.model_fields)
     assert parsed.echo_config.tier2_freq_threshold == 2
     assert parsed.echo_config.tier1_blacklist_enabled is True
-    assert parsed.echo_config.tier3_always_five_enabled is False
-    assert parsed.echo_config.tier3_always_five_min_n == 10
-    assert parsed.echo_config.tier4_enabled is True
+    assert parsed.echo_config.tier3_always_five_enabled is True
+    assert parsed.echo_config.tier3_always_five_min_n == 25
+    assert parsed.echo_config.tier4_enabled is False
     assert parsed.echo_config.tier4_min_volume == 30
     assert parsed.echo_config.tier4_z_threshold == 2.0
     assert parsed.echo_config.tier4_pct_threshold == 90.0
