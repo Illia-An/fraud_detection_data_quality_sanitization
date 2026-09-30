@@ -75,6 +75,7 @@ export function HeroSimulationChart({
   const {
     labels,
     factYs,
+    cumulativeYs,
     draftYs,
     approvedYs,
     upperYs,
@@ -85,6 +86,7 @@ export function HeroSimulationChart({
 
   const yValues = [
     ...factYs.filter((v): v is number => v != null),
+    ...cumulativeYs.filter((v): v is number => v != null),
     ...draftYs.filter((v): v is number => v != null),
     ...approvedYs.filter((v): v is number => v != null),
     ...upperYs.filter((v): v is number => v != null),
@@ -93,6 +95,8 @@ export function HeroSimulationChart({
   ];
   const yMin = yValues.length ? Math.max(0, Math.min(...yValues) - 2) : 0;
   const yMax = yValues.length ? Math.min(100, Math.max(...yValues) + 2) : 100;
+
+  const hoverPct = '%{x}<br>%{fullData.name}: %{y:.2f}%<extra></extra>';
 
   const data = [
     {
@@ -128,6 +132,18 @@ export function HeroSimulationChart({
       line: { color: '#212121', width: 2.5 },
       marker: { size: 7, color: '#212121' },
       connectgaps: false,
+      hovertemplate: hoverPct,
+    },
+    {
+      x: labels,
+      y: cumulativeYs,
+      type: 'scatter' as const,
+      mode: 'lines+markers' as const,
+      name: t('planner.hero.cumulative'),
+      line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
+      marker: { size: 6, color: '#6a1b9a' },
+      connectgaps: false,
+      hovertemplate: hoverPct,
     },
     {
       x: labels,
@@ -138,6 +154,7 @@ export function HeroSimulationChart({
       line: { color: '#9e9e9e', width: 2, dash: 'dash' as const },
       marker: { size: 6, color: '#9e9e9e' },
       connectgaps: false,
+      hovertemplate: hoverPct,
     },
     {
       x: labels,
@@ -148,6 +165,7 @@ export function HeroSimulationChart({
       line: { color: '#1565c0', width: 3 },
       marker: { size: 7, color: '#1565c0' },
       connectgaps: false,
+      hovertemplate: hoverPct,
     },
     {
       x: labels,
@@ -156,7 +174,7 @@ export function HeroSimulationChart({
       mode: 'lines' as const,
       name: t('planner.hero.target'),
       line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
-      hoverinfo: 'y+name' as const,
+      hovertemplate: hoverPct,
     },
   ];
 

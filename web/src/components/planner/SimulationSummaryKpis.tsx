@@ -13,12 +13,12 @@ interface SimulationSummaryKpisProps {
 }
 
 function formatPct(value: number): string {
-  return `${value.toFixed(1)}%`;
+  return `${value.toFixed(2)}%`;
 }
 
 function formatDeltaPp(value: number): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)} pp`;
+  return `${sign}${value.toFixed(2)} pp`;
 }
 
 function MetricCard({

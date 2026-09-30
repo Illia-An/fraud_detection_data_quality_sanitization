@@ -29,10 +29,10 @@ from pydantic import BaseModel, Field
 class PipelineConfig(BaseModel):
     tier1_blacklist_enabled: bool = True
     tier2_freq_enabled: bool = True
-    tier2_freq_threshold: int = Field(default=3, ge=2)
-    tier3_always_five_enabled: bool = False
-    tier3_always_five_min_n: int = 10
-    tier4_enabled: bool = True
+    tier2_freq_threshold: int = Field(default=2, ge=2)
+    tier3_always_five_enabled: bool = True
+    tier3_always_five_min_n: int = 25
+    tier4_enabled: bool = False
     tier4_min_volume: int = Field(default=30, ge=1)
     tier4_z_threshold: float = Field(default=2.0, ge=0.0)
     tier4_pct_threshold: float = Field(default=90.0, ge=0.0, le=100.0)

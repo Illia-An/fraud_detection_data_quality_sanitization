@@ -39,8 +39,8 @@ describe('SimulationSummaryKpis', () => {
     );
 
     expect(screen.getByText('Target KPI')).toBeInTheDocument();
-    expect(screen.getByText(/70\.0% → 74\.0%/)).toBeInTheDocument();
-    expect(screen.getByText('+4.0 pp')).toBeInTheDocument();
+    expect(screen.getByText(/70\.00% → 74\.00%/)).toBeInTheDocument();
+    expect(screen.getByText('+4.00 pp')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/quota N\/A/i)).toBeInTheDocument();
   });
