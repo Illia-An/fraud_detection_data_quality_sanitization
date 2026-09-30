@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -21,8 +21,8 @@ const sampleResult: ProcessResponse = {
     {
       store_id: 10,
       year: 2025,
-      month: 3,
-      period_label: '2025-03',
+      month: 12,
+      period_label: '2025-12',
       actual_five_pct: 80,
       after_tier1_five_pct: 78,
       after_tier2_five_pct: 76,
@@ -35,8 +35,8 @@ const sampleResult: ProcessResponse = {
     {
       store_id: 20,
       year: 2025,
-      month: 3,
-      period_label: '2025-03',
+      month: 12,
+      period_label: '2025-12',
       actual_five_pct: 70,
       after_tier4_five_pct: 68,
       actual_volume: 80,
@@ -92,6 +92,24 @@ describe('PlannerPage Phase A', () => {
     expect(screen.getByRole('button', { name: /Export CSV/i })).toBeDisabled();
     expect(screen.getByText(/Set levers and Run simulation/i)).toBeInTheDocument();
   });
+
+  it('falls back to latest panel month when preferred 2025-12 is absent', async () => {
+    const withoutPreferred: ProcessResponse = {
+      ...sampleResult,
+      store_impact_series: sampleResult.store_impact_series.map((point) => ({
+        ...point,
+        year: 2026,
+        month: point.store_id === 10 ? 1 : 2,
+        period_label: point.store_id === 10 ? '2026-01' : '2026-02',
+      })),
+    };
+    useUiStore.setState({ processResult: withoutPreferred });
+    renderPlanner();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Run simulation/i })).toBeEnabled();
+    });
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('%');
+  });
 });
 
 describe('PlannerPage controls rail', () => {
@@ -110,6 +128,16 @@ describe('PlannerPage controls rail', () => {
     ).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByLabelText(/Max monthly improve/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Lift priority power/i)).toBeInTheDocument();
+  });
+
+  it('labels Current as equal-mean at the reference month', () => {
+    renderPlanner();
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent(/Current:/);
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('71.00%');
+    expect(
+      screen.getByText(/Equal mean of cleansed store scores at the reference month/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/each store weighted equally/i)).toBeInTheDocument();
   });
 
   it('collapses and expands the controls rail without unmounting controls', () => {

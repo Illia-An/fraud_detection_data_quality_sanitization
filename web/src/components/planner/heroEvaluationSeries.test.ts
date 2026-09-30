@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { defaultPipelineConfig } from '../../schemas/api';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
-import { buildHeroEvaluationSeries } from './heroEvaluationSeries';
+import {
+  buildHeroEvaluationSeries,
+  cumulativeMeanSeries,
+} from './heroEvaluationSeries';
 
 const panel: SanitizedPanel = {
   period_start: '2025-01-01',
@@ -39,6 +42,13 @@ const draft: FivePercentPlan = {
   ],
 };
 
+describe('cumulativeMeanSeries', () => {
+  it('computes running mean of monthly scores to hundredths', () => {
+    expect(cumulativeMeanSeries([70, 80, 100])).toEqual([70, 75, 83.33]);
+    expect(cumulativeMeanSeries([70, null, 80])).toEqual([70, null, 75]);
+  });
+});
+
 describe('buildHeroEvaluationSeries', () => {
   it('puts cleansed fact left of as-of and draft forecast from as-of onward', () => {
     const series = buildHeroEvaluationSeries(draft, null, panel, { year: 2025, month: 3 }, 1.5);
@@ -46,10 +56,16 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.asOfLabel).toBe('2025-03');
     expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
     // Feb network avg (68+72)/2 = 70; Mar (70+74)/2 = 72
-    expect(series.factYs[0]).toBeCloseTo(70, 5);
-    expect(series.factYs[1]).toBeCloseTo(72, 5);
+    expect(series.factYs[0]).toBeCloseTo(70, 2);
+    expect(series.factYs[1]).toBeCloseTo(72, 2);
     expect(series.factYs[2]).toBeNull();
     expect(series.factYs[3]).toBeNull();
+
+    // Cumulative: 70; (70+72)/2 = 71
+    expect(series.cumulativeYs[0]).toBeCloseTo(70, 2);
+    expect(series.cumulativeYs[1]).toBeCloseTo(71, 2);
+    expect(series.cumulativeYs[2]).toBeNull();
+    expect(series.cumulativeYs[3]).toBeNull();
 
     expect(series.draftYs[0]).toBeNull();
     expect(series.draftYs[1]).toBeCloseTo(72, 5); // bridge current_chain at as-of

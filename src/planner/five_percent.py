@@ -80,7 +80,7 @@ def plan_five_percent(
     """Allocate store×month score improvements toward a chain target.
 
     Baseline values are cleansed five_percent at the reference month.
-    Equal store weights (matches allocation SQL/API prepare path).
+    Equal store weights (product lock: no volume influence yet; matches allocation prepare path).
     """
     if not baseline:
         raise ValueError("baseline must contain at least one store")

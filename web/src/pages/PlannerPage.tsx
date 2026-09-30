@@ -64,6 +64,8 @@ const RAIL_WIDTH_PX = 320;
 const RAIL_COLLAPSED_PX = 40;
 /** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
 const COLLAPSED_PLAY_REVEAL_MS = 250;
+/** Prefer this month when present in the cleansed panel (DB demo path). */
+const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
 
 function baselineRowsAtReference(
   panel: SanitizedPanel,
@@ -91,6 +93,7 @@ function availableReferences(panel: SanitizedPanel): { year: number; month: numb
 }
 
 function meanChain(rows: { five_percent: number }[]): number | null {
+  // Product lock: equal-weight store mean at reference month (not volume / Final period).
   if (rows.length === 0) {
     return null;
   }
@@ -163,10 +166,10 @@ export function PlannerPage() {
   const refs = useMemo(() => (panel ? availableReferences(panel) : []), [panel]);
   const suggested = refs.length ? refs[refs.length - 1] : null;
 
-  const [referenceYear, setReferenceYear] = useState<number | null>(null);
-  const [referenceMonth, setReferenceMonth] = useState<number | null>(null);
+  const [referenceYear, setReferenceYear] = useState<number | null>(PREFERRED_REFERENCE.year);
+  const [referenceMonth, setReferenceMonth] = useState<number | null>(PREFERRED_REFERENCE.month);
   const [target, setTarget] = useState(75);
-  const [horizon, setHorizon] = useState(6);
+  const [horizon, setHorizon] = useState(12);
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
@@ -181,6 +184,26 @@ export function PlannerPage() {
     const timerId = window.setTimeout(() => setShowCollapsedPlay(true), COLLAPSED_PLAY_REVEAL_MS);
     return () => window.clearTimeout(timerId);
   }, [controlsOpen]);
+
+  useEffect(() => {
+    if (refs.length === 0) {
+      return;
+    }
+    const selectionOk =
+      referenceYear != null &&
+      referenceMonth != null &&
+      refs.some((ref) => ref.year === referenceYear && ref.month === referenceMonth);
+    if (selectionOk) {
+      return;
+    }
+    const preferred = refs.find(
+      (ref) =>
+        ref.year === PREFERRED_REFERENCE.year && ref.month === PREFERRED_REFERENCE.month,
+    );
+    const next = preferred ?? refs[refs.length - 1];
+    setReferenceYear(next.year);
+    setReferenceMonth(next.month);
+  }, [refs, referenceYear, referenceMonth]);
 
   const effectiveYear = referenceYear ?? suggested?.year ?? null;
   const effectiveMonth = referenceMonth ?? suggested?.month ?? null;
@@ -382,16 +405,21 @@ export function PlannerPage() {
                 processResult={processResult}
                 baselineReady={baselineReady}
               />
-              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Typography variant="body2">
-                  {t('planner.current')}{' '}
-                  <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+              <Stack spacing={0.25}>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+                  <Typography variant="body2" data-testid="planner-current-chain">
+                    {t('planner.current')}{' '}
+                    <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+                  </Typography>
+                  <Chip
+                    size="small"
+                    label={directionLabel}
+                    color={directionKind === 'improve' ? 'success' : 'default'}
+                  />
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {t('planner.currentHint')}
                 </Typography>
-                <Chip
-                  size="small"
-                  label={directionLabel}
-                  color={directionKind === 'improve' ? 'success' : 'default'}
-                />
               </Stack>
 
               <TextField
@@ -418,7 +446,9 @@ export function PlannerPage() {
                   labelId="ref-period-label"
                   label={t('planner.referenceMonth')}
                   value={
-                    effectiveYear != null && effectiveMonth != null
+                    effectiveYear != null &&
+                    effectiveMonth != null &&
+                    refs.some((ref) => ref.year === effectiveYear && ref.month === effectiveMonth)
                       ? periodLabel(effectiveYear, effectiveMonth)
                       : ''
                   }
@@ -441,6 +471,9 @@ export function PlannerPage() {
                   ))}
                 </Select>
               </FormControl>
+              <Typography variant="caption" color="text.secondary">
+                {t('planner.referenceMonthHint')}
+              </Typography>
 
               <Accordion
                 disableGutters

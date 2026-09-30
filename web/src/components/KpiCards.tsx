@@ -99,10 +99,12 @@ function KpiMetricCard({
   label,
   value,
   valueColor,
+  hint,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  hint?: string;
 }) {
   return (
     <Card variant="outlined" sx={{ height: '100%' }}>
@@ -119,6 +121,11 @@ function KpiMetricCard({
         >
           {value}
         </Typography>
+        {hint ? (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
+            {hint}
+          </Typography>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -157,6 +164,7 @@ export function KpiCards({ result }: KpiCardsProps) {
   const finalLabel = useStoreScope
     ? t('kpi.finalStore', { id: storeId })
     : t('kpi.finalNetwork');
+  const finalHint = useStoreScope ? t('kpi.finalStoreHint') : t('kpi.finalNetworkHint');
   const deltaLabel = useStoreScope
     ? t('kpi.deltaStore', { id: storeId })
     : t('kpi.deltaNetwork');
@@ -167,7 +175,7 @@ export function KpiCards({ result }: KpiCardsProps) {
         <KpiMetricCard label={baselineLabel} value={formatPct(baseline)} />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard label={finalLabel} value={formatPct(finalPct)} />
+        <KpiMetricCard label={finalLabel} value={formatPct(finalPct)} hint={finalHint} />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <KpiMetricCard
