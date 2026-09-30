@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -91,6 +91,24 @@ describe('PlannerPage Phase A', () => {
     expect(screen.getByText(/Advanced allocator options/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Export CSV/i })).toBeDisabled();
     expect(screen.getByText(/Set levers and Run simulation/i)).toBeInTheDocument();
+  });
+
+  it('falls back to latest panel month when preferred 2025-12 is absent', async () => {
+    const withoutPreferred: ProcessResponse = {
+      ...sampleResult,
+      store_impact_series: sampleResult.store_impact_series.map((point) => ({
+        ...point,
+        year: 2026,
+        month: point.store_id === 10 ? 1 : 2,
+        period_label: point.store_id === 10 ? '2026-01' : '2026-02',
+      })),
+    };
+    useUiStore.setState({ processResult: withoutPreferred });
+    renderPlanner();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Run simulation/i })).toBeEnabled();
+    });
+    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('%');
   });
 });
 
