@@ -1,4 +1,9 @@
-import type { StoreImpactPoint, StoreMonthCell } from '../../schemas/api';
+import type {
+  PipelineConfig,
+  StoreImpactPoint,
+  StoreMonthCell,
+} from '../../schemas/api';
+import { isPipelineStepEnabled } from '../../schemas/api';
 import type { ChartScopeMode, ChartTimeMode } from '../../schemas/chartUi';
 
 export type { ChartScopeMode, ChartTimeMode };
@@ -32,6 +37,8 @@ export interface PlotTrace {
   customdata?: (string | number)[][];
   showlegend?: boolean;
   opacity?: number;
+  /** Plotly: false / 'legendonly' hides from plot; true shows. */
+  visible?: boolean | 'legendonly';
 }
 
 export interface PlotShape {
@@ -272,10 +279,16 @@ export function buildYoYImpactXAxis(): {
  * - Actual: solid baseline (thick)
  * - Tier1–3: progressive dashes (thinner intermediate steps)
  * - Tier4: solid final sanitized series (thick accent)
+ *
+ * Pass ``echoConfig`` from the last ``/process`` so disabled tiers are omitted
+ * (backend still returns passthrough series that would look "active").
  */
-export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] {
+export function buildStoreImpactTraces(
+  points: StoreImpactPoint[],
+  echoConfig?: PipelineConfig | null,
+): PlotTrace[] {
   const x = points.map((point) => point.period_label);
-  return [
+  const traces: PlotTrace[] = [
     {
       name: 'Actual',
       x,
@@ -284,39 +297,48 @@ export function buildStoreImpactTraces(points: StoreImpactPoint[]): PlotTrace[] 
       line: { color: STORE_IMPACT_COLORS.actual, width: 2.5, dash: 'solid' },
       connectgaps: true,
     },
-    {
+  ];
+  if (isPipelineStepEnabled('tier1', echoConfig)) {
+    traces.push({
       name: 'After Tier 1 (BlackList)',
       x,
       y: points.map((point) => point.after_tier1_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier1, width: 1.5, dash: 'dash' },
       connectgaps: true,
-    },
-    {
+    });
+  }
+  if (isPipelineStepEnabled('tier2', echoConfig)) {
+    traces.push({
       name: 'After Tier 2 (Frequency)',
       x,
       y: points.map((point) => point.after_tier2_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier2, width: 1.5, dash: 'dashdot' },
       connectgaps: true,
-    },
-    {
+    });
+  }
+  if (isPipelineStepEnabled('tier3', echoConfig)) {
+    traces.push({
       name: 'After Tier 3 (Always top-box)',
       x,
       y: points.map((point) => point.after_tier3_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier3, width: 1.5, dash: 'dot' },
       connectgaps: true,
-    },
-    {
+    });
+  }
+  if (isPipelineStepEnabled('tier4', echoConfig)) {
+    traces.push({
       name: 'After Tier 4 (Store×month)',
       x,
       y: points.map((point) => point.after_tier4_five_pct ?? null),
       mode: 'lines+markers',
       line: { color: STORE_IMPACT_COLORS.tier4, width: 2.5, dash: 'solid' },
       connectgaps: true,
-    },
-  ];
+    });
+  }
+  return traces;
 }
 
 export function defaultSelectedStoreId(
@@ -347,14 +369,21 @@ const FIT_PAD_RATIO = 0.08;
 const FIT_PAD_MIN_PP = 1;
 
 /** Collect numeric top-box % values used by Store impact traces. */
-export function collectStoreImpactYValues(points: StoreImpactPoint[]): number[] {
+export function collectStoreImpactYValues(
+  points: StoreImpactPoint[],
+  echoConfig?: PipelineConfig | null,
+): number[] {
   const values: number[] = [];
+  const tier1 = isPipelineStepEnabled('tier1', echoConfig);
+  const tier2 = isPipelineStepEnabled('tier2', echoConfig);
+  const tier3 = isPipelineStepEnabled('tier3', echoConfig);
+  const tier4 = isPipelineStepEnabled('tier4', echoConfig);
   for (const point of points) {
     values.push(point.actual_five_pct);
-    if (point.after_tier1_five_pct != null) values.push(point.after_tier1_five_pct);
-    if (point.after_tier2_five_pct != null) values.push(point.after_tier2_five_pct);
-    if (point.after_tier3_five_pct != null) values.push(point.after_tier3_five_pct);
-    if (point.after_tier4_five_pct != null) values.push(point.after_tier4_five_pct);
+    if (tier1 && point.after_tier1_five_pct != null) values.push(point.after_tier1_five_pct);
+    if (tier2 && point.after_tier2_five_pct != null) values.push(point.after_tier2_five_pct);
+    if (tier3 && point.after_tier3_five_pct != null) values.push(point.after_tier3_five_pct);
+    if (tier4 && point.after_tier4_five_pct != null) values.push(point.after_tier4_five_pct);
   }
   return values;
 }
@@ -541,16 +570,41 @@ export const STORE_IMPACT_HOVER_DIM_OPACITY = 0.25;
 /**
  * When ``focusedIndex`` is set, that trace stays full opacity; others dim.
  * When null, all traces stay at full opacity.
+ * ``hiddenNames`` (legend-toggled off) stay ``visible: 'legendonly'`` so a
+ * React data refresh on hover does not bring them back.
  */
 export function applyTraceHoverFocus(
   traces: PlotTrace[],
   focusedIndex: number | null,
+  hiddenNames?: ReadonlySet<string>,
 ): PlotTrace[] {
-  if (focusedIndex == null || focusedIndex < 0 || focusedIndex >= traces.length) {
-    return traces.map((trace) => ({ ...trace, opacity: 1 }));
+  const focusActive =
+    focusedIndex != null && focusedIndex >= 0 && focusedIndex < traces.length;
+
+  return traces.map((trace, index) => {
+    const hidden = hiddenNames?.has(trace.name) ?? false;
+    let opacity = 1;
+    if (!hidden && focusActive) {
+      opacity = index === focusedIndex ? 1 : STORE_IMPACT_HOVER_DIM_OPACITY;
+    }
+    return {
+      ...trace,
+      opacity,
+      visible: hidden ? ('legendonly' as const) : true,
+    };
+  });
+}
+
+/** Toggle a legend item name in the hidden set (Plotly legend click). */
+export function toggleLegendHiddenName(
+  hiddenNames: ReadonlySet<string>,
+  name: string,
+): Set<string> {
+  const next = new Set(hiddenNames);
+  if (next.has(name)) {
+    next.delete(name);
+  } else {
+    next.add(name);
   }
-  return traces.map((trace, index) => ({
-    ...trace,
-    opacity: index === focusedIndex ? 1 : STORE_IMPACT_HOVER_DIM_OPACITY,
-  }));
+  return next;
 }

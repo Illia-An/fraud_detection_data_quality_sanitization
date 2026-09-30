@@ -27,7 +27,8 @@ import {
 import type { PlotMouseEvent } from 'plotly.js';
 
 import { useT } from '../i18n';
-import type { StoreImpactPoint, StoreMonthCell } from '../schemas/api';
+import type { PipelineConfig, StoreImpactPoint, StoreMonthCell } from '../schemas/api';
+import { isPipelineStepEnabled } from '../schemas/api';
 import type { ChartScopeMode, ChartTimeMode } from '../schemas/chartUi';
 import { useUiStore } from '../store/uiStore';
 import {
@@ -47,6 +48,7 @@ import {
   filterFlaggedMonthsForStore,
   filterStoreSeries,
   getStoreIds,
+  toggleLegendHiddenName,
   type StoreImpactYScaleMode,
 } from './charts/storeImpactChartData';
 
@@ -93,9 +95,15 @@ function usePlotContainerResize(enabled: boolean) {
 interface StoreImpactChartProps {
   series: StoreImpactPoint[];
   highStoreMonths?: StoreMonthCell[];
+  /** Last run echo_config — hides disabled tier curves. */
+  echoConfig?: PipelineConfig | null;
 }
 
-export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactChartProps) {
+export function StoreImpactChart({
+  series,
+  highStoreMonths = [],
+  echoConfig = null,
+}: StoreImpactChartProps) {
   const t = useT();
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
   const setSelectedStoreId = useUiStore((state) => state.setSelectedStoreId);
@@ -106,6 +114,8 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   const setChartTimeMode = useUiStore((state) => state.setChartTimeMode);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
   const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
+  /** Trace names hidden via Plotly legend click — kept across hover re-renders. */
+  const [legendHiddenNames, setLegendHiddenNames] = useState<Set<string>>(() => new Set());
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
   const isNetwork = chartScope === 'network';
@@ -137,23 +147,35 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
   );
 
   /** Store+timeline only: per-store Tier 4 overlays. Network/YoY declutter. */
-  const flaggedForChart = useMemo(
-    () => (isNetwork || isYoY ? [] : flaggedForStore),
-    [isNetwork, isYoY, flaggedForStore],
-  );
+  const flaggedForChart = useMemo(() => {
+    if (isNetwork || isYoY || !isPipelineStepEnabled('tier4', echoConfig)) {
+      return [];
+    }
+    return flaggedForStore;
+  }, [isNetwork, isYoY, flaggedForStore, echoConfig]);
 
   const baseTraces = useMemo(() => {
     if (isYoY) {
       return buildYoYImpactTraces(chartPoints);
     }
-    const base = buildStoreImpactTraces(chartPoints);
+    const base = buildStoreImpactTraces(chartPoints, echoConfig);
     const flagTrace = buildTier4FlagMarkerTrace(chartPoints, flaggedForChart);
     return flagTrace ? [...base, flagTrace] : base;
-  }, [chartPoints, flaggedForChart, isYoY]);
+  }, [chartPoints, flaggedForChart, isYoY, echoConfig]);
+
+  const baseTraceNamesKey = useMemo(
+    () => baseTraces.map((trace) => trace.name).join('\0'),
+    [baseTraces],
+  );
+
+  useEffect(() => {
+    setLegendHiddenNames(new Set());
+    setFocusedTraceIndex(null);
+  }, [baseTraceNamesKey]);
 
   const traces = useMemo(
-    () => applyTraceHoverFocus(baseTraces, focusedTraceIndex),
-    [baseTraces, focusedTraceIndex],
+    () => applyTraceHoverFocus(baseTraces, focusedTraceIndex, legendHiddenNames),
+    [baseTraces, focusedTraceIndex, legendHiddenNames],
   );
 
   const periodLabels = useMemo(
@@ -174,9 +196,11 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
     () =>
       buildStoreImpactYAxis(
         yScaleMode,
-        isYoY ? collectYoYImpactYValues(chartPoints) : collectStoreImpactYValues(chartPoints),
+        isYoY
+          ? collectYoYImpactYValues(chartPoints)
+          : collectStoreImpactYValues(chartPoints, echoConfig),
       ),
-    [yScaleMode, chartPoints, isYoY],
+    [yScaleMode, chartPoints, isYoY, echoConfig],
   );
   const xAxis = useMemo(
     () => (isYoY ? buildYoYImpactXAxis() : buildStoreImpactXAxis(periodLabels)),
@@ -219,13 +243,33 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
 
   const handlePlotHover = (event: Readonly<PlotMouseEvent>) => {
     const curveNumber = event.points?.[0]?.curveNumber;
-    if (typeof curveNumber === 'number') {
-      setFocusedTraceIndex(curveNumber);
+    if (typeof curveNumber !== 'number') {
+      return;
     }
+    const name = baseTraces[curveNumber]?.name;
+    if (name != null && legendHiddenNames.has(name)) {
+      return;
+    }
+    setFocusedTraceIndex(curveNumber);
   };
 
   const handlePlotUnhover = () => {
     setFocusedTraceIndex(null);
+  };
+
+  const handleLegendClick = (event: Readonly<{ curveNumber?: number }>) => {
+    const curveNumber = event.curveNumber;
+    if (typeof curveNumber !== 'number') {
+      return false;
+    }
+    const name = baseTraces[curveNumber]?.name;
+    if (name == null) {
+      return false;
+    }
+    setLegendHiddenNames((prev) => toggleLegendHiddenName(prev, name));
+    setFocusedTraceIndex(null);
+    // Suppress Plotly's own visibility toggle — we own it in React state.
+    return false;
   };
 
   if (storeIds.length === 0) {
@@ -370,6 +414,7 @@ export function StoreImpactChart({ series, highStoreMonths = [] }: StoreImpactCh
               useResizeHandler
               onHover={handlePlotHover}
               onUnhover={handlePlotUnhover}
+              onLegendClick={handleLegendClick}
             />
           </Suspense>
         </Box>

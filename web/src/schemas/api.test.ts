@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   defaultPipelineConfig,
   formatPipelineStepLabel,
+  isPipelineStepEnabled,
   pipelineConfigSchema,
   processRequestSchema,
   processResponseSchema,
@@ -174,6 +175,24 @@ describe('formatPipelineStepLabel', () => {
     expect(formatPipelineStepLabel('actual')).toBe('Actual (baseline)');
     expect(formatPipelineStepLabel('tier1')).toBe('Tier 1 — BlackList');
     expect(formatPipelineStepLabel('tier4')).toBe('Tier 4 — Store×month');
+  });
+});
+
+describe('isPipelineStepEnabled', () => {
+  it('treats actual as always enabled and missing config as all-on', () => {
+    expect(isPipelineStepEnabled('actual', null)).toBe(true);
+    expect(isPipelineStepEnabled('tier3', null)).toBe(true);
+  });
+
+  it('respects echo_config tier toggles', () => {
+    const config = {
+      ...defaultPipelineConfig,
+      tier3_always_five_enabled: false,
+      tier4_enabled: false,
+    };
+    expect(isPipelineStepEnabled('tier1', config)).toBe(true);
+    expect(isPipelineStepEnabled('tier3', config)).toBe(false);
+    expect(isPipelineStepEnabled('tier4', config)).toBe(false);
   });
 });
 
