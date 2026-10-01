@@ -115,19 +115,13 @@ export function buildChainMonthCompares(
   });
 }
 
-/** Prefer last plan month that has any store actual in the panel; else last plan month. */
-export function defaultAsOf(plan: FivePercentPlan, panel: SanitizedPanel): MonthScore {
-  const scores = panelScoreMap(panel);
-  let lastWithActual: MonthScore | null = null;
-  for (const point of plan.chain_trajectory) {
-    const hasActual = plan.projections.some((projection) =>
-      scores.has(`${projection.store_id}|${periodLabel(point.year, point.month)}`),
-    );
-    if (hasActual) {
-      lastWithActual = point;
-    }
+/** Start of forecast = first chain_trajectory month (Hero fact|forecast split). */
+export function defaultAsOf(plan: FivePercentPlan, _panel: SanitizedPanel): MonthScore {
+  const first = plan.chain_trajectory[0];
+  if (!first) {
+    throw new Error('defaultAsOf requires a non-empty chain_trajectory');
   }
-  return lastWithActual ?? plan.chain_trajectory[plan.chain_trajectory.length - 1];
+  return { year: first.year, month: first.month, score: first.score };
 }
 
 export function buildPlanMonitoringInsights(

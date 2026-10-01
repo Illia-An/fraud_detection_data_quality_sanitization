@@ -9,6 +9,8 @@ export interface HeroEvaluationSeries {
   factYs: (number | null)[];
   /** Running mean of monthly network equal-means from first fact month (product lock). */
   cumulativeYs: (number | null)[];
+  /** Running mean of monthly draft chain plan scores (יעד מצטבר). */
+  planCumulativeYs: (number | null)[];
   draftYs: (number | null)[];
   approvedYs: (number | null)[];
   upperYs: (number | null)[];
@@ -79,8 +81,9 @@ export function cumulativeMeanSeries(monthly: (number | null)[]): (number | null
 
 /**
  * Timeline = cleansed panel months ≤ as-of ∪ plan trajectory months.
- * Fact solid left of / on as-of; draft/approved/cone from as-of onward (soft slack, not CI).
- * Cumulative = running mean of monthly fact equal-means from the first panel month.
+ * Fact / cumulative: solid left of / on as-of.
+ * Draft / approved / cone: from as-of onward (soft slack, not CI).
+ * Draft is anchored at the last cumulative point so blue continues purple.
  */
 export function buildHeroEvaluationSeries(
   draftPlan: FivePercentPlan,
@@ -131,6 +134,15 @@ export function buildHeroEvaluationSeries(
   });
   const cumulativeYs = cumulativeMeanSeries(factYs);
 
+  const planMonthlyYs = periods.map((p) => {
+    const key = periodLabel(p.year, p.month);
+    if (draftByLabel.has(key)) {
+      return draftByLabel.get(key)!;
+    }
+    return null;
+  });
+  const planCumulativeYs = cumulativeMeanSeries(planMonthlyYs);
+
   const draftYs = periods.map((p) => {
     if (!atOrAfter(p, asOf)) {
       return null;
@@ -139,12 +151,23 @@ export function buildHeroEvaluationSeries(
     if (draftByLabel.has(key)) {
       return draftByLabel.get(key)!;
     }
-    // Bridge as-of when it sits before the first trajectory month.
     if (key === asOfLabel) {
       return draftPlan.current_chain;
     }
     return null;
   });
+
+  // Anchor draft to the last cumulative point so blue continues purple (not black).
+  let handoffIdx = -1;
+  for (let i = cumulativeYs.length - 1; i >= 0; i -= 1) {
+    if (cumulativeYs[i] != null) {
+      handoffIdx = i;
+      break;
+    }
+  }
+  if (handoffIdx >= 0) {
+    draftYs[handoffIdx] = cumulativeYs[handoffIdx];
+  }
 
   const approvedYs = periods.map((p) => {
     if (!atOrAfter(p, asOf)) {
@@ -167,6 +190,7 @@ export function buildHeroEvaluationSeries(
     labels,
     factYs,
     cumulativeYs,
+    planCumulativeYs,
     draftYs,
     approvedYs,
     upperYs,

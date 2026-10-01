@@ -31,14 +31,14 @@ const monitoring: PlanMonitoringInsights = {
 };
 
 describe('SimulationSummaryKpis', () => {
-  it('renders target, projected delta, and behind count', () => {
+  it('renders projected delta, behind count, and feasibility without target duplicate', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <SimulationSummaryKpis draftPlan={draft} approvedPlan={null} monitoring={monitoring} />
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('Target KPI')).toBeInTheDocument();
+    expect(screen.queryByText('Target KPI')).not.toBeInTheDocument();
     expect(screen.getByText(/70\.00% → 74\.00%/)).toBeInTheDocument();
     expect(screen.getByText('+4.00 pp')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
