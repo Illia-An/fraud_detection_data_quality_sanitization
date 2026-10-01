@@ -67,13 +67,30 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.cumulativeYs[2]).toBeNull();
     expect(series.cumulativeYs[3]).toBeNull();
 
+    expect(series.planCumulativeYs[0]).toBeNull();
+    expect(series.planCumulativeYs[1]).toBeNull();
+    expect(series.planCumulativeYs[2]).toBeCloseTo(73, 2);
+    expect(series.planCumulativeYs[3]).toBeCloseTo(73.5, 2);
+
     expect(series.draftYs[0]).toBeNull();
-    expect(series.draftYs[1]).toBeCloseTo(72, 5); // bridge current_chain at as-of
+    expect(series.draftYs[1]).toBeCloseTo(71, 5); // handoff = cumulative
     expect(series.draftYs[2]).toBeCloseTo(73, 5);
     expect(series.draftYs[3]).toBeCloseTo(74, 5);
 
     expect(series.upperYs[2]).toBeCloseTo(74.5, 5);
     expect(series.lowerYs[2]).toBeCloseTo(71.5, 5);
     expect(series.target).toBe(75);
+  });
+
+  it('anchors draft to cumulative handoff when as-of is the first trajectory month', () => {
+    const series = buildHeroEvaluationSeries(draft, null, panel, { year: 2025, month: 4 }, 1.5);
+
+    expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
+    expect(series.factYs[1]).toBeCloseTo(72, 2);
+    expect(series.cumulativeYs[1]).toBeCloseTo(71, 2);
+    expect(series.draftYs[0]).toBeNull();
+    expect(series.draftYs[1]).toBeCloseTo(71, 5); // blue starts on purple
+    expect(series.draftYs[2]).toBeCloseTo(73, 5);
+    expect(series.draftYs[3]).toBeCloseTo(74, 5);
   });
 });

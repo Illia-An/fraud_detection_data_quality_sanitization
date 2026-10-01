@@ -172,6 +172,8 @@ export const en = {
   'planner.goSanitization': 'Sanitization',
   'planner.leversTitle': 'Allocation levers',
   'planner.leversSub': 'Q10012 top-box · equal-mean stores at reference month',
+  'planner.section.goalTime': '1. Goal & Time',
+  'planner.section.allocator': '2. Allocator',
   'planner.current': 'Current:',
   'planner.currentHint':
     'Equal mean of cleansed store scores at the reference month (not Final over the whole period)',
@@ -200,14 +202,12 @@ export const en = {
   'planner.emptyReady':
     'Set levers and Run simulation — canvas shows KPI strip, hero chart, and at-risk stores.',
   'planner.emptyWaiting': 'Waiting for cleansed baseline from Sanitization…',
-  'planner.committed':
-    'Committed session plan · Target {target}% · Export anytime from the left rail (still no DB write-back)',
   'planner.heroTitle': 'Hero evaluation',
   'planner.heroSub':
-    'Cleansed fact left of as-of · draft forecast + cone right · target marker',
+    'Cleansed fact left of as-of · draft forecast + cone from as-of · target marker',
   'planner.heroNeedPanel': 'Cleansed panel required for evaluation view.',
-  'planner.atRiskTitle': 'At-risk entities',
-  'planner.atRiskSub': 'Exception list · Behind / Gainers / All · Inspect opens sandbox',
+  'planner.atRiskTitle': 'At-Risk Exception List',
+  'planner.atRiskSub': 'Management by Exception · Behind / Gainers / All · Inspect opens sandbox',
 
   'planner.block.noBaseline':
     'Run Sanitization first to build a cleansed Q10012 baseline.',
@@ -234,24 +234,11 @@ export const en = {
 
   'planner.strip.aria': 'Planner context',
   'planner.strip.horizon': 'Horizon: {months} mo',
+  'planner.strip.horizonLabel': 'Horizon',
+  'planner.strip.horizonValue': '{months} mo',
   'planner.strip.target': 'Target: {target}%',
-  'planner.strip.status': 'Status: Projected {pct}%',
-  'planner.strip.slack': 'Network slack',
-  'planner.strip.slackAhead': '{pp} pp ahead of target',
-  'planner.strip.slackTo': '{pp} pp slack to target',
-  'planner.strip.atTarget': 'At target',
-  'planner.strip.progressAria': 'Network slack progress {pct}%',
+  'planner.strip.targetLabel': 'Target',
 
-  'planner.sandbox.draft': 'Draft Scenario (Unsaved)',
-  'planner.sandbox.meta': 'Target {target}% · {months} mo',
-  'planner.sandbox.differs': ' · differs from accepted',
-  'planner.sandbox.noAccepted': ' · no accepted snapshot yet',
-  'planner.sandbox.sessionOnly': ' · session only (no DB)',
-  'planner.sandbox.discard': 'Discard Draft',
-  'planner.sandbox.commit': 'Commit to Session',
-
-  'planner.kpi.target': 'Target KPI',
-  'planner.kpi.targetHint': 'Static goal',
   'planner.kpi.projected': 'Projected network KPI',
   'planner.kpi.acceptedDraft': 'Accepted → draft',
   'planner.kpi.currentDraft': 'Current → draft final',
@@ -265,17 +252,27 @@ export const en = {
   'planner.atRisk.behindOnly': 'Behind Plan Only',
   'planner.atRisk.topGainers': 'Top Gainers',
   'planner.atRisk.all': 'All Stores',
+  'planner.atRisk.filter': 'Filter',
   'planner.atRisk.asOf': 'Status as of',
   'planner.atRisk.behindChip': 'Behind {count}',
   'planner.atRisk.aheadChip': 'Ahead {count}',
-  'planner.atRisk.col.store': 'Store',
-  'planner.atRisk.col.actual': 'Actual as-of',
-  'planner.atRisk.col.target': 'Target as-of',
-  'planner.atRisk.col.gap': 'Gap',
+  'planner.atRisk.col.store': 'Store ID',
+  'planner.atRisk.col.actual': 'Fact As-Of',
+  'planner.atRisk.col.target': 'Plan As-Of',
+  'planner.atRisk.col.gap': 'Gap (pp)',
+  'planner.atRisk.col.mom': 'MoM (pp)',
+  'planner.atRisk.col.baselineEnd': 'Baseline → End',
+  'planner.atRisk.col.streak': 'Behind streak',
+  'planner.atRisk.col.gapShare': 'Gap share',
+  'planner.atRisk.col.lift': 'Lift to end',
+  'planner.atRisk.col.deficit': 'Error Budget Deficit',
   'planner.atRisk.col.volume': 'Volume',
   'planner.atRisk.col.action': 'Action',
+  'planner.atRisk.storeId': 'Store #{id}',
   'planner.atRisk.empty': 'No stores match this filter.',
   'planner.atRisk.inspect': 'Inspect',
+  'planner.atRisk.footer':
+    'Management by exception · Gap = fact − plan at as-of ({asOf}). Volume / MoM / streak / gap share / lift help prioritize. Behind ranked by worst gap.',
 
   'planner.inspect.title': 'Inspect · Store {id}',
   'planner.inspect.sandboxWarn':
@@ -304,14 +301,15 @@ export const en = {
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
   'planner.hero.fact': 'Cleansed fact',
-  'planner.hero.cumulative': 'Cumulative mean',
+  'planner.hero.cumulative': 'Cumulative actual',
+  'planner.hero.planCumulative': 'Cumulative plan',
   'planner.hero.accepted': 'Accepted plan',
   'planner.hero.baseline': 'Reference baseline',
   'planner.hero.draft': 'Draft simulation',
   'planner.hero.target': 'Target',
   'planner.hero.asOf': 'as-of',
   'planner.hero.caption':
-    'Evaluation view · solid fact left of as-of ({asOf}) · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval.',
+    'Evaluation view · solid fact left of as-of ({asOf}) · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets.',
 } as const;
 
 export type MessageKey = keyof typeof en;

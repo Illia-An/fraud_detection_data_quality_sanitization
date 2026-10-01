@@ -32,7 +32,7 @@ const draftPlan: FivePercentPlan = {
 };
 
 describe('PlannerContextStrip', () => {
-  it('renders baseline, glance badges, and network slack bar', () => {
+  it('renders baseline, horizon, and target without status/slack duplicates', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <PlannerContextStrip
@@ -47,11 +47,11 @@ describe('PlannerContextStrip', () => {
 
     expect(screen.getByTestId('planner-context-strip')).toBeInTheDocument();
     expect(screen.getByText(/Baseline: Cleansed Q10012/i)).toBeInTheDocument();
-    expect(screen.getByText('Horizon: 6 mo')).toBeInTheDocument();
-    expect(screen.getByText('Target: 75.0%')).toBeInTheDocument();
-    expect(screen.getByText('Status: Projected 73.0%')).toBeInTheDocument();
-    expect(screen.getByText(/Network slack/i)).toBeInTheDocument();
-    expect(screen.getByText(/2\.0 pp slack to target/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Network slack progress/i)).toBeInTheDocument();
+    expect(screen.getByText('Horizon')).toBeInTheDocument();
+    expect(screen.getByText('6 mo')).toBeInTheDocument();
+    expect(screen.getByText('Target')).toBeInTheDocument();
+    expect(screen.getByText('75.0%')).toBeInTheDocument();
+    expect(screen.queryByText(/Network slack/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Status')).not.toBeInTheDocument();
   });
 });

@@ -65,10 +65,13 @@ describe('HeroSimulationChart', () => {
     });
     const payload = screen.getByTestId('hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
-    expect(payload).toContain('Cumulative mean');
+    expect(payload).toContain('Cumulative actual');
+    expect(payload).toContain('Cumulative plan');
     expect(payload).toContain('Draft simulation');
     expect(payload).toContain('as-of');
     expect(payload).toContain('2025-03');
+    expect(payload).toContain('"scrollZoom":true');
     expect(screen.getByText(/not a statistical confidence interval/i)).toBeInTheDocument();
+    expect(screen.getByText(/mouse wheel zooms/i)).toBeInTheDocument();
   });
 });
