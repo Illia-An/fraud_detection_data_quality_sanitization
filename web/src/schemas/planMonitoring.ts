@@ -116,7 +116,8 @@ export function buildChainMonthCompares(
 }
 
 /** Start of forecast = first chain_trajectory month (Hero fact|forecast split). */
-export function defaultAsOf(plan: FivePercentPlan, _panel: SanitizedPanel): MonthScore {
+export function defaultAsOf(plan: FivePercentPlan, panel: SanitizedPanel): MonthScore {
+  void panel;
   const first = plan.chain_trajectory[0];
   if (!first) {
     throw new Error('defaultAsOf requires a non-empty chain_trajectory');
