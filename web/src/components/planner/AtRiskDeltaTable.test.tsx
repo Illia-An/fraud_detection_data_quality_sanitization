@@ -48,6 +48,7 @@ const panel: SanitizedPanel = {
   reference_month: 4,
   row_count: 2,
   rows: [
+    { store_id: 10, year: 2025, month: 3, five_percent: 64, survey_volume: 90 },
     { store_id: 10, year: 2025, month: 4, five_percent: 66, survey_volume: 100 },
     { store_id: 20, year: 2025, month: 4, five_percent: 74, survey_volume: 80 },
   ],
@@ -102,15 +103,28 @@ describe('AtRiskDeltaTable', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('Behind Plan Only')).toBeInTheDocument();
-    expect(screen.getByText('Actual as-of')).toBeInTheDocument();
-    expect(screen.getByText('Target as-of')).toBeInTheDocument();
-    expect(screen.getByText('66.0')).toBeInTheDocument();
-    expect(screen.getByText('68.0')).toBeInTheDocument();
-    expect(screen.getByText('-2.0 pp')).toBeInTheDocument();
+    expect(
+      screen.getByText((_, el) => el?.textContent === 'Behind Plan Only (1)'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Fact As-Of')).toBeInTheDocument();
+    expect(screen.getByText('Plan As-Of')).toBeInTheDocument();
+    expect(screen.getByText('Volume')).toBeInTheDocument();
+    expect(screen.getByText('MoM (pp)')).toBeInTheDocument();
+    expect(screen.getByText('Baseline → End')).toBeInTheDocument();
+    expect(screen.getByText('Behind streak')).toBeInTheDocument();
+    expect(screen.getByText('Gap share')).toBeInTheDocument();
+    expect(screen.getByText('Lift to end')).toBeInTheDocument();
+    expect(screen.getByText('Error Budget Deficit')).toBeInTheDocument();
+    expect(screen.getByText('66.0%')).toBeInTheDocument();
+    expect(screen.getByText('68.0%')).toBeInTheDocument();
+    expect(screen.getByText('−2.0 pp')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.queryByText('20')).not.toBeInTheDocument();
+    expect(screen.getByText('+2.0 pp')).toBeInTheDocument();
+    expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByText('+6.0 pp')).toBeInTheDocument();
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+    expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Inspect/i }));
     expect(onInspect).toHaveBeenCalledWith(10);
@@ -133,7 +147,7 @@ describe('AtRiskDeltaTable', () => {
       </ThemeProvider>,
     );
 
-    fireEvent.click(screen.getByText('10'));
+    fireEvent.click(screen.getByText('Store #10'));
     expect(onInspect).toHaveBeenCalledWith(10);
   });
 });

@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Chip, Grid2 as Grid, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import { useT } from '../../i18n';
@@ -21,26 +21,55 @@ function formatDeltaPp(value: number): string {
   return `${sign}${value.toFixed(2)} pp`;
 }
 
-function MetricCard({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+const labelSx = {
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  color: 'text.secondary',
+  lineHeight: 1.15,
+  whiteSpace: 'nowrap',
+} as const;
+
+const valueSx = {
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1.2,
+  whiteSpace: 'nowrap',
+} as const;
+
+const chipSx = {
+  height: 18,
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  '& .MuiChip-label': { px: 0.6 },
+} as const;
+
+function MiniCard({ children }: { children: ReactNode }) {
   return (
-    <Card variant="outlined" sx={{ height: '100%' }}>
-      <CardContent sx={{ py: 1.25, px: 1.5, '&:last-child': { pb: 1.25 } }}>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
-          {label}
-        </Typography>
-        {children}
-      </CardContent>
-    </Card>
+    <Box
+      sx={{
+        width: 'fit-content',
+        maxWidth: '100%',
+        flex: '0 1 auto',
+        px: 1,
+        py: 0.5,
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 0.15,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </Box>
   );
 }
 
-/** V4.2 Component C — Macro Before vs After KPI strip (quota omitted: no budget API). */
+/** Macro KPI strip — cards hug content (equal L/R padding). */
 export function SimulationSummaryKpis({
   draftPlan,
   approvedPlan,
@@ -56,62 +85,55 @@ export function SimulationSummaryKpis({
     : '—';
 
   return (
-    <Grid container spacing={1.5}>
-      <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label={t('planner.kpi.target')}>
-          <Typography variant="h6" fontWeight={700}>
-            {formatPct(draftPlan.target)}
+    <Box
+      data-testid="planner-kpi-strip"
+      // Participate in parent glance row as a flat card stream.
+      sx={{ display: 'contents' }}
+    >
+      <MiniCard>
+        <Typography sx={labelSx}>{t('planner.kpi.projected')}</Typography>
+        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography sx={valueSx}>
+            {formatPct(baselineFinal)} → {formatPct(projected)}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {t('planner.kpi.targetHint')}
-          </Typography>
-        </MetricCard>
-      </Grid>
-      <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label={t('planner.kpi.projected')}>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-            <Typography variant="body1" fontWeight={600}>
-              {formatPct(baselineFinal)} → {formatPct(projected)}
-            </Typography>
-            <Chip
-              size="small"
-              label={formatDeltaPp(networkDelta)}
-              color={networkDelta >= 0 ? 'success' : 'warning'}
-            />
-          </Stack>
-          <Typography variant="caption" color="text.secondary">
-            {approvedPlan ? t('planner.kpi.acceptedDraft') : t('planner.kpi.currentDraft')}
-          </Typography>
-        </MetricCard>
-      </Grid>
-      <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label={t('planner.kpi.behind')}>
+          <Chip
+            size="small"
+            label={formatDeltaPp(networkDelta)}
+            color={networkDelta >= 0 ? 'success' : 'warning'}
+            sx={chipSx}
+          />
+        </Stack>
+      </MiniCard>
+
+      <MiniCard>
+        <Typography sx={labelSx}>{t('planner.kpi.behind')}</Typography>
+        <Stack direction="row" spacing={0.5} alignItems="baseline">
           <Typography
-            variant="h6"
-            fontWeight={700}
+            sx={valueSx}
             color={behindDraft != null && behindDraft > 0 ? 'warning.main' : undefined}
           >
             {behindDraft == null ? '—' : behindDraft}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
             {t('planner.kpi.asOf', { label: asOfLabel })}
           </Typography>
-        </MetricCard>
-      </Grid>
-      <Grid size={{ xs: 6, md: 3 }}>
-        <MetricCard label={t('planner.kpi.feasibility')}>
-          <Box>
-            <Chip
-              size="small"
-              label={draftPlan.feasible ? t('planner.kpi.onPath') : t('planner.kpi.mayMiss')}
-              color={draftPlan.feasible ? 'success' : 'warning'}
-            />
-          </Box>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+        </Stack>
+      </MiniCard>
+
+      <MiniCard>
+        <Typography sx={labelSx}>{t('planner.kpi.feasibility')}</Typography>
+        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Chip
+            size="small"
+            label={draftPlan.feasible ? t('planner.kpi.onPath') : t('planner.kpi.mayMiss')}
+            color={draftPlan.feasible ? 'success' : 'warning'}
+            sx={chipSx}
+          />
+          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
             {t('planner.kpi.liftQuota', { lift: formatDeltaPp(draftPlan.required_change) })}
           </Typography>
-        </MetricCard>
-      </Grid>
-    </Grid>
+        </Stack>
+      </MiniCard>
+    </Box>
   );
 }

@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planner Workbench — UI Mock</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <!--
+    Planner Workbench mock — visual only (no API / store).
+    Sections: Header · Draft banner · Left rail · Canvas (KPI · Hero · At-risk)
+  -->
+  <body class="h-screen w-full flex flex-col bg-slate-50 font-sans text-sm text-slate-800 overflow-hidden">
+    <!-- ========== TOP HEADER CONTEXT ========== -->
+    <header
+      class="shrink-0 bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center gap-3 justify-between"
+    >
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="inline-flex items-center justify-center w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+        <h1 class="font-bold text-base text-slate-900 tracking-tight truncate">
+          PLANNER WORKBENCH
+        </h1>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
+        >
+          Baseline: Cleansed v2.4 (1.2M rows)
+          <i data-lucide="info" class="w-3.5 h-3.5 text-slate-400"></i>
+        </span>
+        <span
+          class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
+        >
+          Reference: Oct 2025
+        </span>
+        <span
+          class="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-medium"
+        >
+          Metric: Q10012 Top-Box
+        </span>
+      </div>
+    </header>
+
+    <!-- ========== STICKY DRAFT BANNER ========== -->
+    <div
+      class="shrink-0 sticky top-0 z-20 bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3"
+      role="status"
+    >
+      <div class="flex items-center gap-2 text-amber-900 font-medium">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 shrink-0"></i>
+        <span>DRAFT SCENARIO: Levers modified (Unsaved in Session)</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 rounded transition-colors"
+        >
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          Discard Draft
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded shadow-sm transition-colors"
+        >
+          <i data-lucide="check" class="w-3.5 h-3.5"></i>
+          Commit Session
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== MAIN WORKSPACE ========== -->
+    <div class="flex flex-1 min-h-0 overflow-hidden">
+      <!-- ----- LEFT RAIL (CONTROLS) ----- -->
+      <aside
+        class="w-80 shrink-0 bg-white border-r border-slate-200 flex flex-col min-h-0 z-10"
+      >
+        <div class="flex-1 min-h-0 overflow-y-auto p-5 space-y-6">
+          <!-- 1. Goal & Time -->
+          <section>
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+              1. Goal &amp; Time
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Target Goal</label>
+                <input
+                  type="number"
+                  value="75.0"
+                  step="0.1"
+                  class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1"
+                  >Horizon (Months)</label
+                >
+                <select
+                  class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option>6 Months</option>
+                  <option selected>12 Months</option>
+                  <option>18 Months</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1"
+                  >Reference Month</label
+                >
+                <select
+                  class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option selected>2025-10</option>
+                  <option>2025-11</option>
+                  <option>2025-12</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. Allocator -->
+          <section>
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+              2. Allocator
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1"
+                  >Max Monthly Lift</label
+                >
+                <input
+                  type="number"
+                  value="1.5"
+                  step="0.1"
+                  class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1"
+                  >Priority Power</label
+                >
+                <input
+                  type="number"
+                  value="1.5"
+                  step="0.1"
+                  class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <fieldset>
+                <legend class="text-xs font-medium text-slate-600 mb-2">Trajectory Type</legend>
+                <div class="space-y-1.5 text-slate-700">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="traj" checked class="text-indigo-600" />
+                    Uniform
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="traj" class="text-indigo-600" />
+                    Front-loaded
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="traj" class="text-indigo-600" />
+                    Accelerated
+                  </label>
+                </div>
+              </fieldset>
+
+              <!-- Advanced Options (collapsible) -->
+              <details class="group border border-slate-200 rounded">
+                <summary
+                  class="cursor-pointer list-none px-3 py-2 text-xs font-medium text-indigo-600 flex items-center gap-1 select-none"
+                >
+                  <i
+                    data-lucide="chevron-down"
+                    class="w-3.5 h-3.5 transition-transform group-open:rotate-180"
+                  ></i>
+                  Advanced Options
+                </summary>
+                <div class="px-3 pb-3 pt-1 space-y-3 border-t border-slate-100">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Growth</label>
+                    <input
+                      type="number"
+                      value="0.2"
+                      step="0.1"
+                      class="w-full border border-slate-300 rounded px-3 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Floor</label>
+                    <input
+                      type="number"
+                      value="0.0"
+                      class="w-full border border-slate-300 rounded px-3 py-1.5"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Ceiling</label>
+                    <input
+                      type="number"
+                      value="100"
+                      class="w-full border border-slate-300 rounded px-3 py-1.5"
+                    />
+                  </div>
+                </div>
+              </details>
+            </div>
+          </section>
+        </div>
+
+        <!-- Pinned actions -->
+        <div class="shrink-0 border-t border-slate-200 p-4 space-y-2 bg-white">
+          <button
+            type="button"
+            class="w-full inline-flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded shadow-sm transition-colors"
+          >
+            <i data-lucide="play" class="w-4 h-4"></i>
+            Run Simulation
+          </button>
+          <button
+            type="button"
+            class="w-full inline-flex items-center justify-center gap-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2.5 rounded transition-colors"
+          >
+            <i data-lucide="download" class="w-4 h-4"></i>
+            Export CSV
+          </button>
+        </div>
+      </aside>
+
+      <!-- ----- RIGHT CANVAS ----- -->
+      <main class="flex-1 min-w-0 overflow-y-auto p-6 flex flex-col gap-6">
+        <!-- Macro KPI Strip -->
+        <section aria-label="Macro KPI strip">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+            <article class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div class="text-slate-500 text-xs font-medium mb-1">Target Goal</div>
+              <div class="text-2xl font-bold text-slate-800 tabular-nums">75.0%</div>
+            </article>
+            <article class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div class="text-slate-500 text-xs font-medium mb-1">Projected Chain</div>
+              <div class="text-2xl font-bold text-slate-800 tabular-nums">
+                74.2%
+                <span class="text-sm font-semibold text-red-600 ml-1">−0.8pp</span>
+              </div>
+            </article>
+            <article class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div class="text-slate-500 text-xs font-medium mb-1">Feasibility</div>
+              <div class="text-2xl font-bold text-emerald-600">FEASIBLE</div>
+            </article>
+            <article class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div class="text-slate-500 text-xs font-medium mb-1">Behind Plan</div>
+              <div class="text-2xl font-bold text-slate-800">
+                8 <span class="text-sm font-medium text-slate-500">of 120 stores</span>
+              </div>
+            </article>
+            <article class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+              <div class="flex justify-between items-baseline mb-2">
+                <div class="text-slate-500 text-xs font-medium">Net Slack / Deficit</div>
+                <div class="text-sm font-bold text-red-600 tabular-nums">−0.8 pp</div>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div class="bg-red-500 h-2 rounded-full" style="width: 18%"></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- Hero Chart Placeholder -->
+        <section
+          class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm h-80 flex flex-col"
+          aria-label="Hero forecast"
+        >
+          <h2 class="text-sm font-bold text-slate-800 mb-3">
+            Hero Forecast &amp; Monitoring Trajectory
+          </h2>
+          <div
+            class="flex-1 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 text-center px-4"
+          >
+            [ Chart Placeholder: Fact vs Draft Simulation with Confidence Cone ]
+          </div>
+        </section>
+
+        <!-- At-Risk Exception Table -->
+        <section
+          class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"
+          aria-label="At-risk exceptions"
+        >
+          <div
+            class="px-5 py-4 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 bg-slate-50"
+          >
+            <h2 class="text-sm font-bold text-slate-800">
+              At-Risk Exception List (Management by Exception)
+            </h2>
+            <label class="sr-only" for="atrisk-filter">Filter</label>
+            <select
+              id="atrisk-filter"
+              class="border border-slate-300 rounded px-2 py-1.5 text-xs font-medium bg-white"
+            >
+              <option selected>Behind Plan Only (8)</option>
+              <option>Top Gainers</option>
+              <option>All Stores</option>
+            </select>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr
+                  class="border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider"
+                >
+                  <th class="px-5 py-3 font-medium">Store ID</th>
+                  <th class="px-5 py-3 font-medium">Fact As-Of</th>
+                  <th class="px-5 py-3 font-medium">Plan As-Of</th>
+                  <th class="px-5 py-3 font-medium">Gap (pp)</th>
+                  <th class="px-5 py-3 font-medium min-w-[140px]">Error Budget Deficit</th>
+                  <th class="px-5 py-3 font-medium text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <!-- Row template repeated -->
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3 font-medium text-slate-800">Store #07</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">58.2%</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">64.5%</td>
+                  <td class="px-5 py-3">
+                    <span
+                      class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                      >−6.3 pp</span
+                    >
+                  </td>
+                  <td class="px-5 py-3">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-1.5 rounded-full" style="width: 63%"></div>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                    >
+                      Inspect →
+                    </button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3 font-medium text-slate-800">Store #14</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">60.1%</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">65.0%</td>
+                  <td class="px-5 py-3">
+                    <span
+                      class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                      >−4.9 pp</span
+                    >
+                  </td>
+                  <td class="px-5 py-3">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-1.5 rounded-full" style="width: 49%"></div>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                    >
+                      Inspect →
+                    </button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3 font-medium text-slate-800">Store #82</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">62.4%</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">66.2%</td>
+                  <td class="px-5 py-3">
+                    <span
+                      class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                      >−3.8 pp</span
+                    >
+                  </td>
+                  <td class="px-5 py-3">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-1.5 rounded-full" style="width: 38%"></div>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                    >
+                      Inspect →
+                    </button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3 font-medium text-slate-800">Store #03</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">63.0%</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">65.8%</td>
+                  <td class="px-5 py-3">
+                    <span
+                      class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                      >−2.8 pp</span
+                    >
+                  </td>
+                  <td class="px-5 py-3">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-1.5 rounded-full" style="width: 28%"></div>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                    >
+                      Inspect →
+                    </button>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="px-5 py-3 font-medium text-slate-800">Store #91</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">64.1%</td>
+                  <td class="px-5 py-3 text-slate-600 tabular-nums">66.5%</td>
+                  <td class="px-5 py-3">
+                    <span
+                      class="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                      >−2.4 pp</span
+                    >
+                  </td>
+                  <td class="px-5 py-3">
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div class="bg-red-500 h-1.5 rounded-full" style="width: 24%"></div>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                    >
+                      Inspect →
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      lucide.createIcons();
+    </script>
+  </body>
+</html>
