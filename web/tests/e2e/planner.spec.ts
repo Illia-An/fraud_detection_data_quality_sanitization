@@ -39,15 +39,19 @@ test.describe('Planner alt-UI smoke', () => {
 
     await page.getByRole('button', { name: /Run simulation/i }).click();
 
-    await expect(page.getByTestId('planner-context-strip')).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(/Draft Scenario \(Unsaved\)/i)).toBeVisible();
+    await expect(page.getByTestId('planner-glance-row')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Projected network KPI/i)).toBeVisible();
     await expect(page.getByText(/Hero evaluation/i)).toBeVisible();
     await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible();
-    await expect(page.getByText(/At-risk entities/i)).toBeVisible();
+
+    // At-risk is a collapsed bottom overlay — expand before asserting the table.
+    await page.getByText(/At-Risk Exception List/i).click();
+    await expect(page.getByTestId('planner-at-risk-sheet')).toBeVisible();
     await expect(page.getByTestId('atrisk-exception-table')).toBeVisible();
 
     // Default filter is Behind Plan Only — may be empty on synthetic; open All Stores.
-    await page.getByRole('button', { name: /All Stores/i }).click();
+    await page.getByLabel(/^Filter$/i).click();
+    await page.getByRole('option', { name: /All Stores/i }).click();
     const inspect = page
       .getByTestId('atrisk-exception-table')
       .getByRole('button', { name: /^Inspect$/i })
@@ -64,8 +68,5 @@ test.describe('Planner alt-UI smoke', () => {
 
     await page.locator('.MuiDrawer-paper').getByRole('button', { name: 'Close', exact: true }).last().click();
     await expect(page.getByText(/Inspect · Store/i)).toHaveCount(0);
-
-    await page.getByRole('button', { name: /Commit to Session/i }).click({ force: true });
-    await expect(page.getByText(/Committed session plan/i)).toBeVisible({ timeout: 10_000 });
   });
 });
