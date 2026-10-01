@@ -35,7 +35,6 @@ import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import { PlannerBaselineBadge } from '../components/planner/PlannerBaselineBadge';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
-import { PlannerSandboxBar } from '../components/planner/PlannerSandboxBar';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
@@ -64,6 +63,12 @@ const RAIL_WIDTH_PX = 320;
 const RAIL_COLLAPSED_PX = 40;
 /** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
 const COLLAPSED_PLAY_REVEAL_MS = 250;
+/** Collapsed At-risk summary height reserved so Hero is not covered on md. */
+const AT_RISK_SUMMARY_RESERVE_PX = 80;
+/** Gap above At-risk overlay — same as KPI strip ↔ Hero (`gap: 1.5` → 12px). */
+const AT_RISK_GAP_PX = 12;
+/** Expanded At-risk overlay cap on md — scrolls internally; Hero underneath does not move. */
+const AT_RISK_OVERLAY_MAX_HEIGHT = '45vh';
 /** Prefer this month when present in the cleansed panel (DB demo path). */
 const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
 
@@ -141,16 +146,15 @@ export function PlannerPage() {
 
   const draftPlan = usePlannerScenarioStore((s) => s.draftPlan);
   const approvedPlan = usePlannerScenarioStore((s) => s.approvedPlan);
-  const isDirty = usePlannerScenarioStore((s) => s.isDirty);
   const selectedStoreId = usePlannerScenarioStore((s) => s.selectedStoreId);
   const setDraftFromRun = usePlannerScenarioStore((s) => s.setDraftFromRun);
   const acceptDraftAsApproved = usePlannerScenarioStore((s) => s.acceptDraftAsApproved);
-  const discardDraft = usePlannerScenarioStore((s) => s.discardDraft);
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
   const selectStore = usePlannerScenarioStore((s) => s.selectStore);
 
   const [controlsOpen, setControlsOpen] = useState(true);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
+  const [atRiskExpanded, setAtRiskExpanded] = useState(false);
 
   const panel = useMemo(() => {
     if (!processResult) {
@@ -280,16 +284,6 @@ export function PlannerPage() {
     );
   };
 
-  const handleDiscardDraft = () => {
-    discardDraft();
-    setAsOfYear(null);
-    setAsOfMonth(null);
-  };
-
-  const handleAcceptDraft = () => {
-    acceptDraftAsApproved();
-  };
-
   const handleExportCsv = () => {
     if (!draftPlan) {
       return;
@@ -367,7 +361,7 @@ export function PlannerPage() {
             flexDirection: 'column',
             flex: { md: 1 },
             minHeight: { md: 0 },
-            overflowY: { xs: 'visible', md: 'auto' },
+            overflowY: { xs: 'visible', md: 'hidden' },
             overflowX: 'hidden',
             gap: 1.5,
             pb: 1,
@@ -392,13 +386,31 @@ export function PlannerPage() {
           </Alert>
         )}
 
-        <Card variant="outlined" data-testid="allocation-levers">
+        <Card
+          variant="outlined"
+          data-testid="allocation-levers"
+          sx={{
+            flex: { xs: 'none', md: 1 },
+            minHeight: { md: 0 },
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
           <CardHeader
             title={t('planner.leversTitle')}
             subheader={t('planner.leversSub')}
-            sx={{ pb: 0.5 }}
+            sx={{ flexShrink: 0, pb: 0.5 }}
           />
-          <CardContent sx={{ pt: 1 }}>
+          <CardContent
+            sx={{
+              pt: 1,
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              '&:last-child': { pb: 2 },
+            }}
+          >
             <Stack spacing={1.25}>
               <PlannerBaselineBadge
                 panel={panel}
@@ -422,6 +434,13 @@ export function PlannerPage() {
                 </Typography>
               </Stack>
 
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ letterSpacing: 0.8, pt: 0.5 }}
+              >
+                {t('planner.section.goalTime')}
+              </Typography>
               <TextField
                 label={t('planner.target')}
                 type="number"
@@ -475,6 +494,57 @@ export function PlannerPage() {
                 {t('planner.referenceMonthHint')}
               </Typography>
 
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                sx={{ letterSpacing: 0.8, pt: 0.5 }}
+              >
+                {t('planner.section.allocator')}
+              </Typography>
+              <TextField
+                label={t('planner.maxMonthly')}
+                type="number"
+                size="small"
+                value={params.max_monthly_improve}
+                disabled={!baselineReady}
+                onChange={(e) =>
+                  setParams((p) => ({
+                    ...p,
+                    max_monthly_improve: Number(e.target.value),
+                  }))
+                }
+                inputProps={{ min: 0.01, step: 0.1 }}
+              />
+              <TextField
+                label={t('planner.priorityPower')}
+                type="number"
+                size="small"
+                value={params.priority_power}
+                disabled={!baselineReady}
+                onChange={(e) =>
+                  setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
+                }
+                inputProps={{ min: 0.1, step: 0.1 }}
+              />
+              <FormControl fullWidth size="small" disabled={!baselineReady}>
+                <InputLabel id="traj-label">{t('planner.trajectory')}</InputLabel>
+                <Select
+                  labelId="traj-label"
+                  label={t('planner.trajectory')}
+                  value={params.trajectory}
+                  onChange={(e) =>
+                    setParams((p) => ({
+                      ...p,
+                      trajectory: e.target.value as PlanParams['trajectory'],
+                    }))
+                  }
+                >
+                  <MenuItem value="uniform">{t('planner.traj.uniform')}</MenuItem>
+                  <MenuItem value="front_loaded">{t('planner.traj.front')}</MenuItem>
+                  <MenuItem value="accelerated">{t('planner.traj.accel')}</MenuItem>
+                </Select>
+              </FormControl>
+
               <Accordion
                 disableGutters
                 elevation={0}
@@ -488,49 +558,6 @@ export function PlannerPage() {
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={1.25}>
-                    <FormControl fullWidth size="small" disabled={!baselineReady}>
-                      <InputLabel id="traj-label">{t('planner.trajectory')}</InputLabel>
-                      <Select
-                        labelId="traj-label"
-                        label={t('planner.trajectory')}
-                        value={params.trajectory}
-                        onChange={(e) =>
-                          setParams((p) => ({
-                            ...p,
-                            trajectory: e.target.value as PlanParams['trajectory'],
-                          }))
-                        }
-                      >
-                        <MenuItem value="uniform">{t('planner.traj.uniform')}</MenuItem>
-                        <MenuItem value="front_loaded">{t('planner.traj.front')}</MenuItem>
-                        <MenuItem value="accelerated">{t('planner.traj.accel')}</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <TextField
-                      label={t('planner.priorityPower')}
-                      type="number"
-                      size="small"
-                      value={params.priority_power}
-                      disabled={!baselineReady}
-                      onChange={(e) =>
-                        setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
-                      }
-                      inputProps={{ min: 0.1, step: 0.1 }}
-                    />
-                    <TextField
-                      label={t('planner.maxMonthly')}
-                      type="number"
-                      size="small"
-                      value={params.max_monthly_improve}
-                      disabled={!baselineReady}
-                      onChange={(e) =>
-                        setParams((p) => ({
-                          ...p,
-                          max_monthly_improve: Number(e.target.value),
-                        }))
-                      }
-                      inputProps={{ min: 0.01, step: 0.1 }}
-                    />
                     <TextField
                       label={t('planner.trajPower')}
                       type="number"
@@ -718,7 +745,21 @@ export function PlannerPage() {
               overflow: { md: 'hidden' },
             }}
           >
-            <Stack spacing={1.5} sx={{ flexShrink: 0 }}>
+            <Box
+              data-testid="planner-glance-row"
+              role="region"
+              aria-label={t('planner.strip.aria')}
+              sx={{
+                flexShrink: 0,
+                display: 'flex',
+                flexWrap: { xs: 'wrap', md: 'nowrap' },
+                alignItems: 'stretch',
+                justifyContent: 'flex-start',
+                gap: 0.75,
+                width: '100%',
+                overflowX: { md: 'auto' },
+              }}
+            >
               <PlannerContextStrip
                 panel={panel}
                 processResult={processResult}
@@ -727,51 +768,34 @@ export function PlannerPage() {
                 horizonMonths={horizon}
               />
 
-              {isDirty && (
-                <PlannerSandboxBar
-                  targetPct={draftPlan.target}
-                  horizonMonths={horizon}
-                  hasAcceptedSnapshot={approvedPlan != null}
-                  onDiscard={handleDiscardDraft}
-                  onCommitSession={handleAcceptDraft}
-                  onExportCsv={handleExportCsv}
-                />
-              )}
-
-              {!isDirty && approvedPlan && (
-                <Alert severity="success" icon={false} sx={{ alignItems: 'center' }}>
-                  {t('planner.committed', { target: approvedPlan.target.toFixed(1) })}
-                </Alert>
-              )}
-
               <SimulationSummaryKpis
                 draftPlan={draftPlan}
                 approvedPlan={approvedPlan}
                 monitoring={monitoring}
               />
-            </Stack>
+            </Box>
 
             <Box
-              data-testid="planner-explore-split"
+              data-testid="planner-explore-stack"
               sx={{
+                position: 'relative',
                 flex: 1,
                 minHeight: 0,
                 display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
-                gap: 1.5,
-                overflow: { xs: 'visible', md: 'hidden' },
+                flexDirection: 'column',
+                overflow: 'hidden',
               }}
             >
               <Box
                 sx={{
-                  flex: { xs: 'none', md: monitoring ? '3 1 0%' : '1 1 0%' },
-                  minWidth: 0,
-                  minHeight: { xs: 360, md: 0 },
-                  height: { md: '100%' },
+                  flex: 1,
+                  minHeight: 320,
                   display: 'flex',
                   overflow: 'hidden',
-                  position: 'relative',
-                  zIndex: 0,
+                  pb:
+                    panel && monitoring
+                      ? { md: `${AT_RISK_SUMMARY_RESERVE_PX + AT_RISK_GAP_PX}px` }
+                      : 0,
                 }}
               >
                 <Card
@@ -781,7 +805,6 @@ export function PlannerPage() {
                     width: '100%',
                     minWidth: 0,
                     minHeight: 0,
-                    height: { md: '100%' },
                     display: 'flex',
                     flexDirection: 'column',
                     borderWidth: 2,
@@ -837,43 +860,72 @@ export function PlannerPage() {
 
               {panel && monitoring && (
                 <Box
+                  data-testid="planner-at-risk-sheet"
                   sx={{
-                    flex: { xs: 'none', md: '2 1 0%' },
-                    minWidth: 0,
-                    minHeight: { xs: 280, md: 0 },
-                    height: { md: '100%' },
-                    display: 'flex',
-                    overflow: 'hidden',
-                    position: 'relative',
-                    zIndex: 1,
+                    // xs: normal flow under Hero. md: bottom overlay over the pane.
+                    position: { xs: 'relative', md: 'absolute' },
+                    left: { md: 0 },
+                    right: { md: 0 },
+                    bottom: { md: AT_RISK_GAP_PX },
+                    zIndex: { md: 3 },
+                    flexShrink: 0,
+                    maxHeight: { md: AT_RISK_OVERLAY_MAX_HEIGHT },
+                    overflow: { md: 'auto' },
+                    mt: { xs: `${AT_RISK_GAP_PX}px`, md: 0 },
+                    bgcolor: 'background.paper',
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    boxShadow: { md: atRiskExpanded ? 8 : 2 },
                   }}
                 >
-                  <Card
+                  <Accordion
+                    disableGutters
+                    expanded={atRiskExpanded}
+                    onChange={(_event, expanded) => setAtRiskExpanded(expanded)}
                     sx={{
-                      flex: 1,
-                      width: '100%',
-                      minWidth: 0,
-                      minHeight: 0,
-                      height: { md: '100%' },
-                      display: 'flex',
-                      flexDirection: 'column',
-                      overflow: 'hidden',
+                      '&:before': { display: 'none' },
+                      boxShadow: 'none',
+                      bgcolor: 'transparent',
                     }}
                   >
-                    <CardHeader
-                      title={t('planner.atRiskTitle')}
-                      subheader={t('planner.atRiskSub')}
-                      sx={{ flexShrink: 0, pb: 0.5 }}
-                    />
-                    <CardContent
+                    <AccordionSummary
+                      expandIcon={<ExpandMoreIcon />}
+                      sx={{ minHeight: 48, py: 0.5 }}
+                    >
+                      <Box sx={{ minWidth: 0, pr: 1 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {t('planner.atRiskTitle')}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                          display="block"
+                        >
+                          {t('planner.atRisk.behindChip', {
+                            count: monitoring.summary.behind,
+                          })}
+                          {' · '}
+                          {t('planner.atRisk.aheadChip', {
+                            count: monitoring.summary.ahead,
+                          })}
+                        </Typography>
+                      </Box>
+                    </AccordionSummary>
+                    <AccordionDetails
                       sx={{
-                        flex: 1,
-                        minHeight: 0,
-                        overflow: 'hidden',
-                        pt: 1,
+                        px: 1.5,
+                        pt: 0,
+                        pb: 1,
                         display: 'flex',
                         flexDirection: 'column',
-                        '&:last-child': { pb: 2 },
+                        minHeight: 0,
+                        maxHeight: {
+                          xs: '46vh',
+                          md: `calc(${AT_RISK_OVERLAY_MAX_HEIGHT} - ${AT_RISK_SUMMARY_RESERVE_PX}px)`,
+                        },
+                        overflow: 'auto',
                       }}
                     >
                       <AtRiskDeltaTable
@@ -892,8 +944,8 @@ export function PlannerPage() {
                         }}
                         onInspect={(storeId) => selectStore(storeId)}
                       />
-                    </CardContent>
-                  </Card>
+                    </AccordionDetails>
+                  </Accordion>
                 </Box>
               )}
             </Box>

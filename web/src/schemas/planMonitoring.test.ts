@@ -61,9 +61,22 @@ describe('planMonitoring', () => {
     expect(months[1].actual).toBeNull();
   });
 
-  it('defaults as-of to last month with actuals', () => {
+  it('defaults as-of to the first forecast month (start of trajectory)', () => {
     const asOf = defaultAsOf(plan, panel);
     expect(asOf.year).toBe(2025);
+    expect(asOf.month).toBe(4);
+  });
+
+  it('defaults as-of to first month even when later months have actuals', () => {
+    const panelWithMay: SanitizedPanel = {
+      ...panel,
+      rows: [
+        ...panel.rows,
+        { store_id: 10, year: 2025, month: 5, five_percent: 69, survey_volume: 50 },
+        { store_id: 20, year: 2025, month: 5, five_percent: 77, survey_volume: 50 },
+      ],
+    };
+    const asOf = defaultAsOf(plan, panelWithMay);
     expect(asOf.month).toBe(4);
   });
 
