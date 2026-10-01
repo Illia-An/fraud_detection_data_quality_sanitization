@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Planner Workbench — UI Mock (experiment)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-50 flex flex-col font-sans text-sm text-slate-800 relative">
+    <!-- Experiment banner -->
+    <div class="bg-slate-900 text-slate-200 text-xs px-6 py-1.5 flex justify-between">
+      <span>exp/planner-ui-mock · visual only · no data / no API</span>
+      <span>Tailwind CDN · static HTML</span>
+    </div>
+
+    <!-- 1. HEADER & DRAFT BANNER -->
+    <header
+      class="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm"
+    >
+      <div class="flex items-center space-x-4">
+        <h1 class="font-bold text-lg text-slate-900">Planner Workbench</h1>
+        <span
+          class="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-medium flex items-center"
+        >
+          <span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>
+          Cleansed Baseline v2.4
+        </span>
+      </div>
+    </header>
+
+    <!-- Sticky Sandbox Alert -->
+    <div
+      class="bg-amber-50 border-b border-amber-200 px-6 py-2 flex justify-between items-center sticky top-0 z-20"
+    >
+      <div class="text-amber-800 font-medium flex items-center">
+        <span class="mr-2">⚠</span> DRAFT SCENARIO: Levers modified (Unsaved in Session)
+      </div>
+      <div class="space-x-3">
+        <button type="button" class="text-amber-700 hover:text-amber-900 text-sm font-medium">
+          ↺ Discard Draft
+        </button>
+        <button
+          type="button"
+          class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+        >
+          ✓ Commit Session
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. MAIN WORKSPACE -->
+    <div class="flex flex-1 overflow-hidden min-h-0">
+      <!-- LEFT RAIL: Controls -->
+      <aside
+        class="w-72 shrink-0 bg-white border-r border-slate-200 p-5 overflow-y-auto flex flex-col gap-6 shadow-[2px_0_8px_-4px_rgba(0,0,0,0.1)] z-10"
+      >
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+            1. Network Goals
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Target %</label>
+              <input
+                type="number"
+                value="75.0"
+                class="w-full border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Horizon</label>
+              <select class="w-full border border-slate-300 rounded px-3 py-1.5">
+                <option>6 Months</option>
+                <option selected>12 Months</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+            2. Allocator Rules
+          </h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1"
+                >Max Monthly Lift (%)</label
+              >
+              <input
+                type="number"
+                value="1.5"
+                class="w-full border border-slate-300 rounded px-3 py-1.5"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-600 mb-1">Trajectory</label>
+              <select class="w-full border border-slate-300 rounded px-3 py-1.5">
+                <option selected>Uniform</option>
+                <option>Front-loaded</option>
+                <option>Accelerated</option>
+              </select>
+            </div>
+
+            <div class="pt-2">
+              <button type="button" class="text-indigo-600 text-xs font-medium flex items-center">
+                <span class="mr-1">▼</span> Advanced Options
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-auto pt-4 border-t border-slate-200 space-y-2">
+          <button
+            type="button"
+            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded shadow-sm transition-colors"
+          >
+            ▶ Run Simulation
+          </button>
+          <button
+            type="button"
+            class="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-medium py-2 rounded transition-colors"
+          >
+            ⤓ Export CSV
+          </button>
+        </div>
+      </aside>
+
+      <!-- CANVAS -->
+      <main class="flex-1 p-6 overflow-y-auto bg-slate-50">
+        <!-- KPI Strip -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-slate-500 text-xs font-medium mb-1">Target Goal</div>
+            <div class="text-2xl font-bold text-slate-800">75.0%</div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-slate-500 text-xs font-medium mb-1">Projected Chain</div>
+            <div class="text-2xl font-bold text-slate-800">
+              74.2%
+              <span class="text-sm font-medium text-red-500 bg-red-50 px-1 rounded ml-1"
+                >-0.8pp</span
+              >
+            </div>
+          </div>
+          <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+            <div class="text-slate-500 text-xs font-medium mb-1">Feasibility</div>
+            <div class="text-2xl font-bold text-emerald-600">FEASIBLE</div>
+          </div>
+          <div
+            class="bg-white p-4 rounded-lg border border-slate-200 shadow-sm flex flex-col justify-center"
+          >
+            <div class="flex justify-between text-xs font-medium mb-2">
+              <span class="text-slate-500">Error Budget (Behind)</span>
+              <span class="text-red-600 font-bold">8 Stores</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+              <div class="bg-red-500 h-2" style="width: 15%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Chart — static SVG scenario (fake numbers) -->
+        <div
+          class="bg-white p-5 rounded-lg border border-slate-200 shadow-sm mb-6 flex flex-col"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 class="text-sm font-bold text-slate-800">
+                Network Trajectory (Forecast Cone)
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">
+                Fake scenario · Current 71.8% @ Dec&nbsp;2025 · Target 75% · Draft ends ~74.2%
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="w-3 h-0.5 bg-slate-500 inline-block"></span> Cleansed fact</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="w-3 h-0.5 bg-indigo-600 inline-block"></span> Draft forecast</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span
+                  class="w-3 h-0.5 border-t border-dashed border-violet-500 inline-block"
+                ></span>
+                Cumulative mean</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="w-3 h-0.5 bg-emerald-600 inline-block"></span> Target 75%</span
+              >
+              <span class="inline-flex items-center gap-1.5"
+                ><span class="w-3 h-2 rounded-sm bg-indigo-200/80 inline-block"></span> Slack
+                cone</span
+              >
+            </div>
+          </div>
+
+          <div class="w-full overflow-x-auto">
+            <svg
+              viewBox="0 0 760 280"
+              class="w-full min-w-[640px] h-auto"
+              role="img"
+              aria-label="Network trajectory mock chart"
+            >
+              <!-- plot frame -->
+              <rect x="48" y="16" width="680" height="220" fill="#f8fafc" rx="4" />
+
+              <!-- horizontal grid -->
+              <g stroke="#e2e8f0" stroke-width="1">
+                <line x1="48" y1="36" x2="728" y2="36" />
+                <line x1="48" y1="71" x2="728" y2="71" />
+                <line x1="48" y1="106" x2="728" y2="106" />
+                <line x1="48" y1="141" x2="728" y2="141" />
+                <line x1="48" y1="176" x2="728" y2="176" />
+                <line x1="48" y1="211" x2="728" y2="211" />
+              </g>
+
+              <!-- Y labels: 76 → 68 (35px per 2pp; y=36 is 76%, y=211 is 68%) -->
+              <g fill="#64748b" font-size="10" font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="end">
+                <text x="42" y="40">76%</text>
+                <text x="42" y="75">74%</text>
+                <text x="42" y="110">72%</text>
+                <text x="42" y="145">70%</text>
+                <text x="42" y="180">68%</text>
+                <text x="42" y="215">66%</text>
+              </g>
+
+              <!-- X month ticks: 13 points Dec'25 … Dec'26, as-of at index 3 (Mar'26) -->
+              <!-- x = 60 + i * 52 -->
+              <g fill="#64748b" font-size="10" font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+                <text x="60" y="258">Dec</text>
+                <text x="112" y="258">Jan</text>
+                <text x="164" y="258">Feb</text>
+                <text x="216" y="258">Mar</text>
+                <text x="268" y="258">Apr</text>
+                <text x="320" y="258">May</text>
+                <text x="372" y="258">Jun</text>
+                <text x="424" y="258">Jul</text>
+                <text x="476" y="258">Aug</text>
+                <text x="528" y="258">Sep</text>
+                <text x="580" y="258">Oct</text>
+                <text x="632" y="258">Nov</text>
+                <text x="684" y="258">Dec</text>
+              </g>
+
+              <!-- Target 75% → y = 36 + (76-75)/2 * 35 = 53.5 -->
+              <line
+                x1="48"
+                y1="53.5"
+                x2="728"
+                y2="53.5"
+                stroke="#059669"
+                stroke-width="1.5"
+                stroke-dasharray="6 4"
+              />
+              <text
+                x="720"
+                y="48"
+                fill="#059669"
+                font-size="10"
+                font-family="ui-sans-serif, system-ui, sans-serif"
+                text-anchor="end"
+              >
+                Target 75%
+              </text>
+
+              <!-- As-of vertical (Mar = index 3, x=216) -->
+              <line
+                x1="216"
+                y1="16"
+                x2="216"
+                y2="236"
+                stroke="#94a3b8"
+                stroke-width="1.5"
+                stroke-dasharray="4 3"
+              />
+              <rect x="190" y="18" width="52" height="16" rx="3" fill="#e2e8f0" />
+              <text
+                x="216"
+                y="29"
+                fill="#475569"
+                font-size="9"
+                font-family="ui-sans-serif, system-ui, sans-serif"
+                text-anchor="middle"
+                font-weight="600"
+              >
+                as-of
+              </text>
+
+              <!-- Slack cone around draft (from as-of onward): ±~1.5pp
+                   helper: y(pct) = 36 + (76-pct)/2 * 35 = 36 + 17.5*(76-pct)
+                   Draft path (pct): Mar 71.8, Apr 72.1, May 72.5, Jun 72.8, Jul 73.1, Aug 73.4, Sep 73.6, Oct 73.8, Nov 74.0, Dec 74.2
+              -->
+              <!-- Cone = draft ± 1.5 pp from as-of -->
+              <path
+                d="M 216 83.3
+                   L 268 79 L 320 74 L 372 70.3 L 424 66.5
+                   L 476 62.8 L 528 60.3 L 580 57.8 L 632 55.3 L 684 52.8
+                   L 684 105.3 L 632 107.8 L 580 110.3 L 528 112.8 L 476 115.3
+                   L 424 119 L 372 122.8 L 320 126.5 L 268 131.5 L 216 135.8 Z"
+                fill="#818cf8"
+                fill-opacity="0.18"
+                stroke="none"
+              />
+
+              <!-- Cleansed fact (left of as-of, bridge into Mar)
+                   pct: Dec 70.2, Jan 70.8, Feb 71.4, Mar 71.8
+                   y: 122.5, 115.5, 108.5, 103.5 → recalc:
+                   y(70.2)=36+17.5*5.8=137.5
+                   y(70.8)=36+17.5*5.2=127
+                   y(71.4)=36+17.5*4.6=116.5
+                   y(71.8)=36+17.5*4.2=109.5
+              -->
+              <polyline
+                fill="none"
+                stroke="#64748b"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                points="60,137.5 112,127 164,116.5 216,109.5"
+              />
+              <g fill="#64748b">
+                <circle cx="60" cy="137.5" r="3.5" />
+                <circle cx="112" cy="127" r="3.5" />
+                <circle cx="164" cy="116.5" r="3.5" />
+                <circle cx="216" cy="109.5" r="3.5" />
+              </g>
+
+              <!-- Draft forecast from as-of
+                   y(71.8)=109.5, y(72.1)=105.25, y(72.5)=100.25, y(72.8)=96.5,
+                   y(73.1)=92.75, y(73.4)=89, y(73.6)=86.5, y(73.8)=84,
+                   y(74.0)=81.5, y(74.2)=79
+              -->
+              <polyline
+                fill="none"
+                stroke="#4f46e5"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                points="216,109.5 268,105.3 320,100.3 372,96.5 424,92.8 476,89 528,86.5 580,84 632,81.5 684,79"
+              />
+              <g fill="#4f46e5">
+                <circle cx="684" cy="79" r="4" />
+              </g>
+              <text
+                x="684"
+                y="72"
+                fill="#4f46e5"
+                font-size="10"
+                font-family="ui-sans-serif, system-ui, sans-serif"
+                text-anchor="middle"
+                font-weight="600"
+              >
+                74.2%
+              </text>
+
+              <!-- Cumulative mean of monthly equal-mean (smooth rising, lagging draft a bit)
+                   approx: 70.2, 70.5, 70.8, 71.1, 71.3, 71.5, 71.7, 71.9, 72.1, 72.3, 72.5, 72.7, 72.8
+                   y: 137.5, 133.25, 129, 124.75, 122, 119.25, 116.5, 113.75, 111, 108.25, 105.5, 102.75, 101.5
+              -->
+              <polyline
+                fill="none"
+                stroke="#8b5cf6"
+                stroke-width="1.75"
+                stroke-dasharray="5 3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                points="60,137.5 112,133.3 164,129 216,124.8 268,122 320,119.3 372,116.5 424,113.8 476,111 528,108.3 580,105.5 632,102.8 684,101.5"
+              />
+
+              <!-- Shortfall callout -->
+              <line x1="684" y1="53.5" x2="684" y2="79" stroke="#ef4444" stroke-width="1" stroke-dasharray="2 2" />
+              <text
+                x="668"
+                y="64"
+                fill="#dc2626"
+                font-size="9"
+                font-family="ui-sans-serif, system-ui, sans-serif"
+                text-anchor="end"
+              >
+                −0.8 pp
+              </text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Decision table: which number for which decision -->
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mb-6">
+          <div class="px-5 py-4 border-b border-slate-200 bg-slate-50">
+            <h2 class="text-sm font-bold text-slate-800">
+              Metric guide · which number for which decision
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Product lock: do not force Final = Current — different questions.
+            </p>
+          </div>
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr
+                class="border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider"
+              >
+                <th class="px-5 py-3 font-medium">Metric</th>
+                <th class="px-5 py-3 font-medium">Example</th>
+                <th class="px-5 py-3 font-medium">Aggregation</th>
+                <th class="px-5 py-3 font-medium">Use when…</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-sm">
+              <tr class="hover:bg-slate-50">
+                <td class="px-5 py-3 font-medium text-slate-800">Current / Network @ ref</td>
+                <td class="px-5 py-3 tabular-nums text-slate-700">71.8%</td>
+                <td class="px-5 py-3 text-slate-600">Equal mean stores (1/n) @ reference month</td>
+                <td class="px-5 py-3 text-slate-600">Starting point for the plan</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-5 py-3 font-medium text-slate-800">Final (Sanitization)</td>
+                <td class="px-5 py-3 tabular-nums text-slate-700">72.4%</td>
+                <td class="px-5 py-3 text-slate-600">Period · response-weighted</td>
+                <td class="px-5 py-3 text-slate-600">Whole-period cleansed outcome (not plan baseline)</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-5 py-3 font-medium text-slate-800">Cumulative @ t</td>
+                <td class="px-5 py-3 tabular-nums text-slate-700">72.8%</td>
+                <td class="px-5 py-3 text-slate-600">mean(m₁…mₜ) of monthly equal-means</td>
+                <td class="px-5 py-3 text-slate-600">Path quality on Hero — not the end-of-horizon KPI</td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="px-5 py-3 font-medium text-slate-800">Projected / Final chain</td>
+                <td class="px-5 py-3 tabular-nums text-slate-700">74.2%</td>
+                <td class="px-5 py-3 text-slate-600">Equal mean at horizon end (draft)</td>
+                <td class="px-5 py-3 text-slate-600">Will we hit Target? Feasibility + slack</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Exception Table -->
+        <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+          <div
+            class="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 gap-3 flex-wrap"
+          >
+            <h2 class="text-sm font-bold text-slate-800">
+              At-Risk Entities (Management by Exception)
+            </h2>
+            <select class="border border-slate-300 rounded px-2 py-1 text-xs font-medium">
+              <option selected>Behind Plan Only (8)</option>
+              <option>Top Gainers</option>
+              <option>All Stores</option>
+            </select>
+          </div>
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr
+                class="bg-white border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider"
+              >
+                <th class="px-5 py-3 font-medium">Store ID</th>
+                <th class="px-5 py-3 font-medium">Fact As-Of</th>
+                <th class="px-5 py-3 font-medium">Plan As-Of</th>
+                <th class="px-5 py-3 font-medium">Gap (pp)</th>
+                <th class="px-5 py-3 font-medium text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-5 py-3 font-medium text-slate-800">Store #07</td>
+                <td class="px-5 py-3 text-slate-600">58.2%</td>
+                <td class="px-5 py-3 text-slate-600">64.5%</td>
+                <td class="px-5 py-3">
+                  <span
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                    >-6.3 pp</span
+                  >
+                </td>
+                <td class="px-5 py-3 text-right">
+                  <button
+                    type="button"
+                    data-open-inspect="07"
+                    data-plan="64.5"
+                    class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                  >
+                    Inspect &amp; What-If →
+                  </button>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-5 py-3 font-medium text-slate-800">Store #14</td>
+                <td class="px-5 py-3 text-slate-600">60.1%</td>
+                <td class="px-5 py-3 text-slate-600">65.0%</td>
+                <td class="px-5 py-3">
+                  <span
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                    >-4.9 pp</span
+                  >
+                </td>
+                <td class="px-5 py-3 text-right">
+                  <button
+                    type="button"
+                    data-open-inspect="14"
+                    data-plan="65.0"
+                    class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                  >
+                    Inspect &amp; What-If →
+                  </button>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50 transition-colors">
+                <td class="px-5 py-3 font-medium text-slate-800">Store #22</td>
+                <td class="px-5 py-3 text-slate-600">61.4%</td>
+                <td class="px-5 py-3 text-slate-600">65.8%</td>
+                <td class="px-5 py-3">
+                  <span
+                    class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+                    >-4.4 pp</span
+                  >
+                </td>
+                <td class="px-5 py-3 text-right">
+                  <button
+                    type="button"
+                    data-open-inspect="22"
+                    data-plan="65.8"
+                    class="text-indigo-600 hover:text-indigo-900 text-xs font-medium"
+                  >
+                    Inspect &amp; What-If →
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+
+    <!-- Inspect drawer overlay -->
+    <div
+      id="inspect-overlay"
+      class="hidden fixed inset-0 bg-slate-900/40 z-40"
+      aria-hidden="true"
+    ></div>
+
+    <!-- Inspect drawer -->
+    <aside
+      id="inspect-drawer"
+      class="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 translate-x-full transition-transform duration-200 ease-out flex flex-col"
+      aria-hidden="true"
+    >
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center gap-3">
+        <h2 id="inspect-title" class="text-base font-bold text-slate-900 flex-1">
+          Inspect · Store #07
+        </h2>
+        <span
+          class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800"
+          >Behind Plan</span
+        >
+        <button
+          type="button"
+          id="inspect-close"
+          class="text-slate-500 hover:text-slate-800 text-lg leading-none px-1"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="px-5 py-3 bg-amber-50 border-b border-amber-100 text-xs text-amber-900">
+        Session sandbox what-if — draft only. Does not mutate accepted plan, Export CSV, or DB.
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-5 space-y-5">
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+            Estimate vs actual (as-of Mar)
+          </h3>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-lg border border-slate-200 p-3">
+              <div class="text-[10px] uppercase text-slate-500 font-medium">Fact</div>
+              <div id="inspect-fact" class="text-lg font-bold text-slate-800 mt-1">58.2%</div>
+            </div>
+            <div class="rounded-lg border border-slate-200 p-3">
+              <div class="text-[10px] uppercase text-slate-500 font-medium">Plan</div>
+              <div id="inspect-plan" class="text-lg font-bold text-slate-800 mt-1">64.5%</div>
+            </div>
+            <div class="rounded-lg border border-slate-200 p-3">
+              <div class="text-[10px] uppercase text-slate-500 font-medium">Gap</div>
+              <div id="inspect-gap" class="text-lg font-bold text-red-600 mt-1">-6.3 pp</div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+            What-if · last month estimate
+          </h3>
+          <p class="text-xs text-slate-500 mb-3">
+            Bounds ± max monthly lift from previous month. Raising this store takes from the
+            redistribution pool (even-split).
+          </p>
+          <label class="block text-xs font-medium text-slate-600 mb-1"
+            >Proposed last-month score (%)</label
+          >
+          <div class="flex gap-2">
+            <input
+              id="inspect-input"
+              type="number"
+              step="0.1"
+              class="flex-1 border border-slate-300 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <button
+              type="button"
+              id="inspect-recalc"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-xs font-medium"
+            >
+              Recalculate
+            </button>
+            <button
+              type="button"
+              id="inspect-reset"
+              class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded text-xs font-medium"
+            >
+              Reset
+            </button>
+          </div>
+          <p id="inspect-bounds" class="text-[11px] text-slate-500 mt-1.5"></p>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-baseline mb-2">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Redistribution pool
+            </h3>
+            <span id="inspect-pool-meta" class="text-[11px] text-slate-500"></span>
+          </div>
+          <table class="w-full text-left text-xs border border-slate-200 rounded overflow-hidden">
+            <thead class="bg-slate-50 text-slate-500 uppercase tracking-wider">
+              <tr>
+                <th class="px-3 py-2 font-medium">Store</th>
+                <th class="px-3 py-2 font-medium">Original</th>
+                <th class="px-3 py-2 font-medium">Draft</th>
+                <th class="px-3 py-2 font-medium text-right">Δ</th>
+              </tr>
+            </thead>
+            <tbody id="inspect-pool-body" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="px-5 py-3 border-t border-slate-200 flex justify-end">
+        <button
+          type="button"
+          id="inspect-done"
+          class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-1.5 rounded text-sm font-medium"
+        >
+          Done
+        </button>
+      </div>
+    </aside>
+
+    <script>
+      (function () {
+        const overlay = document.getElementById('inspect-overlay');
+        const drawer = document.getElementById('inspect-drawer');
+        const title = document.getElementById('inspect-title');
+        const factEl = document.getElementById('inspect-fact');
+        const planEl = document.getElementById('inspect-plan');
+        const gapEl = document.getElementById('inspect-gap');
+        const input = document.getElementById('inspect-input');
+        const boundsEl = document.getElementById('inspect-bounds');
+        const poolBody = document.getElementById('inspect-pool-body');
+        const poolMeta = document.getElementById('inspect-pool-meta');
+
+        const FACTS = { '07': 58.2, '14': 60.1, '22': 61.4 };
+        const OTHERS = [
+          { id: '03', last: 72.1 },
+          { id: '11', last: 70.4 },
+          { id: '18', last: 68.9 },
+          { id: '29', last: 73.2 },
+        ];
+        const MAX_LIFT = 1.5;
+        let originalLast = 64.5;
+        let previous = 63.0;
+
+        function openDrawer(storeId, plan) {
+          originalLast = Number(plan);
+          previous = originalLast - 1.0;
+          const fact = FACTS[storeId] ?? 60;
+          const gap = fact - originalLast;
+          title.textContent = 'Inspect · Store #' + storeId;
+          factEl.textContent = fact.toFixed(1) + '%';
+          planEl.textContent = originalLast.toFixed(1) + '%';
+          gapEl.textContent = (gap >= 0 ? '+' : '') + gap.toFixed(1) + ' pp';
+          gapEl.className =
+            'text-lg font-bold mt-1 ' + (gap < -0.05 ? 'text-red-600' : 'text-emerald-600');
+          input.value = originalLast.toFixed(1);
+          const min = Math.max(0, previous - MAX_LIFT);
+          const max = Math.min(100, previous + MAX_LIFT);
+          boundsEl.textContent =
+            'Allowed range ' + min.toFixed(1) + ' – ' + max.toFixed(1) + ' (±' + MAX_LIFT + ' from prev month)';
+          renderPool(originalLast);
+          overlay.classList.remove('hidden');
+          drawer.classList.remove('translate-x-full');
+          drawer.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeDrawer() {
+          overlay.classList.add('hidden');
+          drawer.classList.add('translate-x-full');
+          drawer.setAttribute('aria-hidden', 'true');
+        }
+
+        function renderPool(draftSelected) {
+          const taken = draftSelected - originalLast;
+          let remaining = -taken;
+          const pool = OTHERS.map(function (o) {
+            return { id: o.id, original: o.last, draft: o.last, delta: 0 };
+          });
+          for (let pass = 0; pass < 24 && Math.abs(remaining) > 1e-9; pass++) {
+            const eligible = pool.filter(function (row) {
+              return remaining < 0 ? row.draft > 0.01 : row.draft < 99.99;
+            });
+            if (!eligible.length) break;
+            const share = remaining / eligible.length;
+            let placed = 0;
+            eligible.forEach(function (row) {
+              const room = share < 0 ? 0 - row.draft : 100 - row.draft;
+              const apply = share < 0 ? Math.max(share, room) : Math.min(share, room);
+              row.draft += apply;
+              row.delta += apply;
+              placed += apply;
+            });
+            remaining -= placed;
+            if (Math.abs(placed) < 1e-12) break;
+          }
+          const distributed = Math.abs(taken) - Math.abs(remaining);
+          poolMeta.textContent =
+            'taken ' +
+            (taken >= 0 ? '+' : '') +
+            taken.toFixed(1) +
+            ' · distributed ' +
+            distributed.toFixed(1) +
+            ' · leftover ' +
+            Math.abs(remaining).toFixed(2);
+
+          const selectedRow =
+            '<tr class="bg-indigo-50">' +
+            '<td class="px-3 py-2 font-medium text-indigo-800">Selected</td>' +
+            '<td class="px-3 py-2">' +
+            originalLast.toFixed(1) +
+            '</td>' +
+            '<td class="px-3 py-2 font-medium">' +
+            draftSelected.toFixed(1) +
+            '</td>' +
+            '<td class="px-3 py-2 text-right font-medium ' +
+            (taken >= 0 ? 'text-emerald-700' : 'text-red-700') +
+            '">' +
+            (taken >= 0 ? '+' : '') +
+            taken.toFixed(1) +
+            '</td></tr>';
+
+          poolBody.innerHTML =
+            selectedRow +
+            pool
+              .map(function (row) {
+                const sign = row.delta >= 0 ? '+' : '';
+                const color =
+                  Math.abs(row.delta) < 1e-9
+                    ? 'text-slate-500'
+                    : row.delta >= 0
+                      ? 'text-emerald-700'
+                      : 'text-red-700';
+                return (
+                  '<tr class="hover:bg-slate-50">' +
+                  '<td class="px-3 py-2 font-medium">#' +
+                  row.id +
+                  '</td>' +
+                  '<td class="px-3 py-2">' +
+                  row.original.toFixed(1) +
+                  '</td>' +
+                  '<td class="px-3 py-2">' +
+                  row.draft.toFixed(1) +
+                  '</td>' +
+                  '<td class="px-3 py-2 text-right ' +
+                  color +
+                  '">' +
+                  sign +
+                  row.delta.toFixed(1) +
+                  '</td></tr>'
+                );
+              })
+              .join('');
+        }
+
+        document.querySelectorAll('[data-open-inspect]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            openDrawer(btn.getAttribute('data-open-inspect'), btn.getAttribute('data-plan'));
+          });
+        });
+
+        document.getElementById('inspect-close').addEventListener('click', closeDrawer);
+        document.getElementById('inspect-done').addEventListener('click', closeDrawer);
+        overlay.addEventListener('click', closeDrawer);
+
+        document.getElementById('inspect-recalc').addEventListener('click', function () {
+          const min = Math.max(0, previous - MAX_LIFT);
+          const max = Math.min(100, previous + MAX_LIFT);
+          let v = Number(input.value);
+          if (Number.isNaN(v)) return;
+          v = Math.min(max, Math.max(min, v));
+          input.value = v.toFixed(1);
+          renderPool(v);
+        });
+
+        document.getElementById('inspect-reset').addEventListener('click', function () {
+          input.value = originalLast.toFixed(1);
+          renderPool(originalLast);
+        });
+      })();
+    </script>
+  </body>
+</html>
