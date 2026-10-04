@@ -190,6 +190,40 @@ export const he: Record<MessageKey, string> = {
   'planner.noStoresAtRef': 'אין ציוני סניף לחודש הייחוס הזה.',
   'planner.run': 'הרץ סימולציה',
   'planner.exportCsv': 'ייצוא CSV',
+  'planner.revertDraft': 'שחזר טיוטה',
+  'planner.revertDraftTip':
+    'שחזור תוכנית הבסיס של הסשן (לפני Apply / עודף). סוגר את Inspect.',
+  'planner.revertDraftDisabledTip': 'אין מה לשחזר — הטיוטה תואמת את בסיס הסשן.',
+  'planner.packs.title': 'חבילות תרחיש',
+  'planner.packs.sub':
+    'לחיצה אחת: מנופים, הרצה, ואפשרות העברת עודף. Inspect ידני לחריגים.',
+  'planner.packs.apply': 'החל חבילה',
+  'planner.packs.disabledTip': 'תקן חסמי הרצה קודם (בסיס, יעד, סניפים).',
+  'planner.packs.closeGap.title': 'סגירת הפער',
+  'planner.packs.closeGap.blurb':
+    'עדיפות הרמה גבוהה יותר + קציר 50% עודף מהמובילים למאחור (הוצאה — הרשת עולה).',
+  'planner.packs.closeGap.effect': 'רשת ↑',
+  'planner.packs.rebalance.title': 'איזון מחדש',
+  'planner.packs.rebalance.blurb':
+    'אותו קציר עם clawback מהמובילים — כמעט סכום אפס; תמהיל סניפים משתנה, Hero שטוח.',
+  'planner.packs.rebalance.effect': 'סכום אפס',
+  'planner.packs.steady.title': 'התקדמות יציבה',
+  'planner.packs.steady.blurb':
+    'מסלול אחיד, עדיפות ברירת מחדל — רק מקצה, בלי העברת עודף.',
+  'planner.packs.steady.effect': 'מקצה',
+  'planner.packs.result.surplus':
+    'חבילה הוחלה · עודף {mode}: מאגר {pool} נק׳ · Δ רשת {delta} נק׳',
+  'planner.packs.result.surplusSkipped':
+    'חבילה הוחלה · עודף דולג (נדרשים ahead + behind ב־as-of).',
+  'planner.packs.result.steady': 'חבילה הוחלה · התקדמות יציבה (מנופים בלבד).',
+  'planner.exp.surplusTitle': 'ניסוי · עודף → מאחור',
+  'planner.exp.surplusHint':
+    'קציר 50% מהעודף של המובילים והרמת המאחוריים מ־as-of עד הסוף. ברירת מחדל: הוצאת המאגר (הרשת עולה). Clawback ≈ סכום אפס.',
+  'planner.exp.clawback': 'Clawback למובילים (סכום אפס)',
+  'planner.exp.apply': 'החל העברת עודף',
+  'planner.exp.disabledTip': 'הרץ סימולציה קודם. נדרשים סניפים ahead + behind ב־as-of.',
+  'planner.exp.result':
+    'מאגר {pool} נק׳ · חולק {distributed} · נותר {leftover} · Δ רשת {delta} נק׳ · תורמים {donors} → מקבלים {receivers} ({mode})',
   'planner.exportDisabledTip': 'הרץ סימולציה קודם כדי לאפשר ייצוא.',
   'planner.planFailed': 'בקשת התוכנית נכשלה',
   'planner.emptyReady':
@@ -263,19 +297,34 @@ export const he: Record<MessageKey, string> = {
   'planner.atRisk.empty': 'אין סניפים שתואמים למסנן.',
   'planner.atRisk.inspect': 'בדיקה',
 
-  'planner.inspect.title': 'בדיקה · סניף {id}',
+  'planner.inspect.titlePrefix': 'בדיקה ·',
+  'planner.inspect.storeSelect': 'בחירת סניף',
   'planner.inspect.sandboxWarn':
     'Sandbox what-if בסשן — טיוטה בלבד. לא משנה תוכנית מאושרת, ייצוא CSV או DB.',
   'planner.inspect.estimateTitle': 'אומדן מול actual',
   'planner.inspect.estimateHint':
-    'ערוך אומדן חודש אחרון (בטווח) ולחץ חישוב מחדש. ערכים מחוץ לטווח נדחים.',
+    'ערוך אומדן → חשב מחדש (תצוגה מקדימה) → החל על טיוטה (even-split + Hero). איפוס תצוגה מקדימה מנקה רק what-if; שחזור טיוטה ב־Planner מחזיר את בסיס הסשן.',
   'planner.inspect.noProjection': 'אין תחזית לסניף זה.',
   'planner.inspect.asOfSuffix': ' · as of',
   'planner.inspect.estimate': 'אומדן',
   'planner.inspect.actual': 'actual',
   'planner.inspect.recalculate': 'חשב מחדש',
-  'planner.inspect.reset': 'אפס טיוטה',
+  'planner.inspect.apply': 'החל על טיוטה',
+  'planner.inspect.reset': 'אפס תצוגה מקדימה',
+  'planner.inspect.appliedToast':
+    'הוחל על טיוטה — Hero עודכן. לשחזור בסיס הסשן השתמש ב־שחזר טיוטה ב־Planner.',
   'planner.inspect.done': 'סיום',
+  'planner.inspect.sandboxPanel': 'אומדן מול actual',
+  'planner.inspect.sandboxPanelSub': 'רק חודש אחרון · בטווח',
+  'planner.inspect.poolPanel': 'מאגר מקבילים',
+  'planner.inspect.viewPool': 'הצג מאגר',
+  'planner.inspect.poolHint':
+    'פיצוי even-split בין סניפים אחרים. חשב מחדש = תצוגה מקדימה; החל על טיוטה מעדכן את תוכנית הסשן ואת Hero. שחזור סשן ב־Planner.',
+  'planner.inspect.historyPanel': 'היסטוריה מנוקה (עד 12 חודשים)',
+  'planner.inspect.historyEmpty': 'אין שורות פאנל לסניף זה.',
+  'planner.inspect.auditPanel': 'ביקורת כללים (סניטציית רשת)',
+  'planner.inspect.auditHint':
+    'מתגי שכבות מהרצת סניטציה אחרונה (לא לוג הסרות לפי סניף).',
 
   'planner.lens.title': 'תוכנית מול actual',
   'planner.lens.empty': 'אין סדרת תוכנית לסניף זה.',
@@ -286,6 +335,16 @@ export const he: Record<MessageKey, string> = {
   'planner.lens.legend.actual': 'Actual',
   'planner.lens.legend.chain': 'רשת',
   'planner.lens.legend.asOf': 'as of',
+
+  'planner.storeHero.title': 'הערכת סניף',
+  'planner.storeHero.empty': 'אין סדרת תוכנית לסניף זה.',
+  'planner.storeHero.hint':
+    'Hero ברמת סניף · שחור = actual · כחול = תוכנית סניף · אפור מקווקו = שרשרת רשת. Clawback / העברת עודף נראים על קו התוכנית הכחול.',
+  'planner.storeHero.gapCaption': 'סניף {id} · פער as-of {gap}',
+  'planner.storeHero.actual': 'Actual סניף',
+  'planner.storeHero.plan': 'תוכנית סניף',
+  'planner.storeHero.chain': 'שרשרת רשת',
+  'planner.storeHero.asOf': 'as-of',
 
   'planner.hero.cone': 'חרוט תחזית',
   'planner.hero.coneSlack': 'חרוט תחזית (±רזרבה)',
