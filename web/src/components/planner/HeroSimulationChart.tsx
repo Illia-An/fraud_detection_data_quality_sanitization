@@ -4,6 +4,7 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
 import { buildHeroEvaluationSeries } from './heroEvaluationSeries';
 
 const Plot = lazy(async () => {
@@ -14,8 +15,11 @@ const Plot = lazy(async () => {
 /** Datadog Evaluation View — fixed hero height (~340px plot). */
 export const HERO_PLOT_HEIGHT_PX = 340;
 
-/** Minimum horizontal space per period so long horizons stay readable (scroll if needed). */
-export const HERO_PX_PER_PERIOD = 56;
+/**
+ * Min px per month — closer to Sanitization Store impact cell pitch
+ * (auto Y ticks → nearer-square grid vs previous dtick:1 rectangles).
+ */
+export const HERO_PX_PER_PERIOD = 44;
 
 interface HeroSimulationChartProps {
   draftPlan: FivePercentPlan;
@@ -107,8 +111,10 @@ export function HeroSimulationChart({
     ...lowerYs.filter((v): v is number => v != null),
     target,
   ];
-  const yMin = yValues.length ? Math.max(0, Math.min(...yValues) - 1) : 0;
-  const yMax = yValues.length ? Math.min(100, Math.max(...yValues) + 1) : 100;
+  /** Same fit-scale helper as Sanitization Store impact (auto Y ticks, no dtick:1). */
+  const fitY = buildStoreImpactYAxis('fit', yValues);
+  const yMin = fitY.range?.[0] ?? 0;
+  const yMax = fitY.range?.[1] ?? 100;
   // Stretch series across the full component width; scroll only if months need more room.
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
@@ -259,7 +265,6 @@ export function HeroSimulationChart({
                 yaxis: {
                   title: { text: '5% Score' },
                   range: [yMin, yMax],
-                  dtick: 1,
                   ticksuffix: '%',
                   fixedrange: false,
                   showgrid: true,

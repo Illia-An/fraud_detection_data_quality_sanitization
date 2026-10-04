@@ -17,11 +17,13 @@ import {
   Chip,
   CircularProgress,
   FormControl,
+  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -40,6 +42,7 @@ import {
   plannerRunBlockReason,
 } from '../components/planner/plannerRunGuards';
 import { useT } from '../i18n';
+import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import {
@@ -56,6 +59,12 @@ import {
   buildPlanMonitoringInsights,
   defaultAsOf,
 } from '../schemas/planMonitoring';
+import {
+  applyScenarioSurplusPass,
+  getScenarioPack,
+  type ScenarioPackId,
+} from '../schemas/scenarioPacks';
+import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import { useUiStore } from '../store/uiStore';
 
@@ -148,7 +157,10 @@ export function PlannerPage() {
   const approvedPlan = usePlannerScenarioStore((s) => s.approvedPlan);
   const selectedStoreId = usePlannerScenarioStore((s) => s.selectedStoreId);
   const setDraftFromRun = usePlannerScenarioStore((s) => s.setDraftFromRun);
+  const patchDraftPlan = usePlannerScenarioStore((s) => s.patchDraftPlan);
+  const isDirty = usePlannerScenarioStore((s) => s.isDirty);
   const acceptDraftAsApproved = usePlannerScenarioStore((s) => s.acceptDraftAsApproved);
+  const discardDraft = usePlannerScenarioStore((s) => s.discardDraft);
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
   const selectStore = usePlannerScenarioStore((s) => s.selectStore);
 
@@ -177,6 +189,10 @@ export function PlannerPage() {
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
+  /** EXP: clawback ahead when redistributing surplus (zero-sum). Default off → network rises. */
+  const [expClawbackDonors, setExpClawbackDonors] = useState(false);
+  const [expRedistributeNote, setExpRedistributeNote] = useState<string | null>(null);
+  const [pendingPackId, setPendingPackId] = useState<ScenarioPackId | null>(null);
 
   const railWidth = controlsOpen ? RAIL_WIDTH_PX : RAIL_COLLAPSED_PX;
 
@@ -257,6 +273,36 @@ export function PlannerPage() {
     return buildPlanMonitoringInsights(draftPlan, panel, { year, month });
   }, [draftPlan, panel, asOfYear, asOfMonth]);
 
+  const canApplySurplusExp =
+    draftPlan != null &&
+    monitoring != null &&
+    monitoring.summary.ahead > 0 &&
+    monitoring.summary.behind > 0;
+
+  const handleSurplusRedistribute = () => {
+    if (!draftPlan || !monitoring) {
+      return;
+    }
+    const result = redistributeSurplusToBehind(draftPlan, monitoring, {
+      topDonors: 10,
+      topReceivers: 10,
+      harvestFraction: 0.5,
+      clawbackDonors: expClawbackDonors,
+    });
+    setDraftFromRun(result.plan);
+    setExpRedistributeNote(
+      t('planner.exp.result', {
+        pool: result.poolPp.toFixed(1),
+        distributed: result.distributedPp.toFixed(1),
+        leftover: result.leftoverPp.toFixed(1),
+        delta: result.networkDeltaPp.toFixed(2),
+        donors: result.donorIds.length,
+        receivers: result.receiverIds.length,
+        mode: result.mode,
+      }),
+    );
+  };
+
   const handleRun = () => {
     if (!canRun || effectiveYear == null || effectiveMonth == null) {
       return;
@@ -274,11 +320,65 @@ export function PlannerPage() {
         onSuccess: (response) => {
           const next = response.metrics.five_percent;
           setDraftFromRun(next);
+          setExpRedistributeNote(null);
           if (panel) {
             const asOf = defaultAsOf(next, panel);
             setAsOfYear(asOf.year);
             setAsOfMonth(asOf.month);
           }
+        },
+      },
+    );
+  };
+
+  const handleApplyScenarioPack = (packId: ScenarioPackId) => {
+    if (!canRun || effectiveYear == null || effectiveMonth == null || !panel) {
+      return;
+    }
+    const pack = getScenarioPack(packId);
+    setParams(pack.params);
+    if (pack.surplus) {
+      setExpClawbackDonors(pack.surplus.clawbackDonors);
+    }
+    setPendingPackId(packId);
+    planMutation.mutate(
+      {
+        reference_year: effectiveYear,
+        reference_month: effectiveMonth,
+        horizon,
+        target,
+        params: pack.params,
+        baseline_rows: baselineRows,
+      },
+      {
+        onSuccess: (response) => {
+          const runPlan = response.metrics.five_percent;
+          const asOf = defaultAsOf(runPlan, panel);
+          setAsOfYear(asOf.year);
+          setAsOfMonth(asOf.month);
+          setDraftFromRun(runPlan);
+
+          if (pack.surplus) {
+            const pass = applyScenarioSurplusPass(runPlan, panel, asOf, pack.surplus);
+            if (pass.applied && pass.result) {
+              patchDraftPlan(pass.plan);
+              setExpRedistributeNote(
+                t('planner.packs.result.surplus', {
+                  mode: pass.result.mode,
+                  pool: pass.result.poolPp.toFixed(1),
+                  delta: pass.result.networkDeltaPp.toFixed(2),
+                }),
+              );
+            } else {
+              setExpRedistributeNote(t('planner.packs.result.surplusSkipped'));
+            }
+          } else {
+            setExpRedistributeNote(t('planner.packs.result.steady'));
+          }
+          setPendingPackId(null);
+        },
+        onError: () => {
+          setPendingPackId(null);
         },
       },
     );
@@ -655,6 +755,96 @@ export function PlannerPage() {
                   </Button>
                 </span>
               </Tooltip>
+              <Tooltip
+                title={
+                  isDirty && approvedPlan
+                    ? t('planner.revertDraftTip')
+                    : t('planner.revertDraftDisabledTip')
+                }
+              >
+                <span>
+                  <Button
+                    variant="text"
+                    color="inherit"
+                    fullWidth
+                    disabled={!isDirty || approvedPlan == null}
+                    onClick={() => discardDraft()}
+                    data-testid="planner-revert-draft"
+                  >
+                    {t('planner.revertDraft')}
+                  </Button>
+                </span>
+              </Tooltip>
+
+              <Box
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
+                data-testid="scenario-packs-panel"
+              >
+                <ScenarioPackCards
+                  disabled={!canRun || planMutation.isPending}
+                  disabledTip={canRun ? '' : runTooltip}
+                  pendingId={pendingPackId}
+                  onApply={handleApplyScenarioPack}
+                />
+                {expRedistributeNote ? (
+                  <Alert
+                    severity="info"
+                    sx={{ mt: 1, py: 0.5, '& .MuiAlert-message': { fontSize: '0.7rem' } }}
+                  >
+                    {expRedistributeNote}
+                  </Alert>
+                ) : null}
+              </Box>
+
+              <Accordion
+                disableGutters
+                elevation={0}
+                defaultExpanded={false}
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                data-testid="exp-surplus-redistribute"
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="caption" fontWeight={600}>
+                    {t('planner.exp.surplusTitle')}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Stack spacing={1}>
+                    <Typography variant="caption" color="text.secondary">
+                      {t('planner.exp.surplusHint')}
+                    </Typography>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          size="small"
+                          checked={expClawbackDonors}
+                          onChange={(_, checked) => setExpClawbackDonors(checked)}
+                          inputProps={{ 'aria-label': t('planner.exp.clawback') }}
+                        />
+                      }
+                      label={
+                        <Typography variant="caption">{t('planner.exp.clawback')}</Typography>
+                      }
+                    />
+                    <Tooltip title={canApplySurplusExp ? '' : t('planner.exp.disabledTip')}>
+                      <span>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          fullWidth
+                          size="small"
+                          startIcon={<ScienceRoundedIcon />}
+                          disabled={!canApplySurplusExp}
+                          onClick={handleSurplusRedistribute}
+                        >
+                          {t('planner.exp.apply')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
+
               {runBlock === 'no_stores' && (
                 <Typography variant="caption" color="warning.main">
                   {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.no_stores)}
@@ -768,11 +958,7 @@ export function PlannerPage() {
                 horizonMonths={horizon}
               />
 
-              <SimulationSummaryKpis
-                draftPlan={draftPlan}
-                approvedPlan={approvedPlan}
-                monitoring={monitoring}
-              />
+              <SimulationSummaryKpis draftPlan={draftPlan} monitoring={monitoring} />
             </Box>
 
             <Box
@@ -960,6 +1146,8 @@ export function PlannerPage() {
                 processResult={processResult}
                 maxMonthlyImprove={params.max_monthly_improve}
                 onClose={() => selectStore(null)}
+                onStoreChange={(id) => selectStore(id)}
+                onApplyPlan={(next) => patchDraftPlan(next)}
               />
             )}
           </Box>

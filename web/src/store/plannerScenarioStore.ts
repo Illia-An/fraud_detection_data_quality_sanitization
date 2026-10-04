@@ -16,6 +16,11 @@ interface PlannerScenarioState {
   selectedStoreId: number | null;
 
   setDraftFromRun: (plan: FivePercentPlan) => void;
+  /**
+   * Patch session draft without clearing Inspect selection
+   * (sandbox Apply / undo).
+   */
+  patchDraftPlan: (plan: FivePercentPlan) => void;
   acceptDraftAsApproved: () => void;
   discardDraft: () => void;
   clearAll: () => void;
@@ -77,10 +82,22 @@ export const usePlannerScenarioStore = create<PlannerScenarioState>((set, get) =
 
   setDraftFromRun: (plan) => {
     const { approvedPlan } = get();
+    // First run locks session baseline so Revert draft has a restore target.
+    const baseline = approvedPlan ?? plan;
+    set({
+      draftPlan: plan,
+      approvedPlan: baseline,
+      isDirty: !plansEqual(baseline, plan),
+      selectedStoreId: null,
+    });
+  },
+
+  patchDraftPlan: (plan) => {
+    const { approvedPlan, selectedStoreId } = get();
     set({
       draftPlan: plan,
       isDirty: approvedPlan == null || !plansEqual(approvedPlan, plan),
-      selectedStoreId: null,
+      selectedStoreId,
     });
   },
 
