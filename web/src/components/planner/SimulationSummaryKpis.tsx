@@ -8,7 +8,6 @@ import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 
 interface SimulationSummaryKpisProps {
   draftPlan: FivePercentPlan;
-  approvedPlan: FivePercentPlan | null;
   monitoring: PlanMonitoringInsights | null;
 }
 
@@ -72,13 +71,13 @@ function MiniCard({ children }: { children: ReactNode }) {
 /** Macro KPI strip — cards hug content (equal L/R padding). */
 export function SimulationSummaryKpis({
   draftPlan,
-  approvedPlan,
   monitoring,
 }: SimulationSummaryKpisProps) {
   const t = useT();
-  const baselineFinal = approvedPlan?.final_chain ?? draftPlan.current_chain;
+  /** Current (equal-mean @ reference) → draft Final — not approved Final→Final. */
+  const current = draftPlan.current_chain;
   const projected = draftPlan.final_chain;
-  const networkDelta = projected - baselineFinal;
+  const networkDelta = projected - current;
   const behindDraft = monitoring?.summary.behind ?? null;
   const asOfLabel = monitoring
     ? periodLabel(monitoring.as_of_year, monitoring.as_of_month)
@@ -94,7 +93,7 @@ export function SimulationSummaryKpis({
         <Typography sx={labelSx}>{t('planner.kpi.projected')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography sx={valueSx}>
-            {formatPct(baselineFinal)} → {formatPct(projected)}
+            {formatPct(current)} → {formatPct(projected)}
           </Typography>
           <Chip
             size="small"

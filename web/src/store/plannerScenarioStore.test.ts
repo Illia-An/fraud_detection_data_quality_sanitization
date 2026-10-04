@@ -25,15 +25,19 @@ describe('usePlannerScenarioStore', () => {
     usePlannerScenarioStore.getState().clearAll();
   });
 
-  it('marks dirty after run until accept', () => {
+  it('first run locks baseline; later edits mark dirty until accept', () => {
     const plan = samplePlan(74);
     usePlannerScenarioStore.getState().setDraftFromRun(plan);
-    expect(usePlannerScenarioStore.getState().isDirty).toBe(true);
+    expect(usePlannerScenarioStore.getState().isDirty).toBe(false);
     expect(usePlannerScenarioStore.getState().draftPlan?.final_chain).toBe(74);
+    expect(usePlannerScenarioStore.getState().approvedPlan?.final_chain).toBe(74);
+
+    usePlannerScenarioStore.getState().patchDraftPlan(samplePlan(72));
+    expect(usePlannerScenarioStore.getState().isDirty).toBe(true);
 
     usePlannerScenarioStore.getState().acceptDraftAsApproved();
     expect(usePlannerScenarioStore.getState().isDirty).toBe(false);
-    expect(usePlannerScenarioStore.getState().approvedPlan?.final_chain).toBe(74);
+    expect(usePlannerScenarioStore.getState().approvedPlan?.final_chain).toBe(72);
   });
 
   it('discard restores approved snapshot', () => {
@@ -51,8 +55,34 @@ describe('usePlannerScenarioStore', () => {
     usePlannerScenarioStore.getState().setDraftFromRun(samplePlan(71));
     const raw = sessionStorage.getItem(PLANNER_SESSION_STORAGE_KEY);
     expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw!) as { draftPlan: FivePercentPlan | null; isDirty: boolean };
+    const parsed = JSON.parse(raw!) as {
+      draftPlan: FivePercentPlan | null;
+      isDirty: boolean;
+      approvedPlan: FivePercentPlan | null;
+    };
     expect(parsed.draftPlan?.final_chain).toBe(71);
-    expect(parsed.isDirty).toBe(true);
+    expect(parsed.approvedPlan?.final_chain).toBe(71);
+    expect(parsed.isDirty).toBe(false);
+  });
+
+  it('discardDraft restores baseline and clears Inspect selection', () => {
+    usePlannerScenarioStore.getState().setDraftFromRun(samplePlan(74));
+    usePlannerScenarioStore.getState().selectStore(10);
+    usePlannerScenarioStore.getState().patchDraftPlan(samplePlan(70));
+    expect(usePlannerScenarioStore.getState().isDirty).toBe(true);
+
+    usePlannerScenarioStore.getState().discardDraft();
+    expect(usePlannerScenarioStore.getState().draftPlan?.final_chain).toBe(74);
+    expect(usePlannerScenarioStore.getState().isDirty).toBe(false);
+    expect(usePlannerScenarioStore.getState().selectedStoreId).toBeNull();
+  });
+
+  it('patchDraftPlan updates draft but keeps Inspect selection', () => {
+    usePlannerScenarioStore.getState().setDraftFromRun(samplePlan(74));
+    usePlannerScenarioStore.getState().selectStore(10);
+    usePlannerScenarioStore.getState().patchDraftPlan(samplePlan(72));
+    expect(usePlannerScenarioStore.getState().draftPlan?.final_chain).toBe(72);
+    expect(usePlannerScenarioStore.getState().selectedStoreId).toBe(10);
+    expect(usePlannerScenarioStore.getState().isDirty).toBe(true);
   });
 });

@@ -197,6 +197,41 @@ export const en = {
   'planner.noStoresAtRef': 'No store scores for this reference month.',
   'planner.run': 'Run simulation',
   'planner.exportCsv': 'Export CSV',
+  'planner.revertDraft': 'Revert draft',
+  'planner.revertDraftTip':
+    'Restore the session baseline plan (before Apply / surplus edits). Closes Inspect.',
+  'planner.revertDraftDisabledTip':
+    'Nothing to revert — draft matches the session baseline.',
+  'planner.packs.title': 'Scenario packs',
+  'planner.packs.sub':
+    'One click: set levers, Run, optional surplus pass. Manual Inspect stays for exceptions.',
+  'planner.packs.apply': 'Apply pack',
+  'planner.packs.disabledTip': 'Fix Run blockers first (baseline, target, stores).',
+  'planner.packs.closeGap.title': 'Close the gap',
+  'planner.packs.closeGap.blurb':
+    'Higher lift priority + harvest 50% ahead surplus into behind (spend — network rises).',
+  'planner.packs.closeGap.effect': 'Network ↑',
+  'planner.packs.rebalance.title': 'Rebalance',
+  'planner.packs.rebalance.blurb':
+    'Same harvest with clawback from ahead — near zero-sum; store mix shifts, Hero stays flat.',
+  'planner.packs.rebalance.effect': 'Zero-sum',
+  'planner.packs.steady.title': 'Steady grind',
+  'planner.packs.steady.blurb':
+    'Uniform trajectory, default priority — allocator only, no surplus post-pass.',
+  'planner.packs.steady.effect': 'Allocator',
+  'planner.packs.result.surplus':
+    'Pack applied · surplus {mode}: pool {pool} pp · Δ network {delta} pp',
+  'planner.packs.result.surplusSkipped':
+    'Pack applied · surplus skipped (need ahead + behind at as-of).',
+  'planner.packs.result.steady': 'Pack applied · Steady grind (levers only).',
+  'planner.exp.surplusTitle': 'Experiment · Surplus → behind',
+  'planner.exp.surplusHint':
+    'Harvest top ahead surplus (50%) and lift top behind from as-of → end. Default spends the pool (network rises). Clawback ≈ zero-sum.',
+  'planner.exp.clawback': 'Clawback ahead (zero-sum)',
+  'planner.exp.apply': 'Apply surplus redistribute',
+  'planner.exp.disabledTip': 'Run simulation first. Needs ahead + behind stores at as-of.',
+  'planner.exp.result':
+    'Pool {pool} pp · distributed {distributed} · leftover {leftover} · network Δ {delta} pp · donors {donors} → receivers {receivers} ({mode})',
   'planner.exportDisabledTip': 'Run a simulation first to enable export.',
   'planner.planFailed': 'Plan request failed',
   'planner.emptyReady':
@@ -274,19 +309,34 @@ export const en = {
   'planner.atRisk.footer':
     'Management by exception · Gap = fact − plan at as-of ({asOf}). Volume / MoM / streak / gap share / lift help prioritize. Behind ranked by worst gap.',
 
-  'planner.inspect.title': 'Inspect · Store {id}',
+  'planner.inspect.titlePrefix': 'Inspect ·',
+  'planner.inspect.storeSelect': 'Select store',
   'planner.inspect.sandboxWarn':
     'Session sandbox what-if — draft only. Does not mutate the accepted plan, Export CSV, or DB.',
   'planner.inspect.estimateTitle': 'Estimate vs actual',
   'planner.inspect.estimateHint':
-    'Edit last-month estimate (in range), then Recalculate. Out-of-range values are rejected.',
+    'Edit last-month estimate → Recalculate (preview) → Apply to draft (even-split + Hero). Reset preview clears the what-if only; Revert draft on Planner restores the session baseline.',
   'planner.inspect.noProjection': 'No projection for this store.',
   'planner.inspect.asOfSuffix': ' · as of',
   'planner.inspect.estimate': 'estimate',
   'planner.inspect.actual': 'actual',
   'planner.inspect.recalculate': 'Recalculate',
-  'planner.inspect.reset': 'Reset draft',
+  'planner.inspect.apply': 'Apply to draft',
+  'planner.inspect.reset': 'Reset preview',
+  'planner.inspect.appliedToast':
+    'Applied to draft — Hero updated. Use Revert draft on Planner to restore the baseline.',
   'planner.inspect.done': 'Done',
+  'planner.inspect.sandboxPanel': 'Estimate vs actual',
+  'planner.inspect.sandboxPanelSub': 'Last month only · in range',
+  'planner.inspect.poolPanel': 'Counterpart pool',
+  'planner.inspect.viewPool': 'View pool',
+  'planner.inspect.poolHint':
+    'Even-split compensation across other stores. Recalculate = preview; Apply to draft updates the session plan and Hero. Session revert is on Planner.',
+  'planner.inspect.historyPanel': 'Cleansed history (up to 12 months)',
+  'planner.inspect.historyEmpty': 'No panel rows for this store.',
+  'planner.inspect.auditPanel': 'Rule audit (network sanitization)',
+  'planner.inspect.auditHint':
+    'Tier toggles from last Sanitization run (not store-specific drop logs).',
 
   'planner.lens.title': 'Plan vs actual',
   'planner.lens.empty': 'No plan series for this store.',
@@ -297,6 +347,16 @@ export const en = {
   'planner.lens.legend.actual': 'Actual',
   'planner.lens.legend.chain': 'Chain',
   'planner.lens.legend.asOf': 'as of',
+
+  'planner.storeHero.title': 'Store evaluation',
+  'planner.storeHero.empty': 'No plan series for this store.',
+  'planner.storeHero.hint':
+    'Store-level Hero · black = actual · blue = store plan · grey dashed = network chain. Clawback / surplus shifts show on the blue plan path.',
+  'planner.storeHero.gapCaption': 'Store {id} · as-of gap {gap}',
+  'planner.storeHero.actual': 'Store actual',
+  'planner.storeHero.plan': 'Store plan',
+  'planner.storeHero.chain': 'Network chain',
+  'planner.storeHero.asOf': 'as-of',
 
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',

@@ -8,10 +8,13 @@ async function useSmallPreset(page: Page) {
   await page.getByLabel('Data source').click();
   await page.getByRole('option', { name: 'Synthetic — small' }).click();
   await expect(page.getByText(/small\s*·\s*\d+\s*rows/i)).toBeVisible({ timeout: 30_000 });
+  // Selecting a source auto-runs the pipeline; label is "Running…" until complete.
   await expect(page.getByRole('button', { name: 'Run Scenario' })).toBeEnabled({
-    timeout: 30_000,
+    timeout: 90_000,
   });
 }
+
+test.describe.configure({ timeout: 120_000 });
 
 /** Small preset auto-runs; wait for KPI strip (Store-scoped labels by default). */
 async function waitForSanitizationResult(page: Page) {
@@ -61,12 +64,18 @@ test.describe('Planner alt-UI smoke', () => {
     // Cast avoids HTMLElement (tsconfig.node has no DOM lib).
     await inspect.evaluate((el) => (el as { click: () => void }).click());
 
-    await expect(page.getByText(/Inspect · Store/i)).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText(/Session sandbox what-if/i)).toBeVisible();
-    await expect(page.getByText(/Plan vs actual/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /Recalculate/i })).toBeVisible();
+    const dialog = page.getByTestId('store-inspect-dialog');
+    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(dialog.getByText(/Inspect/i).first()).toBeVisible();
+    await expect(page.getByTestId('inspect-store-select')).toBeVisible();
+    await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
+    await expect(page.getByTestId('store-hero-evaluation-chart')).toBeVisible();
 
-    await page.locator('.MuiDrawer-paper').getByRole('button', { name: 'Close', exact: true }).last().click();
-    await expect(page.getByText(/Inspect · Store/i)).toHaveCount(0);
+    // Estimate funnel is collapsed by default.
+    await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
+    await expect(dialog.getByRole('button', { name: /Recalculate/i })).toBeVisible();
+
+    await dialog.locator('.MuiDialogActions-root').getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByTestId('store-inspect-dialog')).toHaveCount(0);
   });
 });
