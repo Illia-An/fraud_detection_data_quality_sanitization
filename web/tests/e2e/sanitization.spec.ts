@@ -14,10 +14,13 @@ async function useSmallPreset(page: Page) {
   await page.getByLabel('Data source').click();
   await page.getByRole('option', { name: 'Synthetic — small' }).click();
   await expect(page.getByText(/small\s*·\s*\d+\s*rows/i)).toBeVisible({ timeout: 30_000 });
+  // Selecting a source auto-runs the pipeline; label is "Running…" until complete.
   await expect(page.getByRole('button', { name: 'Run Scenario' })).toBeEnabled({
-    timeout: 30_000,
+    timeout: 90_000,
   });
 }
+
+test.describe.configure({ timeout: 120_000 });
 
 /**
  * KPI strip follows chart Store|Network scope (default Store).

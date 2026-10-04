@@ -71,6 +71,8 @@ describe('HeroSimulationChart', () => {
     expect(payload).toContain('as-of');
     expect(payload).toContain('2025-03');
     expect(payload).toContain('"scrollZoom":true');
+    // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
+    expect(payload).not.toContain('"dtick":1');
     expect(screen.getByText(/not a statistical confidence interval/i)).toBeInTheDocument();
     expect(screen.getByText(/mouse wheel zooms/i)).toBeInTheDocument();
   });

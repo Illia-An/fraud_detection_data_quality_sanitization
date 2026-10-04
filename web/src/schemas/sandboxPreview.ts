@@ -1,6 +1,11 @@
-/** Sandbox even-split preview (TASK-15 Phase C) — client-only, does not mutate plan. */
+/**
+ * Sandbox even-split preview + optional apply to session draft
+ * (TASK-15 Phase C) — no DB / Export semantics.
+ */
 
+import type { FivePercentPlan } from './plan';
 import type { MonitorSignal } from './planMonitoring';
+import { recomputeChainFromProjections } from './surplusRedistribute';
 
 export interface SandboxStoreDelta {
   store_id: number;
@@ -118,4 +123,46 @@ export function previewSandboxEvenSplit(args: {
     leftover: Math.abs(remaining),
     pool,
   };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function setStoreMonthScore(
+  plan: FivePercentPlan,
+  storeId: number,
+  year: number,
+  month: number,
+  score: number,
+): void {
+  const projection = plan.projections.find((p) => p.store_id === storeId);
+  const point = projection?.months.find((m) => m.year === year && m.month === month);
+  if (point) {
+    point.score = round2(score);
+  }
+}
+
+/**
+ * Commit even-split preview into a cloned plan (last-month scores) and
+ * recompute equal-mean chain / final_chain for Hero.
+ */
+export function applySandboxEvenSplitToPlan(
+  plan: FivePercentPlan,
+  preview: SandboxEvenSplitPreview,
+  year: number,
+  month: number,
+): FivePercentPlan {
+  const working = structuredClone(plan);
+  setStoreMonthScore(
+    working,
+    preview.selected_store_id,
+    year,
+    month,
+    preview.draft,
+  );
+  for (const row of preview.pool) {
+    setStoreMonthScore(working, row.store_id, year, month, row.draft);
+  }
+  return recomputeChainFromProjections(working);
 }

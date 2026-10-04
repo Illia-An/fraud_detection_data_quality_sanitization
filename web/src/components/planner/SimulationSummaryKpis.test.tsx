@@ -31,17 +31,33 @@ const monitoring: PlanMonitoringInsights = {
 };
 
 describe('SimulationSummaryKpis', () => {
-  it('renders projected delta, behind count, and feasibility without target duplicate', () => {
+  it('renders Current → Final projected delta, behind count, and feasibility', () => {
     render(
       <ThemeProvider theme={appTheme}>
-        <SimulationSummaryKpis draftPlan={draft} approvedPlan={null} monitoring={monitoring} />
+        <SimulationSummaryKpis draftPlan={draft} monitoring={monitoring} />
       </ThemeProvider>,
     );
 
     expect(screen.queryByText('Target KPI')).not.toBeInTheDocument();
+    // Always Current → Final (never approved Final → draft Final).
     expect(screen.getByText(/70\.00% → 74\.00%/)).toBeInTheDocument();
     expect(screen.getByText('+4.00 pp')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/quota N\/A/i)).toBeInTheDocument();
+  });
+
+  it('keeps Current on the left even when Final equals a prior approved snapshot', () => {
+    const nearTarget: FivePercentPlan = {
+      ...draft,
+      current_chain: 61.06,
+      final_chain: 75.47,
+      required_change: 75 - 61.06,
+    };
+    render(
+      <ThemeProvider theme={appTheme}>
+        <SimulationSummaryKpis draftPlan={nearTarget} monitoring={monitoring} />
+      </ThemeProvider>,
+    );
+    expect(screen.getByText(/61\.06% → 75\.47%/)).toBeInTheDocument();
   });
 });
