@@ -108,7 +108,8 @@ describe('PlannerPage Phase A', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Run simulation/i })).toBeEnabled();
     });
-    expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('%');
+    // Latest available reference month in the panel (2026-02), not preferred 2025-12.
+    expect(screen.getByLabelText(/Reference month/i)).toHaveTextContent('2026-02');
   });
 });
 
@@ -130,14 +131,16 @@ describe('PlannerPage controls rail', () => {
     expect(screen.getByLabelText(/Lift priority power/i)).toBeInTheDocument();
   });
 
-  it('labels Current as equal-mean at the reference month', () => {
+  it('shows compact Current at reference month without duplicating canvas KPI chrome', () => {
     renderPlanner();
     expect(screen.getByTestId('planner-current-chain')).toHaveTextContent(/Current:/);
     expect(screen.getByTestId('planner-current-chain')).toHaveTextContent('71.00%');
     expect(
-      screen.getByText(/Equal mean of cleansed store scores at the reference month/i),
-    ).toBeInTheDocument();
+      screen.queryByText(/Equal mean of cleansed store scores at the reference month/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/Stores at reference/i)).not.toBeInTheDocument();
     expect(screen.getByText(/each store weighted equally/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Target/i)).toBeInTheDocument();
   });
 
   it('collapses and expands the controls rail without unmounting controls', () => {

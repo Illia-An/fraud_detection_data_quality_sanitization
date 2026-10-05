@@ -5,6 +5,7 @@ import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
+import { EvaluationLegend, HERO_EVALUATION_LEGEND } from './EvaluationLegend';
 import { buildHeroEvaluationSeries } from './heroEvaluationSeries';
 
 const Plot = lazy(async () => {
@@ -23,7 +24,6 @@ export const HERO_PX_PER_PERIOD = 44;
 
 interface HeroSimulationChartProps {
   draftPlan: FivePercentPlan;
-  approvedPlan: FivePercentPlan | null;
   panel: SanitizedPanel;
   asOfYear: number;
   asOfMonth: number;
@@ -34,7 +34,6 @@ interface HeroSimulationChartProps {
 /** Dual-trace Evaluation View: cleansed fact | as-of | forecast cone + target. */
 export function HeroSimulationChart({
   draftPlan,
-  approvedPlan,
   panel,
   asOfYear,
   asOfMonth,
@@ -80,12 +79,11 @@ export function HeroSimulationChart({
     () =>
       buildHeroEvaluationSeries(
         draftPlan,
-        approvedPlan,
         panel,
         { year: asOfYear, month: asOfMonth },
         slackBandPp,
       ),
-    [draftPlan, approvedPlan, panel, asOfYear, asOfMonth, slackBandPp],
+    [draftPlan, panel, asOfYear, asOfMonth, slackBandPp],
   );
 
   const {
@@ -94,7 +92,6 @@ export function HeroSimulationChart({
     cumulativeYs,
     planCumulativeYs,
     draftYs,
-    approvedYs,
     upperYs,
     lowerYs,
     target,
@@ -106,7 +103,6 @@ export function HeroSimulationChart({
     ...cumulativeYs.filter((v): v is number => v != null),
     ...planCumulativeYs.filter((v): v is number => v != null),
     ...draftYs.filter((v): v is number => v != null),
-    ...approvedYs.filter((v): v is number => v != null),
     ...upperYs.filter((v): v is number => v != null),
     ...lowerYs.filter((v): v is number => v != null),
     target,
@@ -181,17 +177,6 @@ export function HeroSimulationChart({
     },
     {
       x: labels,
-      y: approvedYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: approvedPlan ? t('planner.hero.accepted') : t('planner.hero.baseline'),
-      line: { color: '#9e9e9e', width: 2, dash: 'dash' as const },
-      marker: { size: 6, color: '#9e9e9e' },
-      connectgaps: false,
-      hovertemplate: hoverPct,
-    },
-    {
-      x: labels,
       y: draftYs,
       type: 'scatter' as const,
       mode: 'lines+markers' as const,
@@ -214,6 +199,7 @@ export function HeroSimulationChart({
 
   return (
     <Stack spacing={0.75} sx={{ height: '100%', minHeight: 0 }} data-testid="hero-evaluation-chart">
+      <EvaluationLegend items={HERO_EVALUATION_LEGEND} testId="hero-evaluation-legend" />
       <Box
         ref={containerRef}
         sx={{
@@ -248,11 +234,11 @@ export function HeroSimulationChart({
                 autosize: true,
                 height: plotHeight,
                 width: plotMinWidth > 0 ? plotMinWidth : undefined,
-                margin: { l: 48, r: 16, t: 28, b: 40 },
+                margin: { l: 48, r: 16, t: 20, b: 40 },
                 paper_bgcolor: 'transparent',
                 plot_bgcolor: 'transparent',
                 dragmode: 'zoom',
-                legend: { orientation: 'h', y: 1.12, x: 0 },
+                showlegend: false,
                 xaxis: {
                   title: { text: '' },
                   tickangle: -30,
@@ -295,7 +281,6 @@ export function HeroSimulationChart({
                     xshift: 4,
                   },
                 ],
-                showlegend: true,
               }}
               config={{
                 responsive: true,

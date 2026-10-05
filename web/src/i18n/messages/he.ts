@@ -339,23 +339,36 @@ export const he: Record<MessageKey, string> = {
   'planner.storeHero.title': 'הערכת סניף',
   'planner.storeHero.empty': 'אין סדרת תוכנית לסניף זה.',
   'planner.storeHero.hint':
-    'Hero ברמת סניף · שחור = actual · כחול = תוכנית סניף · אפור מקווקו = שרשרת רשת. Clawback / העברת עודף נראים על קו התוכנית הכחול.',
+    'אותה דקדוק הערכה כמו Hero רשת · שחור = עובדה · סגול = Actual מצטבר · ירוק = יעד מצטבר (אם הטיוטה) · כחול = סימולציית טיוטה. Clawback / העברת עודף נראים על הקו הכחול; פער הסניף בכותרת.',
   'planner.storeHero.gapCaption': 'סניף {id} · פער as-of {gap}',
-  'planner.storeHero.actual': 'Actual סניף',
-  'planner.storeHero.plan': 'תוכנית סניף',
-  'planner.storeHero.chain': 'שרשרת רשת',
+  'planner.storeHero.actual': 'עובדה מנוקה',
+  'planner.storeHero.cumulative': 'Actual מצטבר',
+  'planner.storeHero.planCumulative': 'יעד מצטבר (אם הטיוטה)',
+  'planner.storeHero.plan': 'סימולציית טיוטה',
+  'planner.storeHero.target': 'יעד',
   'planner.storeHero.asOf': 'as-of',
 
   'planner.hero.cone': 'חרוט תחזית',
   'planner.hero.coneSlack': 'חרוט תחזית (±רזרבה)',
   'planner.hero.fact': 'עובדה מנוקה',
   'planner.hero.cumulative': 'Actual מצטבר',
-  'planner.hero.planCumulative': 'יעד מצטבר',
-  'planner.hero.accepted': 'תוכנית מאושרת',
-  'planner.hero.baseline': 'בסיס ייחוס',
+  'planner.hero.planCumulative': 'יעד מצטבר (אם הטיוטה)',
   'planner.hero.draft': 'סימולציית טיוטה',
   'planner.hero.target': 'יעד',
   'planner.hero.asOf': 'as-of',
+  'planner.hero.tip.fact':
+    'ממוצע שווה חודשי מנוקה של הרשת (עובדה) עד as-of.',
+  'planner.hero.tip.cumulative':
+    'ממוצע מצטבר של ציוני העובדה החודשיים מתחילת הסדרה עד כל חודש.',
+  'planner.hero.tip.planCumulative':
+    'ממשיך את Actual מצטבר מ־as-of ומוסיף את ציוני הטיוטה החודשיים אם התוכנית תתממש.',
+  'planner.hero.tip.draft':
+    'מסלול תוכנית חודשי מה־as-of; מתחיל מ־Actual מצטבר (מסירה).',
+  'planner.hero.tip.target': 'רמת יעד הרשת להרצת תוכנית זו.',
+  'planner.hero.tip.cone':
+    'רזרבת הקצאה רכה סביב הטיוטה (±נק׳) — לא מרווח סמך סטטיסטי.',
+  'planner.hero.tip.asOf':
+    'חודש מעבר: עובדה ומצטבר משמאל; טיוטה / יעד מצטבר מימין.',
   'planner.hero.caption':
-    'תצוגת הערכה · עובדה מלאה משמאל ל־as-of ({asOf}) · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס.',
+    'תצוגת הערכה · עובדה מלאה משמאל ל־as-of ({asOf}) · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. העבירו עכבר על תוויות המקרא לטיפים קצרים.',
 };
