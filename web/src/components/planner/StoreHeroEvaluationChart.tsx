@@ -7,6 +7,7 @@ import { monitoringDeviationFill } from '../../schemas/planActualGap';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
+import { EvaluationLegend, STORE_EVALUATION_LEGEND } from './EvaluationLegend';
 import { buildStoreHeroEvaluationSeries } from './storeHeroEvaluationSeries';
 
 const Plot = lazy(async () => {
@@ -45,7 +46,7 @@ function formatGap(value: number | null): string {
 }
 
 /**
- * EXP: store-level Evaluation View (fact · plan · network chain · as-of).
+ * Store-level Evaluation View — same grammar as network Hero (fact · cumulative · plan · as-of).
  * Makes clawback / surplus redistribute readable per Inspected store.
  */
 export function StoreHeroEvaluationChart({
@@ -115,11 +116,22 @@ export function StoreHeroEvaluationChart({
     );
   }
 
-  const { labels, actualYs, planYs, chainYs, asOfLabel, deviation } = series;
+  const {
+    labels,
+    actualYs,
+    planYs,
+    cumulativeYs,
+    planCumulativeYs,
+    target,
+    asOfLabel,
+    deviation,
+  } = series;
   const yValues = [
     ...actualYs.filter((v): v is number => v != null),
     ...planYs.filter((v): v is number => v != null),
-    ...chainYs.filter((v): v is number => v != null),
+    ...cumulativeYs.filter((v): v is number => v != null),
+    ...planCumulativeYs.filter((v): v is number => v != null),
+    target,
   ];
   /** Same fit-scale helper as Sanitization Store impact (auto Y ticks, no dtick:1). */
   const fitY = buildStoreImpactYAxis('fit', yValues);
@@ -133,23 +145,34 @@ export function StoreHeroEvaluationChart({
   const data = [
     {
       x: labels,
-      y: chainYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: t('planner.storeHero.chain'),
-      line: { color: '#78909c', width: 1.5, dash: 'dash' as const },
-      marker: { size: 5, color: '#78909c' },
-      connectgaps: false,
-      hovertemplate: hoverPct,
-    },
-    {
-      x: labels,
       y: actualYs,
       type: 'scatter' as const,
       mode: 'lines+markers' as const,
       name: t('planner.storeHero.actual'),
       line: { color: '#212121', width: 2.5 },
       marker: { size: 7, color: '#212121' },
+      connectgaps: false,
+      hovertemplate: hoverPct,
+    },
+    {
+      x: labels,
+      y: cumulativeYs,
+      type: 'scatter' as const,
+      mode: 'lines+markers' as const,
+      name: t('planner.storeHero.cumulative'),
+      line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
+      marker: { size: 6, color: '#6a1b9a' },
+      connectgaps: false,
+      hovertemplate: hoverPct,
+    },
+    {
+      x: labels,
+      y: planCumulativeYs,
+      type: 'scatter' as const,
+      mode: 'lines+markers' as const,
+      name: t('planner.storeHero.planCumulative'),
+      line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
+      marker: { size: 6, color: '#2e7d32' },
       connectgaps: false,
       hovertemplate: hoverPct,
     },
@@ -162,6 +185,15 @@ export function StoreHeroEvaluationChart({
       line: { color: '#1565c0', width: 3 },
       marker: { size: 7, color: '#1565c0' },
       connectgaps: false,
+      hovertemplate: hoverPct,
+    },
+    {
+      x: labels,
+      y: labels.map(() => target),
+      type: 'scatter' as const,
+      mode: 'lines' as const,
+      name: t('planner.storeHero.target'),
+      line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
       hovertemplate: hoverPct,
     },
   ];
@@ -238,6 +270,7 @@ export function StoreHeroEvaluationChart({
           {t('planner.storeHero.hint')}
         </Typography>
       </Stack>
+      <EvaluationLegend items={STORE_EVALUATION_LEGEND} testId="store-evaluation-legend" />
       <Box
         ref={containerRef}
         sx={{
@@ -276,11 +309,11 @@ export function StoreHeroEvaluationChart({
                 autosize: true,
                 height: plotHeight,
                 width: plotMinWidth > 0 ? plotMinWidth : undefined,
-                margin: { l: 44, r: 12, t: 24, b: 36 },
+                margin: { l: 44, r: 12, t: 16, b: 36 },
                 paper_bgcolor: 'transparent',
                 plot_bgcolor: 'transparent',
                 dragmode: 'zoom',
-                legend: { orientation: 'h', y: 1.15, x: 0, font: { size: 10 } },
+                showlegend: false,
                 xaxis: {
                   title: { text: '' },
                   tickangle: -30,

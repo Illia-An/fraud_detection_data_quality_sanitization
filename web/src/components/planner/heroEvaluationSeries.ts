@@ -9,10 +9,12 @@ export interface HeroEvaluationSeries {
   factYs: (number | null)[];
   /** Running mean of monthly network equal-means from first fact month (product lock). */
   cumulativeYs: (number | null)[];
-  /** Running mean of monthly draft chain plan scores (יעד מצטבר). */
+  /**
+   * Running mean continuing from cumulative actual: fact months, then plan months
+   * (client YTD if the draft lands). Drawn from the purple handoff onward only.
+   */
   planCumulativeYs: (number | null)[];
   draftYs: (number | null)[];
-  approvedYs: (number | null)[];
   upperYs: (number | null)[];
   lowerYs: (number | null)[];
   target: number;
@@ -82,12 +84,12 @@ export function cumulativeMeanSeries(monthly: (number | null)[]): (number | null
 /**
  * Timeline = cleansed panel months ≤ as-of ∪ plan trajectory months.
  * Fact / cumulative: solid left of / on as-of.
- * Draft / approved / cone: from as-of onward (soft slack, not CI).
- * Draft is anchored at the last cumulative point so blue continues purple.
+ * Draft / cone: from as-of onward (soft slack, not CI).
+ * Blue (draft) and green (plan cumulative) both hand off from purple.
+ * Session approved/baseline is kept for Revert only — not drawn on Hero.
  */
 export function buildHeroEvaluationSeries(
   draftPlan: FivePercentPlan,
-  approvedPlan: FivePercentPlan | null,
   panel: SanitizedPanel,
   asOf: { year: number; month: number },
   slackBandPp: number,
@@ -119,12 +121,6 @@ export function buildHeroEvaluationSeries(
   const draftByLabel = new Map(
     draftPlan.chain_trajectory.map((p) => [periodLabel(p.year, p.month), p.score]),
   );
-  const approvedByLabel = new Map(
-    (approvedPlan?.chain_trajectory ?? []).map((p) => [
-      periodLabel(p.year, p.month),
-      p.score,
-    ]),
-  );
 
   const factYs = periods.map((p) => {
     if (!atOrBefore(p, asOf)) {
@@ -134,14 +130,19 @@ export function buildHeroEvaluationSeries(
   });
   const cumulativeYs = cumulativeMeanSeries(factYs);
 
-  const planMonthlyYs = periods.map((p) => {
+  // Hybrid monthly: facts through history, then draft plan months — one running mean.
+  const planHandoffMonthlyYs = periods.map((p, i) => {
+    const fact = factYs[i];
+    if (fact != null) {
+      return fact;
+    }
     const key = periodLabel(p.year, p.month);
     if (draftByLabel.has(key)) {
       return draftByLabel.get(key)!;
     }
     return null;
   });
-  const planCumulativeYs = cumulativeMeanSeries(planMonthlyYs);
+  const planCumulativeFull = cumulativeMeanSeries(planHandoffMonthlyYs);
 
   const draftYs = periods.map((p) => {
     if (!atOrAfter(p, asOf)) {
@@ -157,7 +158,7 @@ export function buildHeroEvaluationSeries(
     return null;
   });
 
-  // Anchor draft to the last cumulative point so blue continues purple (not black).
+  // Last purple point = handoff for blue (monthly) and green (cumulative).
   let handoffIdx = -1;
   for (let i = cumulativeYs.length - 1; i >= 0; i -= 1) {
     if (cumulativeYs[i] != null) {
@@ -169,18 +170,15 @@ export function buildHeroEvaluationSeries(
     draftYs[handoffIdx] = cumulativeYs[handoffIdx];
   }
 
-  const approvedYs = periods.map((p) => {
-    if (!atOrAfter(p, asOf)) {
+  // Green from handoff onward only (same start as purple; then folds in plan months).
+  const planCumulativeYs = planCumulativeFull.map((value, i) => {
+    if (handoffIdx < 0 || i < handoffIdx) {
       return null;
     }
-    const key = periodLabel(p.year, p.month);
-    if (approvedPlan) {
-      return approvedByLabel.get(key) ?? null;
+    if (i === handoffIdx) {
+      return cumulativeYs[handoffIdx];
     }
-    if (draftByLabel.has(key) || key === asOfLabel) {
-      return draftPlan.current_chain;
-    }
-    return null;
+    return value;
   });
 
   const upperYs = draftYs.map((v) => (v == null ? null : Math.min(100, v + slackBandPp)));
@@ -192,7 +190,6 @@ export function buildHeroEvaluationSeries(
     cumulativeYs,
     planCumulativeYs,
     draftYs,
-    approvedYs,
     upperYs,
     lowerYs,
     target: draftPlan.target,

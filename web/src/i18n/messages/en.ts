@@ -351,25 +351,38 @@ export const en = {
   'planner.storeHero.title': 'Store evaluation',
   'planner.storeHero.empty': 'No plan series for this store.',
   'planner.storeHero.hint':
-    'Store-level Hero · black = actual · blue = store plan · grey dashed = network chain. Clawback / surplus shifts show on the blue plan path.',
+    'Same evaluation grammar as network Hero · black = fact · purple = cumulative actual · green = cumulative plan (if draft) · blue = draft simulation. Clawback / surplus shifts show on the blue path; store gap stays in the caption.',
   'planner.storeHero.gapCaption': 'Store {id} · as-of gap {gap}',
-  'planner.storeHero.actual': 'Store actual',
-  'planner.storeHero.plan': 'Store plan',
-  'planner.storeHero.chain': 'Network chain',
+  'planner.storeHero.actual': 'Cleansed fact',
+  'planner.storeHero.cumulative': 'Cumulative actual',
+  'planner.storeHero.planCumulative': 'Cumulative plan (if draft)',
+  'planner.storeHero.plan': 'Draft simulation',
+  'planner.storeHero.target': 'Target',
   'planner.storeHero.asOf': 'as-of',
 
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
   'planner.hero.fact': 'Cleansed fact',
   'planner.hero.cumulative': 'Cumulative actual',
-  'planner.hero.planCumulative': 'Cumulative plan',
-  'planner.hero.accepted': 'Accepted plan',
-  'planner.hero.baseline': 'Reference baseline',
+  'planner.hero.planCumulative': 'Cumulative plan (if draft)',
   'planner.hero.draft': 'Draft simulation',
   'planner.hero.target': 'Target',
   'planner.hero.asOf': 'as-of',
+  'planner.hero.tip.fact':
+    'Monthly cleansed network equal-mean (fact) up to as-of.',
+  'planner.hero.tip.cumulative':
+    'Running average of monthly fact scores from the start of the series to each month.',
+  'planner.hero.tip.planCumulative':
+    'Continues cumulative actual from as-of, folding in draft monthly scores if the plan lands.',
+  'planner.hero.tip.draft':
+    'Monthly draft plan path from as-of; starts on cumulative actual (handoff).',
+  'planner.hero.tip.target': 'Network target level for this plan run.',
+  'planner.hero.tip.cone':
+    'Soft allocation slack around the draft (±pp) — not a statistical confidence interval.',
+  'planner.hero.tip.asOf':
+    'Cutover month: fact and cumulative to the left; draft / plan-cumulative to the right.',
   'planner.hero.caption':
-    'Evaluation view · solid fact left of as-of ({asOf}) · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets.',
+    'Evaluation view · solid fact left of as-of ({asOf}) · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Hover legend labels for short tips.',
 } as const;
 
 export type MessageKey = keyof typeof en;

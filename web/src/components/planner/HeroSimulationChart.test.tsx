@@ -52,7 +52,6 @@ describe('HeroSimulationChart', () => {
       <ThemeProvider theme={appTheme}>
         <HeroSimulationChart
           draftPlan={draft}
-          approvedPlan={null}
           panel={panel}
           asOfYear={2025}
           asOfMonth={3}
@@ -68,11 +67,16 @@ describe('HeroSimulationChart', () => {
     expect(payload).toContain('Cumulative actual');
     expect(payload).toContain('Cumulative plan');
     expect(payload).toContain('Draft simulation');
+    expect(payload).not.toContain('Accepted plan');
+    expect(payload).not.toContain('Reference baseline');
     expect(payload).toContain('as-of');
     expect(payload).toContain('2025-03');
+    expect(payload).toContain('"showlegend":false');
     expect(payload).toContain('"scrollZoom":true');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
+    expect(screen.getByTestId('hero-evaluation-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
     expect(screen.getByText(/not a statistical confidence interval/i)).toBeInTheDocument();
     expect(screen.getByText(/mouse wheel zooms/i)).toBeInTheDocument();
   });

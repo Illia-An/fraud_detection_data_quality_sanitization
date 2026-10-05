@@ -35,7 +35,6 @@ import { Link as RouterLink } from 'react-router-dom';
 import { usePlan } from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
-import { PlannerBaselineBadge } from '../components/planner/PlannerBaselineBadge';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
@@ -245,23 +244,6 @@ export function PlannerPage() {
   });
   const canRun = runBlock == null;
   const runTooltip = runBlock ? t(PLANNER_RUN_BLOCK_MESSAGE_KEYS[runBlock]) : '';
-
-  const directionKind =
-    currentChain == null
-      ? null
-      : target > currentChain + 1e-9
-        ? ('improve' as const)
-        : target < currentChain - 1e-9
-          ? ('invalid' as const)
-          : ('hold' as const);
-  const directionLabel =
-    directionKind === 'improve'
-      ? t('planner.dir.improve')
-      : directionKind === 'invalid'
-        ? t('planner.dir.invalid')
-        : directionKind === 'hold'
-          ? t('planner.dir.hold')
-          : '—';
 
   const monitoring = useMemo(() => {
     if (!draftPlan || !panel) {
@@ -499,7 +481,6 @@ export function PlannerPage() {
         >
           <CardHeader
             title={t('planner.leversTitle')}
-            subheader={t('planner.leversSub')}
             sx={{ flexShrink: 0, pb: 0.5 }}
           />
           <CardContent
@@ -512,32 +493,10 @@ export function PlannerPage() {
             }}
           >
             <Stack spacing={1.25}>
-              <PlannerBaselineBadge
-                panel={panel}
-                processResult={processResult}
-                baselineReady={baselineReady}
-              />
-              <Stack spacing={0.25}>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                  <Typography variant="body2" data-testid="planner-current-chain">
-                    {t('planner.current')}{' '}
-                    <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={directionLabel}
-                    color={directionKind === 'improve' ? 'success' : 'default'}
-                  />
-                </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  {t('planner.currentHint')}
-                </Typography>
-              </Stack>
-
               <Typography
                 variant="overline"
                 color="text.secondary"
-                sx={{ letterSpacing: 0.8, pt: 0.5 }}
+                sx={{ letterSpacing: 0.8 }}
               >
                 {t('planner.section.goalTime')}
               </Typography>
@@ -590,9 +549,26 @@ export function PlannerPage() {
                   ))}
                 </Select>
               </FormControl>
-              <Typography variant="caption" color="text.secondary">
-                {t('planner.referenceMonthHint')}
-              </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="baseline"
+                justifyContent="space-between"
+                flexWrap="wrap"
+                useFlexGap
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ flex: '1 1 8rem' }}>
+                  {t('planner.referenceMonthHint')}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  data-testid="planner-current-chain"
+                  sx={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}
+                >
+                  {t('planner.current')}{' '}
+                  <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
+                </Typography>
+              </Stack>
 
               <Typography
                 variant="overline"
@@ -684,45 +660,6 @@ export function PlannerPage() {
                 </AccordionDetails>
               </Accordion>
 
-              <Accordion
-                disableGutters
-                elevation={0}
-                defaultExpanded={false}
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
-              >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption" fontWeight={600}>
-                    {t('planner.storesAtRef', { count: baselineRows.length })}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails sx={{ maxHeight: 160, overflow: 'auto', pt: 0 }}>
-                  {baselineRows.length === 0 ? (
-                    <Typography variant="caption" color="text.secondary">
-                      {t('planner.noStoresAtRef')}
-                    </Typography>
-                  ) : (
-                    <Stack spacing={0.25}>
-                      {baselineRows
-                        .slice()
-                        .sort((a, b) => a.five_percent - b.five_percent)
-                        .map((row) => (
-                          <Stack
-                            key={row.store_id}
-                            direction="row"
-                            justifyContent="space-between"
-                            spacing={1}
-                          >
-                            <Typography variant="caption">{row.store_id}</Typography>
-                            <Typography variant="caption" fontWeight={600}>
-                              {row.five_percent.toFixed(1)}%
-                            </Typography>
-                          </Stack>
-                        ))}
-                    </Stack>
-                  )}
-                </AccordionDetails>
-              </Accordion>
-
               <Tooltip title={canRun ? '' : runTooltip}>
                 <span>
                   <Button
@@ -742,39 +679,43 @@ export function PlannerPage() {
                   </Button>
                 </span>
               </Tooltip>
-              <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
-                <span>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<DownloadRoundedIcon />}
-                    disabled={!draftPlan}
-                    onClick={handleExportCsv}
-                  >
-                    {t('planner.exportCsv')}
-                  </Button>
-                </span>
-              </Tooltip>
-              <Tooltip
-                title={
-                  isDirty && approvedPlan
-                    ? t('planner.revertDraftTip')
-                    : t('planner.revertDraftDisabledTip')
-                }
-              >
-                <span>
-                  <Button
-                    variant="text"
-                    color="inherit"
-                    fullWidth
-                    disabled={!isDirty || approvedPlan == null}
-                    onClick={() => discardDraft()}
-                    data-testid="planner-revert-draft"
-                  >
-                    {t('planner.revertDraft')}
-                  </Button>
-                </span>
-              </Tooltip>
+              <Stack direction="row" spacing={1}>
+                <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
+                  <span style={{ flex: 1 }}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      size="small"
+                      startIcon={<DownloadRoundedIcon />}
+                      disabled={!draftPlan}
+                      onClick={handleExportCsv}
+                    >
+                      {t('planner.exportCsv')}
+                    </Button>
+                  </span>
+                </Tooltip>
+                <Tooltip
+                  title={
+                    isDirty && approvedPlan
+                      ? t('planner.revertDraftTip')
+                      : t('planner.revertDraftDisabledTip')
+                  }
+                >
+                  <span style={{ flex: 1 }}>
+                    <Button
+                      variant="text"
+                      color="inherit"
+                      fullWidth
+                      size="small"
+                      disabled={!isDirty || approvedPlan == null}
+                      onClick={() => discardDraft()}
+                      data-testid="planner-revert-draft"
+                    >
+                      {t('planner.revertDraft')}
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Stack>
 
               <Box
                 sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
@@ -1017,7 +958,6 @@ export function PlannerPage() {
                     {panel ? (
                       <HeroSimulationChart
                         draftPlan={draftPlan}
-                        approvedPlan={approvedPlan}
                         panel={panel}
                         asOfYear={
                           monitoring?.as_of_year ??
