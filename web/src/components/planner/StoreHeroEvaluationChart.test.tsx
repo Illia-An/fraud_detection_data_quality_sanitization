@@ -87,12 +87,18 @@ describe('StoreHeroEvaluationChart', () => {
       expect(screen.getByTestId('store-hero-plotly')).toBeInTheDocument();
     });
     const payload = screen.getByTestId('store-hero-plotly').textContent ?? '';
-    expect(payload).toContain('Store actual');
-    expect(payload).toContain('Store plan');
-    expect(payload).toContain('Network chain');
+    expect(payload).toContain('Cleansed fact');
+    expect(payload).toContain('Cumulative actual');
+    expect(payload).toContain('Cumulative plan (if draft)');
+    expect(payload).toContain('Draft simulation');
+    expect(payload).toContain('Target');
+    expect(payload).not.toContain('Network chain');
     expect(payload).toContain('2025-04');
+    expect(payload).toContain('"showlegend":false');
     expect(payload).toContain('"scrollZoom":true');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
+    expect(screen.getByTestId('store-evaluation-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
   });
 });

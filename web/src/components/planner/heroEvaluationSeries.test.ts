@@ -51,7 +51,7 @@ describe('cumulativeMeanSeries', () => {
 
 describe('buildHeroEvaluationSeries', () => {
   it('puts cleansed fact left of as-of and draft forecast from as-of onward', () => {
-    const series = buildHeroEvaluationSeries(draft, null, panel, { year: 2025, month: 3 }, 1.5);
+    const series = buildHeroEvaluationSeries(draft, panel, { year: 2025, month: 3 }, 1.5);
 
     expect(series.asOfLabel).toBe('2025-03');
     expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
@@ -67,10 +67,11 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.cumulativeYs[2]).toBeNull();
     expect(series.cumulativeYs[3]).toBeNull();
 
+    // Green continues purple: handoff 71; then (70+72+73)/3; (70+72+73+74)/4
     expect(series.planCumulativeYs[0]).toBeNull();
-    expect(series.planCumulativeYs[1]).toBeNull();
-    expect(series.planCumulativeYs[2]).toBeCloseTo(73, 2);
-    expect(series.planCumulativeYs[3]).toBeCloseTo(73.5, 2);
+    expect(series.planCumulativeYs[1]).toBeCloseTo(71, 2);
+    expect(series.planCumulativeYs[2]).toBeCloseTo(71.67, 2);
+    expect(series.planCumulativeYs[3]).toBeCloseTo(72.25, 2);
 
     expect(series.draftYs[0]).toBeNull();
     expect(series.draftYs[1]).toBeCloseTo(71, 5); // handoff = cumulative
@@ -82,8 +83,8 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.target).toBe(75);
   });
 
-  it('anchors draft to cumulative handoff when as-of is the first trajectory month', () => {
-    const series = buildHeroEvaluationSeries(draft, null, panel, { year: 2025, month: 4 }, 1.5);
+  it('anchors draft and plan-cumulative to purple when as-of is the first trajectory month', () => {
+    const series = buildHeroEvaluationSeries(draft, panel, { year: 2025, month: 4 }, 1.5);
 
     expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
     expect(series.factYs[1]).toBeCloseTo(72, 2);
@@ -92,5 +93,9 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.draftYs[1]).toBeCloseTo(71, 5); // blue starts on purple
     expect(series.draftYs[2]).toBeCloseTo(73, 5);
     expect(series.draftYs[3]).toBeCloseTo(74, 5);
+    expect(series.planCumulativeYs[0]).toBeNull();
+    expect(series.planCumulativeYs[1]).toBeCloseTo(71, 2); // green starts on purple
+    expect(series.planCumulativeYs[2]).toBeCloseTo(71.67, 2);
+    expect(series.planCumulativeYs[3]).toBeCloseTo(72.25, 2);
   });
 });
