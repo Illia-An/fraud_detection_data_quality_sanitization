@@ -1,43 +1,40 @@
-import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
-import { Box, Button, Chip, Stack, Typography } from '@mui/material';
+import { Box, Button, Stack, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
 import type { MessageKey } from '../../i18n';
+import type { PlanParams } from '../../schemas/plan';
 import { SCENARIO_PACKS, type ScenarioPackId } from '../../schemas/scenarioPacks';
+import { formatPathLeversSummary } from './plannerPathLeversSummary';
 
 interface ScenarioPackCardsProps {
   disabled: boolean;
   disabledTip: string;
   pendingId: ScenarioPackId | null;
+  pathParams: PlanParams;
   onApply: (id: ScenarioPackId) => void;
 }
 
-const PACK_COPY: Record<
-  ScenarioPackId,
-  { title: MessageKey; blurb: MessageKey; effect: MessageKey }
-> = {
+const PACK_COPY: Record<ScenarioPackId, { title: MessageKey; blurb: MessageKey }> = {
   close_gap: {
     title: 'planner.packs.closeGap.title',
     blurb: 'planner.packs.closeGap.blurb',
-    effect: 'planner.packs.closeGap.effect',
-  },
-  rebalance: {
-    title: 'planner.packs.rebalance.title',
-    blurb: 'planner.packs.rebalance.blurb',
-    effect: 'planner.packs.rebalance.effect',
   },
   steady_grind: {
     title: 'planner.packs.steady.title',
     blurb: 'planner.packs.steady.blurb',
-    effect: 'planner.packs.steady.effect',
+  },
+  front_loaded: {
+    title: 'planner.packs.frontLoaded.title',
+    blurb: 'planner.packs.frontLoaded.blurb',
   },
 };
 
-/** One-click scenario recipes — Run (+ optional surplus post-pass). */
+/** Preset questions — one click sets levers and Runs; canvas is the answer. */
 export function ScenarioPackCards({
   disabled,
   disabledTip,
   pendingId,
+  pathParams,
   onApply,
 }: ScenarioPackCardsProps) {
   const t = useT();
@@ -49,6 +46,14 @@ export function ScenarioPackCards({
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block">
         {t('planner.packs.sub')}
+      </Typography>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        data-testid="planner-path-levers-summary"
+        sx={{ fontSize: '0.68rem', lineHeight: 1.35, fontVariantNumeric: 'tabular-nums' }}
+      >
+        {formatPathLeversSummary(pathParams, t)}
       </Typography>
       {SCENARIO_PACKS.map((pack) => {
         const copy = PACK_COPY[pack.id];
@@ -68,36 +73,9 @@ export function ScenarioPackCards({
             }}
           >
             <Stack spacing={0.5}>
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={0.5}
-                useFlexGap
-                flexWrap="wrap"
-              >
-                <Typography variant="caption" fontWeight={700} sx={{ lineHeight: 1.25 }}>
-                  {t(copy.title)}
-                </Typography>
-                <Chip
-                  size="small"
-                  label={t(copy.effect)}
-                  color={
-                    pack.id === 'close_gap'
-                      ? 'success'
-                      : pack.id === 'rebalance'
-                        ? 'default'
-                        : 'info'
-                  }
-                  variant={pack.id === 'rebalance' ? 'outlined' : 'filled'}
-                  sx={{
-                    height: 18,
-                    fontSize: '0.65rem',
-                    fontWeight: 600,
-                    '& .MuiChip-label': { px: 0.6 },
-                  }}
-                />
-              </Stack>
+              <Typography variant="caption" fontWeight={700} sx={{ lineHeight: 1.3 }}>
+                {t(copy.title)}
+              </Typography>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -109,7 +87,6 @@ export function ScenarioPackCards({
                 size="small"
                 variant="outlined"
                 fullWidth
-                startIcon={<ScienceRoundedIcon />}
                 disabled={disabled || otherBusy}
                 onClick={() => onApply(pack.id)}
                 data-testid={`scenario-pack-apply-${pack.id}`}

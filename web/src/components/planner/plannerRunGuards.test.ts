@@ -28,4 +28,14 @@ describe('plannerRunBlockReason', () => {
       }),
     ).toBe('cap_too_tight');
   });
+
+  it('blocks horizon outside 1–12', () => {
+    expect(plannerRunBlockReason({ ...base, horizon: 0 })).toBe('horizon_invalid');
+    expect(plannerRunBlockReason({ ...base, horizon: 13 })).toBe('horizon_invalid');
+  });
+
+  it('blocks target outside 0–100', () => {
+    expect(plannerRunBlockReason({ ...base, target: -1 })).toBe('target_out_of_range');
+    expect(plannerRunBlockReason({ ...base, target: 101 })).toBe('target_out_of_range');
+  });
 });

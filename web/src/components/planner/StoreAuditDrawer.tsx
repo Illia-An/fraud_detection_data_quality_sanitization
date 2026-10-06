@@ -50,6 +50,8 @@ import {
   type SandboxEvenSplitPreview,
 } from '../../schemas/sandboxPreview';
 import { StoreHeroEvaluationChart } from './StoreHeroEvaluationChart';
+import { InspectStoreGlance } from './InspectStoreGlance';
+import type { StoreBaselineRow } from './atRiskRowMetrics';
 
 /** EXP: large Inspect dialog — room for store Hero + sandbox (~+13% vs 1400). */
 const INSPECT_DIALOG_PAPER_MAX_PX = 1580;
@@ -69,6 +71,8 @@ interface StoreAuditDrawerProps {
   insights: PlanMonitoringInsights;
   processResult: ProcessResponse | null;
   maxMonthlyImprove: number;
+  /** Reference-month baseline scores (Baseline → End). */
+  baselineRows?: StoreBaselineRow[];
   onClose: () => void;
   /** Switch Inspected store without closing the dialog. */
   onStoreChange: (storeId: number) => void;
@@ -93,6 +97,7 @@ export function StoreAuditDrawer({
   insights,
   processResult,
   maxMonthlyImprove,
+  baselineRows = [],
   onClose,
   onStoreChange,
   onApplyPlan,
@@ -426,6 +431,13 @@ export function StoreAuditDrawer({
           overflow: 'hidden',
         }}
       >
+        <InspectStoreGlance
+          plan={plan}
+          insights={insights}
+          storeId={storeId}
+          baselineRows={baselineRows}
+          draftLast={appliedDraft}
+        />
         <Box
           sx={{
             flex: 1,

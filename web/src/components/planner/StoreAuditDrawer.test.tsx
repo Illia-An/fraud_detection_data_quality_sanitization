@@ -101,6 +101,10 @@ function renderDrawer(overrides?: {
           insights={insights}
           processResult={null}
           maxMonthlyImprove={4}
+          baselineRows={[
+            { store_id: 10, five_percent: 65 },
+            { store_id: 20, five_percent: 70 },
+          ]}
           onClose={vi.fn()}
           onStoreChange={onStoreChange}
           onApplyPlan={onApplyPlan}
@@ -115,6 +119,12 @@ describe('StoreAuditDrawer', () => {
     renderDrawer();
 
     expect(screen.getByTestId('store-inspect-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
+    expect(screen.getByText(/Store snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText('66.0%')).toBeInTheDocument();
+    expect(screen.getByText('68.0%')).toBeInTheDocument();
+    expect(screen.getByText('−2.0 pp')).toBeInTheDocument();
+    expect(screen.getByText(/→ 72\.0%/)).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getByText(/Inspect/i)).toBeInTheDocument();
     expect(screen.getByTestId('inspect-store-select')).toBeInTheDocument();
@@ -123,7 +133,8 @@ describe('StoreAuditDrawer', () => {
     expect(screen.getByLabelText(/Session sandbox what-if/i)).toBeInTheDocument();
     expect(screen.getByTestId('store-hero-evaluation-chart')).toBeInTheDocument();
     expect(screen.getByText(/Store evaluation/i)).toBeInTheDocument();
-    expect(screen.getByText(/as-of gap/i)).toBeInTheDocument();
+    expect(screen.queryByText(/as-of gap/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Same evaluation grammar/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByTestId('store-hero-plotly-mock')).toBeInTheDocument();
     });

@@ -59,13 +59,13 @@ export function HeroSimulationChart({
         }
         const nextH = Math.floor(rect.height);
         const nextW = Math.floor(rect.width);
+        // Drive Plot size via props only — do not fake window.resize (Plotly feedback loop).
         if (nextH >= 200) {
-          setPlotHeight(nextH);
+          setPlotHeight((prev) => (prev === nextH ? prev : nextH));
         }
         if (nextW > 0) {
-          setPlotWidth(nextW);
+          setPlotWidth((prev) => (prev === nextW ? prev : nextW));
         }
-        window.dispatchEvent(new Event('resize'));
       });
     });
     observer.observe(node);
@@ -283,7 +283,7 @@ export function HeroSimulationChart({
                 ],
               }}
               config={{
-                responsive: true,
+                responsive: false,
                 scrollZoom: true,
                 displaylogo: false,
                 displayModeBar: 'hover',

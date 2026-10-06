@@ -1,44 +1,23 @@
 /**
- * One-click Planner scenario packs — recipes over existing levers + optional
- * surplus→behind post-pass (session draft only).
+ * Preset questions for the network path — each pack is a question + PlanParams recipe.
+ * One click: set levers + Run; canvas draft is the answer (session only).
+ * Store mix / surplus stays in the EXP redistribute block (group B).
  */
 
-import { buildPlanMonitoringInsights } from './planMonitoring';
 import {
   DEFAULT_PLAN_PARAMS,
-  type FivePercentPlan,
   type PlanParams,
 } from './plan';
-import type { SanitizedPanel } from './sanitizedPanel';
-import {
-  redistributeSurplusToBehind,
-  type SurplusRedistributeResult,
-} from './surplusRedistribute';
 
-export type ScenarioPackId = 'close_gap' | 'rebalance' | 'steady_grind';
-
-export interface ScenarioPackSurplus {
-  clawbackDonors: boolean;
-  harvestFraction: number;
-  topDonors: number;
-  topReceivers: number;
-}
+export type ScenarioPackId = 'close_gap' | 'steady_grind' | 'front_loaded';
 
 export interface ScenarioPackRecipe {
   id: ScenarioPackId;
   /** Allocator levers applied before Run. */
   params: PlanParams;
-  /** After Run: surplus redistribute; null = steady grind (levers only). */
-  surplus: ScenarioPackSurplus | null;
 }
 
-const SURPLUS_DEFAULTS: Omit<ScenarioPackSurplus, 'clawbackDonors'> = {
-  harvestFraction: 0.5,
-  topDonors: 10,
-  topReceivers: 10,
-};
-
-/** v1 packs: Close the gap · Rebalance · Steady grind. */
+/** Exp 1: network path only — Close · Steady · Front-loaded. */
 export const SCENARIO_PACKS: readonly ScenarioPackRecipe[] = [
   {
     id: 'close_gap',
@@ -47,16 +26,6 @@ export const SCENARIO_PACKS: readonly ScenarioPackRecipe[] = [
       trajectory: 'uniform',
       priority_power: 1.5,
     },
-    surplus: { ...SURPLUS_DEFAULTS, clawbackDonors: false },
-  },
-  {
-    id: 'rebalance',
-    params: {
-      ...DEFAULT_PLAN_PARAMS,
-      trajectory: 'uniform',
-      priority_power: 1.5,
-    },
-    surplus: { ...SURPLUS_DEFAULTS, clawbackDonors: true },
   },
   {
     id: 'steady_grind',
@@ -65,7 +34,15 @@ export const SCENARIO_PACKS: readonly ScenarioPackRecipe[] = [
       trajectory: 'uniform',
       priority_power: 1,
     },
-    surplus: null,
+  },
+  {
+    id: 'front_loaded',
+    params: {
+      ...DEFAULT_PLAN_PARAMS,
+      trajectory: 'front_loaded',
+      trajectory_power: 2,
+      priority_power: 1,
+    },
   },
 ] as const;
 
@@ -75,29 +52,4 @@ export function getScenarioPack(id: ScenarioPackId): ScenarioPackRecipe {
     throw new Error(`Unknown scenario pack: ${id}`);
   }
   return pack;
-}
-
-/**
- * Optional surplus→behind pass after a fresh Run.
- * Returns the input plan unchanged when there is no ahead/behind split.
- */
-export function applyScenarioSurplusPass(
-  plan: FivePercentPlan,
-  panel: SanitizedPanel,
-  asOf: { year: number; month: number },
-  surplus: ScenarioPackSurplus,
-): { plan: FivePercentPlan; applied: boolean; result: SurplusRedistributeResult | null } {
-  const insights = buildPlanMonitoringInsights(plan, panel, asOf);
-  if (insights.summary.ahead <= 0 || insights.summary.behind <= 0) {
-    return { plan, applied: false, result: null };
-  }
-  const result = redistributeSurplusToBehind(plan, insights, {
-    topDonors: surplus.topDonors,
-    topReceivers: surplus.topReceivers,
-    harvestFraction: surplus.harvestFraction,
-    clawbackDonors: surplus.clawbackDonors,
-    asOfYear: asOf.year,
-    asOfMonth: asOf.month,
-  });
-  return { plan: result.plan, applied: true, result };
 }

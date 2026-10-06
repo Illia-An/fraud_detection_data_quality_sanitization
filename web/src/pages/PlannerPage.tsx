@@ -16,13 +16,11 @@ import {
   CardHeader,
   CircularProgress,
   FormControl,
-  FormControlLabel,
   IconButton,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -43,11 +41,14 @@ import { useT } from '../i18n';
 import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
+import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
 import {
   buildSanitizedPanelFromProcess,
   type SanitizedPanel,
 } from '../schemas/sanitizedPanel';
 import {
+  clampPlanHorizon,
+  clampPlanTarget,
   DEFAULT_PLAN_PARAMS,
   periodLabel,
   type FivePercentPlan,
@@ -57,11 +58,11 @@ import {
   buildPlanMonitoringInsights,
   defaultAsOf,
 } from '../schemas/planMonitoring';
+import { getScenarioPack, type ScenarioPackId } from '../schemas/scenarioPacks';
 import {
-  applyScenarioSurplusPass,
-  getScenarioPack,
-  type ScenarioPackId,
-} from '../schemas/scenarioPacks';
+  getStoreMixQuestion,
+  type StoreMixQuestionId,
+} from '../schemas/storeMixQuestions';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import { useUiStore } from '../store/uiStore';
@@ -184,13 +185,14 @@ export function PlannerPage() {
   const [referenceMonth, setReferenceMonth] = useState<number | null>(PREFERRED_REFERENCE.month);
   const [target, setTarget] = useState(75);
   const [horizon, setHorizon] = useState(12);
+  const [targetText, setTargetText] = useState('75');
+  const [horizonText, setHorizonText] = useState('12');
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
-  /** EXP: clawback ahead when redistributing surplus (zero-sum). Default off → network rises. */
-  const [expClawbackDonors, setExpClawbackDonors] = useState(false);
-  const [expRedistributeNote, setExpRedistributeNote] = useState<string | null>(null);
+  const [mixNote, setMixNote] = useState<string | null>(null);
   const [pendingPackId, setPendingPackId] = useState<ScenarioPackId | null>(null);
+  const [pendingMixId, setPendingMixId] = useState<StoreMixQuestionId | null>(null);
 
   const railWidth = controlsOpen ? RAIL_WIDTH_PX : RAIL_COLLAPSED_PX;
 
@@ -254,25 +256,27 @@ export function PlannerPage() {
     return buildPlanMonitoringInsights(draftPlan, panel, { year, month });
   }, [draftPlan, panel, asOfYear, asOfMonth]);
 
-  const canApplySurplusExp =
+  const canApplyStoreMix =
     draftPlan != null &&
     monitoring != null &&
     monitoring.summary.ahead > 0 &&
     monitoring.summary.behind > 0;
 
-  const handleSurplusRedistribute = () => {
-    if (!draftPlan || !monitoring) {
+  const handleApplyStoreMix = (questionId: StoreMixQuestionId) => {
+    if (!draftPlan || !monitoring || !canApplyStoreMix) {
       return;
     }
+    const recipe = getStoreMixQuestion(questionId);
+    setPendingMixId(questionId);
     const result = redistributeSurplusToBehind(draftPlan, monitoring, {
-      topDonors: 10,
-      topReceivers: 10,
-      harvestFraction: 0.5,
-      clawbackDonors: expClawbackDonors,
+      topDonors: recipe.topDonors,
+      topReceivers: recipe.topReceivers,
+      harvestFraction: recipe.harvestFraction,
+      clawbackDonors: recipe.clawbackDonors,
     });
     setDraftFromRun(result.plan);
-    setExpRedistributeNote(
-      t('planner.exp.result', {
+    setMixNote(
+      t('planner.mix.result', {
         pool: result.poolPp.toFixed(1),
         distributed: result.distributedPp.toFixed(1),
         leftover: result.leftoverPp.toFixed(1),
@@ -282,18 +286,39 @@ export function PlannerPage() {
         mode: result.mode,
       }),
     );
+    setPendingMixId(null);
+  };
+
+  const commitGoalDrafts = (): { target: number; horizon: number } => {
+    const nextTarget = clampPlanTarget(targetText, target);
+    const nextHorizon = clampPlanHorizon(horizonText, horizon);
+    setTarget(nextTarget);
+    setTargetText(String(nextTarget));
+    setHorizon(nextHorizon);
+    setHorizonText(String(nextHorizon));
+    return { target: nextTarget, horizon: nextHorizon };
   };
 
   const handleRun = () => {
-    if (!canRun || effectiveYear == null || effectiveMonth == null) {
+    const goal = commitGoalDrafts();
+    const block = plannerRunBlockReason({
+      baselineReady,
+      storeCount: baselineRows.length,
+      currentChain,
+      target: goal.target,
+      horizon: goal.horizon,
+      maxMonthlyImprove: params.max_monthly_improve,
+      isPending: planMutation.isPending,
+    });
+    if (block != null || effectiveYear == null || effectiveMonth == null) {
       return;
     }
     planMutation.mutate(
       {
         reference_year: effectiveYear,
         reference_month: effectiveMonth,
-        horizon,
-        target,
+        horizon: goal.horizon,
+        target: goal.target,
         params,
         baseline_rows: baselineRows,
       },
@@ -301,7 +326,7 @@ export function PlannerPage() {
         onSuccess: (response) => {
           const next = response.metrics.five_percent;
           setDraftFromRun(next);
-          setExpRedistributeNote(null);
+          setMixNote(null);
           if (panel) {
             const asOf = defaultAsOf(next, panel);
             setAsOfYear(asOf.year);
@@ -313,21 +338,28 @@ export function PlannerPage() {
   };
 
   const handleApplyScenarioPack = (packId: ScenarioPackId) => {
-    if (!canRun || effectiveYear == null || effectiveMonth == null || !panel) {
+    const goal = commitGoalDrafts();
+    const block = plannerRunBlockReason({
+      baselineReady,
+      storeCount: baselineRows.length,
+      currentChain,
+      target: goal.target,
+      horizon: goal.horizon,
+      maxMonthlyImprove: params.max_monthly_improve,
+      isPending: planMutation.isPending,
+    });
+    if (block != null || effectiveYear == null || effectiveMonth == null || !panel) {
       return;
     }
     const pack = getScenarioPack(packId);
     setParams(pack.params);
-    if (pack.surplus) {
-      setExpClawbackDonors(pack.surplus.clawbackDonors);
-    }
     setPendingPackId(packId);
     planMutation.mutate(
       {
         reference_year: effectiveYear,
         reference_month: effectiveMonth,
-        horizon,
-        target,
+        horizon: goal.horizon,
+        target: goal.target,
         params: pack.params,
         baseline_rows: baselineRows,
       },
@@ -338,24 +370,7 @@ export function PlannerPage() {
           setAsOfYear(asOf.year);
           setAsOfMonth(asOf.month);
           setDraftFromRun(runPlan);
-
-          if (pack.surplus) {
-            const pass = applyScenarioSurplusPass(runPlan, panel, asOf, pack.surplus);
-            if (pass.applied && pass.result) {
-              patchDraftPlan(pass.plan);
-              setExpRedistributeNote(
-                t('planner.packs.result.surplus', {
-                  mode: pass.result.mode,
-                  pool: pass.result.poolPp.toFixed(1),
-                  delta: pass.result.networkDeltaPp.toFixed(2),
-                }),
-              );
-            } else {
-              setExpRedistributeNote(t('planner.packs.result.surplusSkipped'));
-            }
-          } else {
-            setExpRedistributeNote(t('planner.packs.result.steady'));
-          }
+          setMixNote(t('planner.packs.result.applied'));
           setPendingPackId(null);
         },
         onError: () => {
@@ -488,6 +503,7 @@ export function PlannerPage() {
               flex: 1,
               minHeight: 0,
               overflowY: 'auto',
+              scrollbarGutter: 'stable',
               '&:last-child': { pb: 2 },
             }}
           >
@@ -501,21 +517,51 @@ export function PlannerPage() {
               </Typography>
               <TextField
                 label={t('planner.target')}
-                type="number"
+                type="text"
                 size="small"
-                value={target}
+                value={targetText}
                 disabled={!baselineReady}
-                onChange={(e) => setTarget(Number(e.target.value))}
-                inputProps={{ min: 0, max: 100, step: 0.1 }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) {
+                    return;
+                  }
+                  setTargetText(raw);
+                  if (raw !== '' && Number.isFinite(Number(raw))) {
+                    setTarget(Number(raw));
+                  }
+                }}
+                onBlur={() => {
+                  const next = clampPlanTarget(targetText, target);
+                  setTarget(next);
+                  setTargetText(String(next));
+                }}
+                inputProps={{ inputMode: 'decimal', 'aria-label': t('planner.target') }}
+                helperText={t('planner.targetHint')}
               />
               <TextField
                 label={t('planner.horizon')}
-                type="number"
+                type="text"
                 size="small"
-                value={horizon}
+                value={horizonText}
                 disabled={!baselineReady}
-                onChange={(e) => setHorizon(Number(e.target.value))}
-                inputProps={{ min: 1, max: 60 }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw !== '' && !/^\d*$/.test(raw)) {
+                    return;
+                  }
+                  setHorizonText(raw);
+                  if (raw !== '' && Number.isFinite(Number(raw))) {
+                    setHorizon(Number(raw));
+                  }
+                }}
+                onBlur={() => {
+                  const next = clampPlanHorizon(horizonText, horizon);
+                  setHorizon(next);
+                  setHorizonText(String(next));
+                }}
+                inputProps={{ inputMode: 'numeric', 'aria-label': t('planner.horizon') }}
+                helperText={t('planner.horizonHint')}
               />
               <FormControl fullWidth size="small" disabled={!baselineReady || refs.length === 0}>
                 <InputLabel id="ref-period-label">{t('planner.referenceMonth')}</InputLabel>
@@ -724,66 +770,32 @@ export function PlannerPage() {
                   disabled={!canRun || planMutation.isPending}
                   disabledTip={canRun ? '' : runTooltip}
                   pendingId={pendingPackId}
+                  pathParams={params}
                   onApply={handleApplyScenarioPack}
                 />
-                {expRedistributeNote ? (
-                  <Alert
-                    severity="info"
-                    sx={{ mt: 1, py: 0.5, '& .MuiAlert-message': { fontSize: '0.7rem' } }}
-                  >
-                    {expRedistributeNote}
-                  </Alert>
-                ) : null}
               </Box>
 
-              <Accordion
-                disableGutters
-                elevation={0}
-                defaultExpanded={false}
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
-                data-testid="exp-surplus-redistribute"
+              <Box
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
+                data-testid="store-mix-panel"
               >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="caption" fontWeight={600}>
-                    {t('planner.exp.surplusTitle')}
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Stack spacing={1}>
-                    <Typography variant="caption" color="text.secondary">
-                      {t('planner.exp.surplusHint')}
-                    </Typography>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={expClawbackDonors}
-                          onChange={(_, checked) => setExpClawbackDonors(checked)}
-                          inputProps={{ 'aria-label': t('planner.exp.clawback') }}
-                        />
-                      }
-                      label={
-                        <Typography variant="caption">{t('planner.exp.clawback')}</Typography>
-                      }
-                    />
-                    <Tooltip title={canApplySurplusExp ? '' : t('planner.exp.disabledTip')}>
-                      <span>
-                        <Button
-                          variant="outlined"
-                          color="secondary"
-                          fullWidth
-                          size="small"
-                          startIcon={<ScienceRoundedIcon />}
-                          disabled={!canApplySurplusExp}
-                          onClick={handleSurplusRedistribute}
-                        >
-                          {t('planner.exp.apply')}
-                        </Button>
-                      </span>
-                    </Tooltip>
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
+                <StoreMixQuestionCards
+                  disabled={!canApplyStoreMix || pendingMixId != null}
+                  disabledTip={t('planner.mix.disabledTip')}
+                  pendingId={pendingMixId}
+                  onApply={handleApplyStoreMix}
+                />
+              </Box>
+
+              {mixNote ? (
+                <Alert
+                  severity="info"
+                  sx={{ py: 0.5, '& .MuiAlert-message': { fontSize: '0.7rem' } }}
+                  data-testid="planner-action-note"
+                >
+                  {mixNote}
+                </Alert>
+              ) : null}
 
               {runBlock === 'no_stores' && (
                 <Typography variant="caption" color="warning.main">
@@ -996,6 +1008,7 @@ export function PlannerPage() {
                     flexShrink: 0,
                     maxHeight: { md: AT_RISK_OVERLAY_MAX_HEIGHT },
                     overflow: { md: 'auto' },
+                    scrollbarGutter: 'stable',
                     mt: { xs: `${AT_RISK_GAP_PX}px`, md: 0 },
                     bgcolor: 'background.paper',
                     border: 1,
@@ -1051,6 +1064,7 @@ export function PlannerPage() {
                           md: `calc(${AT_RISK_OVERLAY_MAX_HEIGHT} - ${AT_RISK_SUMMARY_RESERVE_PX}px)`,
                         },
                         overflow: 'auto',
+                        scrollbarGutter: 'stable',
                       }}
                     >
                       <AtRiskDeltaTable
@@ -1084,6 +1098,7 @@ export function PlannerPage() {
                 insights={monitoring}
                 processResult={processResult}
                 maxMonthlyImprove={params.max_monthly_improve}
+                baselineRows={baselineRows}
                 onClose={() => selectStore(null)}
                 onStoreChange={(id) => selectStore(id)}
                 onApplyPlan={(next) => patchDraftPlan(next)}
