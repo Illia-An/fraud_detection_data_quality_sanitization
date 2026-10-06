@@ -1,4 +1,10 @@
 import type { MessageKey } from '../../i18n';
+import {
+  PLAN_HORIZON_MAX,
+  PLAN_HORIZON_MIN,
+  PLAN_TARGET_MAX,
+  PLAN_TARGET_MIN,
+} from '../../schemas/plan';
 
 /** Run-button guard reasons for Planner (V4.2 Step 4). */
 
@@ -30,10 +36,14 @@ export function plannerRunBlockReason(input: {
   if (input.storeCount < 1) {
     return 'no_stores';
   }
-  if (input.horizon < 1 || input.horizon > 60) {
+  if (input.horizon < PLAN_HORIZON_MIN || input.horizon > PLAN_HORIZON_MAX) {
     return 'horizon_invalid';
   }
-  if (Number.isNaN(input.target) || input.target < 0 || input.target > 100) {
+  if (
+    Number.isNaN(input.target) ||
+    input.target < PLAN_TARGET_MIN ||
+    input.target > PLAN_TARGET_MAX
+  ) {
     return 'target_out_of_range';
   }
   if (input.currentChain != null && input.target < input.currentChain - 1e-9) {

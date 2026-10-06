@@ -2,6 +2,36 @@
 
 import { z } from 'zod';
 
+/** Goal levers — horizon capped at one year (product sense). */
+export const PLAN_HORIZON_MIN = 1;
+export const PLAN_HORIZON_MAX = 12;
+export const PLAN_TARGET_MIN = 0;
+export const PLAN_TARGET_MAX = 100;
+
+export function clampPlanHorizon(raw: string | number, fallback = PLAN_HORIZON_MAX): number {
+  const n =
+    typeof raw === 'number' ? raw : Number(String(raw).trim());
+  if (typeof raw === 'string' && String(raw).trim() === '') {
+    return Math.min(PLAN_HORIZON_MAX, Math.max(PLAN_HORIZON_MIN, Math.round(fallback)));
+  }
+  if (!Number.isFinite(n)) {
+    return Math.min(PLAN_HORIZON_MAX, Math.max(PLAN_HORIZON_MIN, Math.round(fallback)));
+  }
+  return Math.min(PLAN_HORIZON_MAX, Math.max(PLAN_HORIZON_MIN, Math.round(n)));
+}
+
+export function clampPlanTarget(raw: string | number, fallback = 75): number {
+  if (typeof raw === 'string' && String(raw).trim() === '') {
+    return Math.min(PLAN_TARGET_MAX, Math.max(PLAN_TARGET_MIN, fallback));
+  }
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+  if (!Number.isFinite(n)) {
+    return Math.min(PLAN_TARGET_MAX, Math.max(PLAN_TARGET_MIN, fallback));
+  }
+  const clamped = Math.min(PLAN_TARGET_MAX, Math.max(PLAN_TARGET_MIN, n));
+  return Math.round(clamped * 10) / 10;
+}
+
 export const planParamsSchema = z.object({
   trajectory: z.enum(['uniform', 'front_loaded', 'accelerated']).default('uniform'),
   trajectory_power: z.number().min(0.1).default(2),
@@ -20,8 +50,13 @@ export const planBaselineRowSchema = z.object({
 export const planRequestSchema = z.object({
   reference_year: z.number().int(),
   reference_month: z.number().int().min(1).max(12),
-  horizon: z.number().int().min(1).max(60).default(12),
-  target: z.number().min(0).max(100).default(75),
+  horizon: z
+    .number()
+    .int()
+    .min(PLAN_HORIZON_MIN)
+    .max(PLAN_HORIZON_MAX)
+    .default(12),
+  target: z.number().min(PLAN_TARGET_MIN).max(PLAN_TARGET_MAX).default(75),
   params: planParamsSchema.default({}),
   baseline_rows: z.array(planBaselineRowSchema).min(1),
 });

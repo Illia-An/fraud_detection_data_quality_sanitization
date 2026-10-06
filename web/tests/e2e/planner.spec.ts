@@ -53,7 +53,7 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(page.getByTestId('atrisk-exception-table')).toBeVisible();
 
     // Default filter is Behind Plan Only — may be empty on synthetic; open All Stores.
-    await page.getByLabel(/^Filter$/i).click();
+    await page.locator('#atrisk-filter-select').click();
     await page.getByRole('option', { name: /All Stores/i }).click();
     const inspect = page
       .getByTestId('atrisk-exception-table')
