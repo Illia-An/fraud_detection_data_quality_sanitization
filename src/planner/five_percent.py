@@ -86,8 +86,8 @@ def plan_five_percent(
         raise ValueError("baseline must contain at least one store")
     if not (1 <= reference_month <= 12):
         raise ValueError("reference_month must be 1..12")
-    if n_months < 1 or n_months > 60:
-        raise ValueError("n_months must be 1..60")
+    if n_months < 1 or n_months > 12:
+        raise ValueError("n_months must be 1..12")
     if max_monthly_improve < 0.01:
         raise ValueError("max_monthly_improve must be >= 0.01")
     if priority_power < 0.1:

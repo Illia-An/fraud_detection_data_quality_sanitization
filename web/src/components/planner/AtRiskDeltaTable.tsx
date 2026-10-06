@@ -4,7 +4,6 @@ import {
   Button,
   Chip,
   FormControl,
-  InputLabel,
   LinearProgress,
   MenuItem,
   Select,
@@ -39,8 +38,11 @@ import {
 
 export type { StoreBaselineRow };
 
-/** Exception filters — Behind Plan Only | Top Gainers | All Stores. */
-export type AtRiskFilter = 'behind' | 'top_gainers' | 'all';
+/** Exception filters — Behind | Ahead | Top Gainers | Top Laggards | All Stores. */
+export type AtRiskFilter = 'behind' | 'ahead' | 'top_gainers' | 'top_laggards' | 'all';
+
+/** Max rows shown in Top Gainers / Top Laggards slices. */
+export const TOP_SLICE_LIMIT = 15;
 
 interface AtRiskDeltaTableProps {
   plan: FivePercentPlan;
@@ -169,10 +171,20 @@ export function AtRiskDeltaTable({
         .filter((r) => r.signal === 'behind_plan')
         .sort((a, b) => (a.gapPp ?? 0) - (b.gapPp ?? 0));
     }
+    if (filter === 'ahead') {
+      return built
+        .filter((r) => r.signal === 'ahead_of_plan')
+        .sort((a, b) => (b.gapPp ?? 0) - (a.gapPp ?? 0));
+    }
     if (filter === 'top_gainers') {
       return [...built]
         .sort((a, b) => (b.gapPp ?? -999) - (a.gapPp ?? -999))
-        .slice(0, 15);
+        .slice(0, TOP_SLICE_LIMIT);
+    }
+    if (filter === 'top_laggards') {
+      return [...built]
+        .sort((a, b) => (a.gapPp ?? 999) - (b.gapPp ?? 999))
+        .slice(0, TOP_SLICE_LIMIT);
     }
     return [...built].sort((a, b) => {
       const rank = (s: MonitorSignal) =>
@@ -182,12 +194,10 @@ export function AtRiskDeltaTable({
     });
   }, [plan, insights, filter, panel, baselineRows]);
 
-  const filterLabelCount =
-    filter === 'behind'
-      ? insights.summary.behind
-      : filter === 'top_gainers'
-        ? Math.min(15, plan.projections.length)
-        : plan.projections.length;
+  const behindCount = insights.summary.behind;
+  const aheadCount = insights.summary.ahead;
+  const allStoresCount = plan.projections.length;
+  const topSliceCount = Math.min(TOP_SLICE_LIMIT, allStoresCount);
 
   const cellSx = {
     py: 0.4,
@@ -240,41 +250,66 @@ export function AtRiskDeltaTable({
             }}
           />
         </Stack>
-        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-          <FormControl size="small" sx={{ minWidth: 140 }}>
-            <InputLabel id="atrisk-filter" sx={{ fontSize: '0.75rem' }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          alignItems="flex-end"
+          sx={{ pr: { xs: 0, sm: 1.5 }, minWidth: 0 }}
+        >
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 188 }, flex: { sm: '1 1 11rem' } }}>
+            <Typography
+              component="label"
+              htmlFor="atrisk-filter-select"
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 0.25, display: 'block', lineHeight: 1.2 }}
+            >
               {t('planner.atRisk.filter')}
-            </InputLabel>
+            </Typography>
             <Select
-              labelId="atrisk-filter"
-              label={t('planner.atRisk.filter')}
+              id="atrisk-filter-select"
               value={filter}
               onChange={(event) => setFilter(event.target.value as AtRiskFilter)}
+              inputProps={{ 'aria-label': t('planner.atRisk.filter') }}
               sx={{ fontSize: '0.75rem', '& .MuiSelect-select': { py: 0.75 } }}
             >
               <MenuItem value="behind" sx={{ fontSize: '0.75rem' }}>
-                {t('planner.atRisk.behindOnly')} ({insights.summary.behind})
+                {t('planner.atRisk.behindOnly')} ({behindCount})
+              </MenuItem>
+              <MenuItem value="ahead" sx={{ fontSize: '0.75rem' }}>
+                {t('planner.atRisk.aheadOnly')} ({aheadCount})
               </MenuItem>
               <MenuItem value="top_gainers" sx={{ fontSize: '0.75rem' }}>
-                {t('planner.atRisk.topGainers')}
+                {t('planner.atRisk.topGainers')} ({topSliceCount})
+              </MenuItem>
+              <MenuItem value="top_laggards" sx={{ fontSize: '0.75rem' }}>
+                {t('planner.atRisk.topLaggards')} ({topSliceCount})
               </MenuItem>
               <MenuItem value="all" sx={{ fontSize: '0.75rem' }}>
-                {t('planner.atRisk.all')} ({filterLabelCount})
+                {t('planner.atRisk.all')} ({allStoresCount})
               </MenuItem>
             </Select>
           </FormControl>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel id="atrisk-as-of" sx={{ fontSize: '0.75rem' }}>
+          <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 112 } }}>
+            <Typography
+              component="label"
+              htmlFor="atrisk-as-of-select"
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 0.25, display: 'block', lineHeight: 1.2 }}
+            >
               {t('planner.atRisk.asOf')}
-            </InputLabel>
+            </Typography>
             <Select
-              labelId="atrisk-as-of"
-              label={t('planner.atRisk.asOf')}
+              id="atrisk-as-of-select"
               value={asOfValue}
               onChange={(event) => {
                 const [y, m] = event.target.value.split('-').map(Number);
                 onAsOfChange(y, m);
               }}
+              inputProps={{ 'aria-label': t('planner.atRisk.asOf') }}
               sx={{ fontSize: '0.75rem', '& .MuiSelect-select': { py: 0.75 } }}
             >
               {asOfOptions.map((opt) => (
@@ -296,6 +331,7 @@ export function AtRiskDeltaTable({
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
+          scrollbarGutter: 'stable',
           border: 1,
           borderColor: 'divider',
           borderRadius: 1,

@@ -175,6 +175,8 @@ export const he: Record<MessageKey, string> = {
   'planner.dir.hold': 'שמור',
   'planner.target': 'יעד (%)',
   'planner.horizon': 'אופק (חודשים)',
+  'planner.targetHint': '0–100',
+  'planner.horizonHint': '1–12 חודשים',
   'planner.referenceMonth': 'חודש ייחוס',
   'planner.referenceMonthHint': 'חודש בסיס לתוכנית · כל סניף במשקל שווה',
   'planner.advanced': 'אפשרויות מקצה מתקדמות',
@@ -194,36 +196,40 @@ export const he: Record<MessageKey, string> = {
   'planner.revertDraftTip':
     'שחזור תוכנית הבסיס של הסשן (לפני Apply / עודף). סוגר את Inspect.',
   'planner.revertDraftDisabledTip': 'אין מה לשחזר — הטיוטה תואמת את בסיס הסשן.',
-  'planner.packs.title': 'חבילות תרחיש',
+  'planner.packs.title': 'בחרו שאלה',
   'planner.packs.sub':
-    'לחיצה אחת: מנופים, הרצה, ואפשרות העברת עודף. Inspect ידני לחריגים.',
-  'planner.packs.apply': 'החל חבילה',
+    'בחרו אחת — נגדיר את המסלול ונריץ את התוכנית. יעד, אופק וחודש ייחוס נשארים כפי שהגדרתם למעלה.',
+  'planner.packs.pathLeversSummary':
+    'תואם למקצה: {trajectory} · עדיפות {priority} · מקס חודשי {maxMonthly} נק׳',
+  'planner.packs.pathLeversAdvancedSuffix': ' · עוצמת מסלול {power} (מתקדם)',
+  'planner.packs.apply': 'הצג תוכנית',
   'planner.packs.disabledTip': 'תקן חסמי הרצה קודם (בסיס, יעד, סניפים).',
-  'planner.packs.closeGap.title': 'סגירת הפער',
+  'planner.packs.closeGap.title': 'איך סוגרים את הפער ליעד?',
   'planner.packs.closeGap.blurb':
-    'עדיפות הרמה גבוהה יותר + קציר 50% עודף מהמובילים למאחור (הוצאה — הרשת עולה).',
-  'planner.packs.closeGap.effect': 'רשת ↑',
-  'planner.packs.rebalance.title': 'איזון מחדש',
-  'planner.packs.rebalance.blurb':
-    'אותו קציר עם clawback מהמובילים — כמעט סכום אפס; תמהיל סניפים משתנה, Hero שטוח.',
-  'planner.packs.rebalance.effect': 'סכום אפס',
-  'planner.packs.steady.title': 'התקדמות יציבה',
+    'תקבלו תוכנית רשת ששמה יותר שיפור בסניפים הרחוקים ביותר מהיעד.',
+  'planner.packs.steady.title': 'איך נראה שיפור חודשי אחיד?',
   'planner.packs.steady.blurb':
-    'מסלול אחיד, עדיפות ברירת מחדל — רק מקצה, בלי העברת עודף.',
-  'planner.packs.steady.effect': 'מקצה',
-  'planner.packs.result.surplus':
-    'חבילה הוחלה · עודף {mode}: מאגר {pool} נק׳ · Δ רשת {delta} נק׳',
-  'planner.packs.result.surplusSkipped':
-    'חבילה הוחלה · עודף דולג (נדרשים ahead + behind ב־as-of).',
-  'planner.packs.result.steady': 'חבילה הוחלה · התקדמות יציבה (מנופים בלבד).',
-  'planner.exp.surplusTitle': 'ניסוי · עודף → מאחור',
-  'planner.exp.surplusHint':
-    'קציר 50% מהעודף של המובילים והרמת המאחוריים מ־as-of עד הסוף. ברירת מחדל: הוצאת המאגר (הרשת עולה). Clawback ≈ סכום אפס.',
-  'planner.exp.clawback': 'Clawback למובילים (סכום אפס)',
-  'planner.exp.apply': 'החל העברת עודף',
-  'planner.exp.disabledTip': 'הרץ סימולציה קודם. נדרשים סניפים ahead + behind ב־as-of.',
-  'planner.exp.result':
-    'מאגר {pool} נק׳ · חולק {distributed} · נותר {leftover} · Δ רשת {delta} נק׳ · תורמים {donors} → מקבלים {receivers} ({mode})',
+    'תקבלו מסלול רגוע ואחיד חודש אחר חודש לקראת היעד — קל להסביר ולעקוב.',
+  'planner.packs.frontLoaded.title': 'איך משפרים יותר בתחילת התקופה?',
+  'planner.packs.frontLoaded.blurb':
+    'תקבלו תוכנית עם שיפור חזק יותר בתחילת האופק, וקל יותר לקראת הסוף.',
+  'planner.packs.result.applied': 'התשובה מוכנה · התוכנית רועננה על המסך.',
+  'planner.mix.title': 'בחרו שאלת תמהיל סניפים',
+  'planner.mix.sub':
+    'אחרי שיש תוכנית. נדרשים נתוני actual ב־as-of עם סניפים ahead ו־behind. התשובה מעדכנת את הטיוטה — לא הרצה חדשה.',
+  'planner.mix.recipeSummary':
+    'משתמש ב־10 מובילים → 10 מאחור · קציר 50% מהעודף מ־as-of עד הסוף.',
+  'planner.mix.apply': 'הצג התאמה',
+  'planner.mix.disabledTip':
+    'הרץ או הצג תוכנית קודם. נדרשים סניפים ahead + behind עם actual ב־as-of.',
+  'planner.mix.liftBehind.title': 'איך מרימים סניפים מאחור בעזרת עודף מהמובילים?',
+  'planner.mix.liftBehind.blurb':
+    'תקבלו הרמת מאחור מעודף המובילים; ציון הרשת עשוי לעלות (המובילים שומרים על התוכנית).',
+  'planner.mix.rebalance.title': 'איך מאזנים סניפים בלי להעלות את הרשת?',
+  'planner.mix.rebalance.blurb':
+    'תקבלו העברה כמעט בסכום אפס — תוכניות המובילים יורדות קצת, המאחור עולים; הרשת נשארת כמעט שטוחה.',
+  'planner.mix.result':
+    'התאמה מוכנה · מאגר {pool} נק׳ · חולק {distributed} · נותר {leftover} · Δ רשת {delta} נק׳ · {donors} → {receivers} ({mode})',
   'planner.exportDisabledTip': 'הרץ סימולציה קודם כדי לאפשר ייצוא.',
   'planner.planFailed': 'בקשת התוכנית נכשלה',
   'planner.emptyReady':
@@ -242,7 +248,7 @@ export const he: Record<MessageKey, string> = {
   'planner.block.targetRange': 'היעד חייב להיות בין 0 ל־100%.',
   'planner.block.capTight':
     'ההרמה הנדרשת חורגת מ־חודשים × שיפור חודשי מקס׳ — הגדל תקרה/אופק או הורד יעד.',
-  'planner.block.horizon': 'מספר החודשים חייב להיות בין 1 ל־60.',
+  'planner.block.horizon': 'מספר החודשים חייב להיות בין 1 ל־12.',
   'planner.block.running': 'הסימולציה רצה…',
 
   'planner.baseline.ready': 'בסיס: Q10012 מנוקה · {rows}',
@@ -273,9 +279,11 @@ export const he: Record<MessageKey, string> = {
   'planner.kpi.liftQuota': 'הרמה נדרשת {lift} · מכסה N/A',
 
   'planner.atRisk.behindOnly': 'רק מאחורי התוכנית',
+  'planner.atRisk.aheadOnly': 'רק לפני התוכנית',
   'planner.atRisk.topGainers': 'מובילים',
+  'planner.atRisk.topLaggards': 'הכי מאחור',
   'planner.atRisk.all': 'כל הסניפים',
-  'planner.atRisk.asOf': 'סטטוס נכון ל־',
+  'planner.atRisk.asOf': 'נכון ל־',
   'planner.atRisk.behindChip': 'מאחור {count}',
   'planner.atRisk.aheadChip': 'לפני {count}',
   'planner.atRisk.col.store': 'מזהה סניף',
@@ -290,7 +298,7 @@ export const he: Record<MessageKey, string> = {
   'planner.atRisk.col.deficit': 'גירעון error budget',
   'planner.atRisk.col.volume': 'נפח',
   'planner.atRisk.col.action': 'פעולה',
-  'planner.atRisk.filter': 'סינון',
+  'planner.atRisk.filter': 'תצוגה',
   'planner.atRisk.storeId': 'סניף #{id}',
   'planner.atRisk.footer':
     'Management by exception · פער = fact − plan ב־as-of ({asOf}). נפח / MoM / רצף / חלק / הרמה לעדיפות. מאחור לפי הפער הגרוע ביותר.',
@@ -299,6 +307,7 @@ export const he: Record<MessageKey, string> = {
 
   'planner.inspect.titlePrefix': 'בדיקה ·',
   'planner.inspect.storeSelect': 'בחירת סניף',
+  'planner.inspect.glanceSub': 'תמונת סניף · as-of {asOf} · End / Lift עוקבים אחרי Estimate',
   'planner.inspect.sandboxWarn':
     'Sandbox what-if בסשן — טיוטה בלבד. לא משנה תוכנית מאושרת, ייצוא CSV או DB.',
   'planner.inspect.estimateTitle': 'אומדן מול actual',
@@ -338,9 +347,6 @@ export const he: Record<MessageKey, string> = {
 
   'planner.storeHero.title': 'הערכת סניף',
   'planner.storeHero.empty': 'אין סדרת תוכנית לסניף זה.',
-  'planner.storeHero.hint':
-    'אותה דקדוק הערכה כמו Hero רשת · שחור = עובדה · סגול = Actual מצטבר · ירוק = יעד מצטבר (אם הטיוטה) · כחול = סימולציית טיוטה. Clawback / העברת עודף נראים על הקו הכחול; פער הסניף בכותרת.',
-  'planner.storeHero.gapCaption': 'סניף {id} · פער as-of {gap}',
   'planner.storeHero.actual': 'עובדה מנוקה',
   'planner.storeHero.cumulative': 'Actual מצטבר',
   'planner.storeHero.planCumulative': 'יעד מצטבר (אם הטיוטה)',

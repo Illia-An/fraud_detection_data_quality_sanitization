@@ -25,7 +25,7 @@ class PlanRequest(BaseModel):
 
     reference_year: int = Field(ge=2000, le=2100)
     reference_month: int = Field(ge=1, le=12)
-    horizon: int = Field(default=12, ge=1, le=60)
+    horizon: int = Field(default=12, ge=1, le=12)
     target: float = Field(default=75.0, ge=0.0, le=100.0)
     params: PlanParams = Field(default_factory=PlanParams)
     baseline_rows: list[PlanBaselineRow] = Field(min_length=1)

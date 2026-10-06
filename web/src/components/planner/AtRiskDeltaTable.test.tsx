@@ -106,6 +106,40 @@ describe('AtRiskDeltaTable', () => {
     expect(
       screen.getByText((_, el) => el?.textContent === 'Behind Plan Only (1)'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Behind 1')).toBeInTheDocument();
+    expect(screen.getByText('Ahead 1')).toBeInTheDocument();
+
+    // Open filter to assert each option has its own stable count (not tied to active filter).
+    const filterSelect = () => screen.getByRole('combobox', { name: /^View$/i });
+    fireEvent.mouseDown(filterSelect());
+    expect(
+      screen.getByRole('option', { name: 'Behind Plan Only (1)' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Ahead Plan Only (1)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Top Gainers (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Top Laggards (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'All Stores (2)' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('option', { name: 'Top Laggards (2)' }));
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+    // With only 2 stores, both appear in the slice; #10 (more behind) first.
+    expect(screen.getByText('Store #20')).toBeInTheDocument();
+
+    fireEvent.mouseDown(filterSelect());
+    fireEvent.click(screen.getByRole('option', { name: 'Top Gainers (2)' }));
+    expect(screen.getByText('Store #20')).toBeInTheDocument();
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+
+    fireEvent.mouseDown(filterSelect());
+    fireEvent.click(screen.getByRole('option', { name: 'Ahead Plan Only (1)' }));
+    expect(screen.getByText('Store #20')).toBeInTheDocument();
+    expect(screen.queryByText('Store #10')).not.toBeInTheDocument();
+
+    fireEvent.mouseDown(filterSelect());
+    fireEvent.click(screen.getByRole('option', { name: 'Behind Plan Only (1)' }));
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+    expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
+
     expect(screen.getByText('Fact As-Of')).toBeInTheDocument();
     expect(screen.getByText('Plan As-Of')).toBeInTheDocument();
     expect(screen.getByText('Volume')).toBeInTheDocument();
