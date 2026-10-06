@@ -182,6 +182,8 @@ export const en = {
   'planner.dir.hold': 'Hold',
   'planner.target': 'Target (%)',
   'planner.horizon': 'Horizon (months)',
+  'planner.targetHint': '0–100',
+  'planner.horizonHint': '1–12 months',
   'planner.referenceMonth': 'Reference month',
   'planner.referenceMonthHint': 'Plan baseline month · each store weighted equally',
   'planner.advanced': 'Advanced allocator options',
@@ -202,36 +204,40 @@ export const en = {
     'Restore the session baseline plan (before Apply / surplus edits). Closes Inspect.',
   'planner.revertDraftDisabledTip':
     'Nothing to revert — draft matches the session baseline.',
-  'planner.packs.title': 'Scenario packs',
+  'planner.packs.title': 'Choose a question',
   'planner.packs.sub':
-    'One click: set levers, Run, optional surplus pass. Manual Inspect stays for exceptions.',
-  'planner.packs.apply': 'Apply pack',
+    'Pick one — we set the path and run the plan. Target, horizon, and reference stay as you set them above.',
+  'planner.packs.pathLeversSummary':
+    'Matches Allocator: {trajectory} · priority {priority} · max monthly {maxMonthly} pp',
+  'planner.packs.pathLeversAdvancedSuffix': ' · trajectory power {power} (Advanced)',
+  'planner.packs.apply': 'Show plan',
   'planner.packs.disabledTip': 'Fix Run blockers first (baseline, target, stores).',
-  'planner.packs.closeGap.title': 'Close the gap',
+  'planner.packs.closeGap.title': 'How do we close the gap to Target?',
   'planner.packs.closeGap.blurb':
-    'Higher lift priority + harvest 50% ahead surplus into behind (spend — network rises).',
-  'planner.packs.closeGap.effect': 'Network ↑',
-  'planner.packs.rebalance.title': 'Rebalance',
-  'planner.packs.rebalance.blurb':
-    'Same harvest with clawback from ahead — near zero-sum; store mix shifts, Hero stays flat.',
-  'planner.packs.rebalance.effect': 'Zero-sum',
-  'planner.packs.steady.title': 'Steady grind',
+    'You’ll get a network plan that puts more improvement on stores furthest below Target.',
+  'planner.packs.steady.title': 'What does even monthly progress look like?',
   'planner.packs.steady.blurb':
-    'Uniform trajectory, default priority — allocator only, no surplus post-pass.',
-  'planner.packs.steady.effect': 'Allocator',
-  'planner.packs.result.surplus':
-    'Pack applied · surplus {mode}: pool {pool} pp · Δ network {delta} pp',
-  'planner.packs.result.surplusSkipped':
-    'Pack applied · surplus skipped (need ahead + behind at as-of).',
-  'planner.packs.result.steady': 'Pack applied · Steady grind (levers only).',
-  'planner.exp.surplusTitle': 'Experiment · Surplus → behind',
-  'planner.exp.surplusHint':
-    'Harvest top ahead surplus (50%) and lift top behind from as-of → end. Default spends the pool (network rises). Clawback ≈ zero-sum.',
-  'planner.exp.clawback': 'Clawback ahead (zero-sum)',
-  'planner.exp.apply': 'Apply surplus redistribute',
-  'planner.exp.disabledTip': 'Run simulation first. Needs ahead + behind stores at as-of.',
-  'planner.exp.result':
-    'Pool {pool} pp · distributed {distributed} · leftover {leftover} · network Δ {delta} pp · donors {donors} → receivers {receivers} ({mode})',
+    'You’ll get a calm, even month-by-month path toward Target — easy to explain and monitor.',
+  'planner.packs.frontLoaded.title': 'How do we improve more at the start?',
+  'planner.packs.frontLoaded.blurb':
+    'You’ll get a plan with stronger gains early in the horizon, lighter toward the end.',
+  'planner.packs.result.applied': 'Answer ready · plan refreshed on the canvas.',
+  'planner.mix.title': 'Choose a store-mix question',
+  'planner.mix.sub':
+    'After a plan exists. Needs actuals at as-of with ahead and behind stores. Answer updates the draft — not a new Run.',
+  'planner.mix.recipeSummary':
+    'Uses top 10 ahead → top 10 behind · harvest 50% of ahead surplus from as-of → end.',
+  'planner.mix.apply': 'Show adjustment',
+  'planner.mix.disabledTip':
+    'Run or Show plan first. Needs ahead + behind stores with actuals at as-of.',
+  'planner.mix.liftBehind.title': 'How do we lift behind stores using ahead surplus?',
+  'planner.mix.liftBehind.blurb':
+    'You’ll get behind stores lifted from ahead surplus; network score may rise (leaders keep their plan).',
+  'planner.mix.rebalance.title': 'How do we rebalance stores without raising the network?',
+  'planner.mix.rebalance.blurb':
+    'You’ll get a near zero-sum shift — ahead plans ease down, behind rise; network stays about flat.',
+  'planner.mix.result':
+    'Adjustment ready · pool {pool} pp · distributed {distributed} · leftover {leftover} · network Δ {delta} pp · {donors} → {receivers} ({mode})',
   'planner.exportDisabledTip': 'Run a simulation first to enable export.',
   'planner.planFailed': 'Plan request failed',
   'planner.emptyReady':
@@ -253,7 +259,7 @@ export const en = {
   'planner.block.targetRange': 'Target must be between 0 and 100%.',
   'planner.block.capTight':
     'Required lift exceeds Months × Max monthly improve — raise the cap or horizon, or lower Target.',
-  'planner.block.horizon': 'Months must be between 1 and 60.',
+  'planner.block.horizon': 'Months must be between 1 and 12.',
   'planner.block.running': 'Simulation is running…',
 
   'planner.baseline.ready': 'Baseline: Cleansed Q10012 · {rows}',
@@ -285,10 +291,12 @@ export const en = {
   'planner.kpi.liftQuota': 'Required lift {lift} · quota N/A',
 
   'planner.atRisk.behindOnly': 'Behind Plan Only',
+  'planner.atRisk.aheadOnly': 'Ahead Plan Only',
   'planner.atRisk.topGainers': 'Top Gainers',
+  'planner.atRisk.topLaggards': 'Top Laggards',
   'planner.atRisk.all': 'All Stores',
-  'planner.atRisk.filter': 'Filter',
-  'planner.atRisk.asOf': 'Status as of',
+  'planner.atRisk.filter': 'View',
+  'planner.atRisk.asOf': 'As of',
   'planner.atRisk.behindChip': 'Behind {count}',
   'planner.atRisk.aheadChip': 'Ahead {count}',
   'planner.atRisk.col.store': 'Store ID',
@@ -311,6 +319,7 @@ export const en = {
 
   'planner.inspect.titlePrefix': 'Inspect ·',
   'planner.inspect.storeSelect': 'Select store',
+  'planner.inspect.glanceSub': 'Store snapshot · as-of {asOf} · End / Lift follow Estimate',
   'planner.inspect.sandboxWarn':
     'Session sandbox what-if — draft only. Does not mutate the accepted plan, Export CSV, or DB.',
   'planner.inspect.estimateTitle': 'Estimate vs actual',
@@ -350,9 +359,6 @@ export const en = {
 
   'planner.storeHero.title': 'Store evaluation',
   'planner.storeHero.empty': 'No plan series for this store.',
-  'planner.storeHero.hint':
-    'Same evaluation grammar as network Hero · black = fact · purple = cumulative actual · green = cumulative plan (if draft) · blue = draft simulation. Clawback / surplus shifts show on the blue path; store gap stays in the caption.',
-  'planner.storeHero.gapCaption': 'Store {id} · as-of gap {gap}',
   'planner.storeHero.actual': 'Cleansed fact',
   'planner.storeHero.cumulative': 'Cumulative actual',
   'planner.storeHero.planCumulative': 'Cumulative plan (if draft)',

@@ -3,7 +3,6 @@ import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
-import { monitoringDeviationFill } from '../../schemas/planActualGap';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
@@ -37,17 +36,9 @@ interface StoreHeroEvaluationChartProps {
   fillParent?: boolean;
 }
 
-function formatGap(value: number | null): string {
-  if (value == null || !Number.isFinite(value)) {
-    return '—';
-  }
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(1)} pp`;
-}
-
 /**
  * Store-level Evaluation View — same grammar as network Hero (fact · cumulative · plan · as-of).
- * Makes clawback / surplus redistribute readable per Inspected store.
+ * Gap / metric snapshot lives in Inspect glance strip; legend tips explain line colors.
  */
 export function StoreHeroEvaluationChart({
   plan,
@@ -82,13 +73,15 @@ export function StoreHeroEvaluationChart({
         if (!rect) {
           return;
         }
-        if (rect.height >= 180) {
-          setPlotHeight(Math.floor(rect.height));
+        const nextH = Math.floor(rect.height);
+        const nextW = Math.floor(rect.width);
+        // Drive Plot size via props only — do not fake window.resize (Plotly feedback loop).
+        if (nextH >= 180) {
+          setPlotHeight((prev) => (prev === nextH ? prev : nextH));
         }
-        if (rect.width > 0) {
-          setPlotWidth(Math.floor(rect.width));
+        if (nextW > 0) {
+          setPlotWidth((prev) => (prev === nextW ? prev : nextW));
         }
-        window.dispatchEvent(new Event('resize'));
       });
     });
     observer.observe(node);
@@ -124,7 +117,6 @@ export function StoreHeroEvaluationChart({
     planCumulativeYs,
     target,
     asOfLabel,
-    deviation,
   } = series;
   const yValues = [
     ...actualYs.filter((v): v is number => v != null),
@@ -139,7 +131,6 @@ export function StoreHeroEvaluationChart({
   const yMax = fitY.range?.[1] ?? 100;
   const contentMinWidth = Math.max(labels.length, 1) * STORE_HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
-  const gapColor = monitoringDeviationFill(deviation);
   const hoverPct = '%{x}<br>%{fullData.name}: %{y:.2f}%<extra></extra>';
 
   const data = [
@@ -232,44 +223,11 @@ export function StoreHeroEvaluationChart({
       data-testid="store-hero-evaluation-chart"
       sx={fillParent ? { flex: 1, minHeight: 0, height: '100%' } : undefined}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        flexWrap="wrap"
-        useFlexGap
-        spacing={0.75}
-        sx={{ minWidth: 0, columnGap: 1, rowGap: 0.25, flexShrink: 0 }}
+      <Typography
+        sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
       >
-        <Typography
-          component="span"
-          sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
-        >
-          {t('planner.storeHero.title')}
-        </Typography>
-        <Typography
-          component="span"
-          sx={{ fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.2, color: gapColor, flexShrink: 0 }}
-        >
-          {t('planner.storeHero.gapCaption', {
-            id: storeId,
-            gap: formatGap(deviation),
-          })}
-        </Typography>
-        <Typography
-          component="span"
-          color="text.secondary"
-          sx={{
-            fontSize: '0.65rem',
-            lineHeight: 1.2,
-            minWidth: 0,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: { xs: 'normal', md: 'nowrap' },
-          }}
-        >
-          {t('planner.storeHero.hint')}
-        </Typography>
-      </Stack>
+        {t('planner.storeHero.title')}
+      </Typography>
       <EvaluationLegend items={STORE_EVALUATION_LEGEND} testId="store-evaluation-legend" />
       <Box
         ref={containerRef}
@@ -337,7 +295,7 @@ export function StoreHeroEvaluationChart({
               config={{
                 displayModeBar: true,
                 displaylogo: false,
-                responsive: true,
+                responsive: false,
                 scrollZoom: true,
                 modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
               }}
