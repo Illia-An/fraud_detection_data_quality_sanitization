@@ -150,7 +150,7 @@ describe('PlannerPage controls rail', () => {
     const rail = screen.getByTestId('controls-rail');
     expect(rail).toHaveAttribute('data-collapsed', 'false');
     expect(screen.getByTestId('allocation-levers')).toBeInTheDocument();
-    expect(screen.getByText(/Allocation levers/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plan controls/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse controls' }));
 
