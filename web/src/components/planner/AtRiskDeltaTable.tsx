@@ -229,23 +229,37 @@ export function AtRiskDeltaTable({
         <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap alignItems="center">
           <Chip
             size="small"
-            label={t('planner.atRisk.behindChip', { count: insights.summary.behind })}
+            clickable
+            data-testid="atrisk-chip-behind"
+            aria-pressed={filter === 'behind'}
+            aria-label={t('planner.atRisk.behindChip', { count: behindCount })}
+            label={t('planner.atRisk.behindChip', { count: behindCount })}
+            onClick={() => setFilter('behind')}
             sx={{
               bgcolor: SIGNAL_COLORS.behind_plan,
               color: '#fff',
               height: 22,
               fontSize: '0.7rem',
+              cursor: 'pointer',
+              boxShadow: filter === 'behind' ? (theme) => `0 0 0 2px ${theme.palette.common.white}, 0 0 0 4px ${SIGNAL_COLORS.behind_plan}` : 'none',
               '& .MuiChip-label': { px: 0.75 },
             }}
           />
           <Chip
             size="small"
-            label={t('planner.atRisk.aheadChip', { count: insights.summary.ahead })}
+            clickable
+            data-testid="atrisk-chip-ahead"
+            aria-pressed={filter === 'ahead'}
+            aria-label={t('planner.atRisk.aheadChip', { count: aheadCount })}
+            label={t('planner.atRisk.aheadChip', { count: aheadCount })}
+            onClick={() => setFilter('ahead')}
             sx={{
               bgcolor: SIGNAL_COLORS.ahead_of_plan,
               color: '#fff',
               height: 22,
               fontSize: '0.7rem',
+              cursor: 'pointer',
+              boxShadow: filter === 'ahead' ? (theme) => `0 0 0 2px ${theme.palette.common.white}, 0 0 0 4px ${SIGNAL_COLORS.ahead_of_plan}` : 'none',
               '& .MuiChip-label': { px: 0.75 },
             }}
           />

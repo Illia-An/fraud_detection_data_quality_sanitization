@@ -184,4 +184,39 @@ describe('AtRiskDeltaTable', () => {
     fireEvent.click(screen.getByText('Store #10'));
     expect(onInspect).toHaveBeenCalledWith(10);
   });
+
+  it('switches View filter when Behind / Ahead chips are clicked', () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <AtRiskDeltaTable
+          plan={plan}
+          approvedPlan={null}
+          baselineRows={[
+            { store_id: 10, five_percent: 65 },
+            { store_id: 20, five_percent: 70 },
+          ]}
+          panel={panel}
+          insights={insights}
+          asOfOptions={[{ year: 2025, month: 4 }]}
+          onAsOfChange={vi.fn()}
+          onInspect={vi.fn()}
+        />
+      </ThemeProvider>,
+    );
+
+    // Default filter is Behind.
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+    expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-chip-behind')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByTestId('atrisk-chip-ahead'));
+    expect(screen.getByText('Store #20')).toBeInTheDocument();
+    expect(screen.queryByText('Store #10')).not.toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-chip-ahead')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('atrisk-chip-behind')).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(screen.getByTestId('atrisk-chip-behind'));
+    expect(screen.getByText('Store #10')).toBeInTheDocument();
+    expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
+  });
 });

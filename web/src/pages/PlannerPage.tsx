@@ -4,6 +4,7 @@ import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
+import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import {
   Accordion,
   AccordionDetails,
@@ -14,6 +15,7 @@ import {
   Card,
   CardContent,
   CardHeader,
+  Chip,
   CircularProgress,
   FormControl,
   IconButton,
@@ -31,6 +33,11 @@ import { Link as RouterLink } from 'react-router-dom';
 
 import { usePlan } from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
+import {
+  activeAnswerLabelKey,
+  type ActiveAnswer,
+} from '../components/planner/activeAnswer';
+import { createAnswerUndoSnapshot, type AnswerUndoSnapshot } from '../components/planner/answerUndo';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
 import {
@@ -193,6 +200,8 @@ export function PlannerPage() {
   const [mixNote, setMixNote] = useState<string | null>(null);
   const [pendingPackId, setPendingPackId] = useState<ScenarioPackId | null>(null);
   const [pendingMixId, setPendingMixId] = useState<StoreMixQuestionId | null>(null);
+  const [activeAnswer, setActiveAnswer] = useState<ActiveAnswer | null>(null);
+  const [answerUndo, setAnswerUndo] = useState<AnswerUndoSnapshot | null>(null);
 
   const railWidth = controlsOpen ? RAIL_WIDTH_PX : RAIL_COLLAPSED_PX;
 
@@ -262,10 +271,38 @@ export function PlannerPage() {
     monitoring.summary.ahead > 0 &&
     monitoring.summary.behind > 0;
 
+  const captureAnswerUndo = (): AnswerUndoSnapshot => {
+    const snap = createAnswerUndoSnapshot({
+      plan: draftPlan,
+      activeAnswer,
+      params,
+      mixNote,
+    });
+    setAnswerUndo(snap);
+    return snap;
+  };
+
+  const handleUndoAnswer = () => {
+    if (!answerUndo) {
+      return;
+    }
+    const snap = answerUndo;
+    setAnswerUndo(null);
+    setActiveAnswer(snap.activeAnswer);
+    setMixNote(snap.mixNote);
+    setParams(snap.params);
+    if (snap.plan) {
+      patchDraftPlan(snap.plan);
+    } else {
+      clearAll();
+    }
+  };
+
   const handleApplyStoreMix = (questionId: StoreMixQuestionId) => {
     if (!draftPlan || !monitoring || !canApplyStoreMix) {
       return;
     }
+    captureAnswerUndo();
     const recipe = getStoreMixQuestion(questionId);
     setPendingMixId(questionId);
     const result = redistributeSurplusToBehind(draftPlan, monitoring, {
@@ -275,6 +312,7 @@ export function PlannerPage() {
       clawbackDonors: recipe.clawbackDonors,
     });
     setDraftFromRun(result.plan);
+    setActiveAnswer({ kind: 'mix', id: questionId });
     setMixNote(
       t('planner.mix.result', {
         pool: result.poolPp.toFixed(1),
@@ -313,6 +351,7 @@ export function PlannerPage() {
     if (block != null || effectiveYear == null || effectiveMonth == null) {
       return;
     }
+    const undoSnap = captureAnswerUndo();
     planMutation.mutate(
       {
         reference_year: effectiveYear,
@@ -327,11 +366,16 @@ export function PlannerPage() {
           const next = response.metrics.five_percent;
           setDraftFromRun(next);
           setMixNote(null);
+          setActiveAnswer({ kind: 'manual' });
           if (panel) {
             const asOf = defaultAsOf(next, panel);
             setAsOfYear(asOf.year);
             setAsOfMonth(asOf.month);
           }
+        },
+        onError: () => {
+          setParams(undoSnap.params);
+          setAnswerUndo(null);
         },
       },
     );
@@ -351,6 +395,7 @@ export function PlannerPage() {
     if (block != null || effectiveYear == null || effectiveMonth == null || !panel) {
       return;
     }
+    const undoSnap = captureAnswerUndo();
     const pack = getScenarioPack(packId);
     setParams(pack.params);
     setPendingPackId(packId);
@@ -371,10 +416,13 @@ export function PlannerPage() {
           setAsOfMonth(asOf.month);
           setDraftFromRun(runPlan);
           setMixNote(t('planner.packs.result.applied'));
+          setActiveAnswer({ kind: 'pack', id: packId });
           setPendingPackId(null);
         },
         onError: () => {
           setPendingPackId(null);
+          setParams(undoSnap.params);
+          setAnswerUndo(null);
         },
       },
     );
@@ -580,6 +628,9 @@ export function PlannerPage() {
                     setReferenceYear(y);
                     setReferenceMonth(m);
                     clearAll();
+                    setActiveAnswer(null);
+                    setMixNote(null);
+                    setAnswerUndo(null);
                     setAsOfYear(null);
                     setAsOfMonth(null);
                   }}
@@ -614,6 +665,52 @@ export function PlannerPage() {
                   <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
                 </Typography>
               </Stack>
+
+              <Box
+                sx={{
+                  border: 2,
+                  borderColor: 'primary.light',
+                  borderRadius: 1.5,
+                  p: 1.25,
+                  bgcolor: 'action.hover',
+                }}
+                data-testid="scenario-packs-panel"
+              >
+                <ScenarioPackCards
+                  disabled={!canRun || planMutation.isPending}
+                  disabledTip={canRun ? '' : runTooltip}
+                  pendingId={pendingPackId}
+                  pathParams={params}
+                  onApply={handleApplyScenarioPack}
+                />
+              </Box>
+
+              <Box
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                }}
+                data-testid="store-mix-panel"
+              >
+                <StoreMixQuestionCards
+                  disabled={!canApplyStoreMix || pendingMixId != null}
+                  disabledTip={t('planner.mix.disabledTip')}
+                  pendingId={pendingMixId}
+                  onApply={handleApplyStoreMix}
+                />
+              </Box>
+
+              {mixNote ? (
+                <Alert
+                  severity="info"
+                  sx={{ py: 0.5, '& .MuiAlert-message': { fontSize: '0.7rem' } }}
+                  data-testid="planner-action-note"
+                >
+                  {mixNote}
+                </Alert>
+              ) : null}
 
               <Typography
                 variant="overline"
@@ -708,7 +805,8 @@ export function PlannerPage() {
               <Tooltip title={canRun ? '' : runTooltip}>
                 <span>
                   <Button
-                    variant="contained"
+                    variant="outlined"
+                    color="primary"
                     fullWidth
                     startIcon={
                       planMutation.isPending ? (
@@ -749,11 +847,16 @@ export function PlannerPage() {
                   <span style={{ flex: 1 }}>
                     <Button
                       variant="text"
-                      color="inherit"
+                      color="warning"
                       fullWidth
                       size="small"
                       disabled={!isDirty || approvedPlan == null}
-                      onClick={() => discardDraft()}
+                      onClick={() => {
+                        discardDraft();
+                        setActiveAnswer(null);
+                        setMixNote(null);
+                        setAnswerUndo(null);
+                      }}
                       data-testid="planner-revert-draft"
                     >
                       {t('planner.revertDraft')}
@@ -761,41 +864,6 @@ export function PlannerPage() {
                   </span>
                 </Tooltip>
               </Stack>
-
-              <Box
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
-                data-testid="scenario-packs-panel"
-              >
-                <ScenarioPackCards
-                  disabled={!canRun || planMutation.isPending}
-                  disabledTip={canRun ? '' : runTooltip}
-                  pendingId={pendingPackId}
-                  pathParams={params}
-                  onApply={handleApplyScenarioPack}
-                />
-              </Box>
-
-              <Box
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1 }}
-                data-testid="store-mix-panel"
-              >
-                <StoreMixQuestionCards
-                  disabled={!canApplyStoreMix || pendingMixId != null}
-                  disabledTip={t('planner.mix.disabledTip')}
-                  pendingId={pendingMixId}
-                  onApply={handleApplyStoreMix}
-                />
-              </Box>
-
-              {mixNote ? (
-                <Alert
-                  severity="info"
-                  sx={{ py: 0.5, '& .MuiAlert-message': { fontSize: '0.7rem' } }}
-                  data-testid="planner-action-note"
-                >
-                  {mixNote}
-                </Alert>
-              ) : null}
 
               {runBlock === 'no_stores' && (
                 <Typography variant="caption" color="warning.main">
@@ -902,6 +970,45 @@ export function PlannerPage() {
                 overflowX: { md: 'auto' },
               }}
             >
+              {activeAnswer || answerUndo ? (
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  alignItems="center"
+                  sx={{ alignSelf: 'center', flexShrink: 0 }}
+                >
+                  {activeAnswer ? (
+                    <Chip
+                      color="primary"
+                      variant="outlined"
+                      size="small"
+                      data-testid="planner-active-answer"
+                      label={t('planner.answer.chip', {
+                        label: t(activeAnswerLabelKey(activeAnswer)),
+                      })}
+                      sx={{
+                        fontWeight: 600,
+                        maxWidth: { xs: '100%', md: 240 },
+                        '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                      }}
+                    />
+                  ) : null}
+                  {answerUndo ? (
+                    <Tooltip title={t('planner.answer.undoTip')}>
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<UndoRoundedIcon fontSize="small" />}
+                        onClick={handleUndoAnswer}
+                        data-testid="planner-undo-answer"
+                        sx={{ flexShrink: 0, minWidth: 0, px: 1 }}
+                      >
+                        {t('planner.answer.undo')}
+                      </Button>
+                    </Tooltip>
+                  ) : null}
+                </Stack>
+              ) : null}
               <PlannerContextStrip
                 panel={panel}
                 processResult={processResult}
