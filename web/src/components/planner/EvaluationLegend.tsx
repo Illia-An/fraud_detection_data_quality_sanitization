@@ -157,6 +157,13 @@ export const HERO_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     swatch: 'dashdot',
   },
   {
+    id: 'windowCumulative',
+    labelKey: 'planner.hero.windowCumulative',
+    tipKey: 'planner.hero.tip.windowCumulative',
+    color: '#ef6c00',
+    swatch: 'dash',
+  },
+  {
     id: 'planCumulative',
     labelKey: 'planner.hero.planCumulative',
     tipKey: 'planner.hero.tip.planCumulative',

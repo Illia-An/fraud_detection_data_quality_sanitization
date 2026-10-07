@@ -429,6 +429,7 @@ export const he: Record<MessageKey, string> = {
   'planner.hero.coneSlack': 'חרוט תחזית (±רזרבה)',
   'planner.hero.fact': 'עובדה מנוקה',
   'planner.hero.cumulative': 'Actual מצטבר',
+  'planner.hero.windowCumulative': 'מסלול ליעד (−3 חוד׳)',
   'planner.hero.planCumulative': 'יעד מצטבר (אם הטיוטה)',
   'planner.hero.draft': 'סימולציית טיוטה',
   'planner.hero.target': 'יעד',
@@ -437,11 +438,14 @@ export const he: Record<MessageKey, string> = {
     'ממוצע שווה חודשי מנוקה של הרשת (עובדה) עד as-of.',
   'planner.hero.tip.cumulative':
     'ממוצע מצטבר של ציוני העובדה החודשיים מתחילת הסדרה עד כל חודש.',
+  'planner.hero.tip.windowCumulative':
+    'ממוצע מצטבר בחלון קצר מ־as-of − 3 חודשים, ואז מסלול מצטבר ישר שמגיע ליעד התוכנית בסוף האופק (אם התוכנית משיגה את היעד).',
   'planner.hero.tip.planCumulative':
-    'ממשיך את Actual מצטבר מ־as-of ומוסיף את ציוני הטיוטה החודשיים אם התוכנית תתממש.',
+    'ממוצע מצטבר מוחלט בחלון קצר מ־as-of עם ציוני הטיוטה החודשיים לאורך האופק (יכול לא להגיע ליעד).',
   'planner.hero.tip.draft':
-    'מסלול תוכנית חודשי מה־as-of; מתחיל מ־Actual מצטבר (מסירה).',
-  'planner.hero.tip.target': 'רמת יעד הרשת להרצת תוכנית זו.',
+    'מסלול תוכנית חודשי מה־as-of; מתחיל ממצטבר מוחלט בחלון הקצר (מסירה).',
+  'planner.hero.tip.target':
+    'יעד הרשת — הקו הכתום מגיע אליו בסוף האופק; הירוק מציג את המצטבר של הטיוטה עצמה.',
   'planner.hero.tip.cone':
     'רזרבת הקצאה רכה סביב הטיוטה (±נק׳) — לא מרווח סמך סטטיסטי.',
   'planner.hero.tip.asOf':

@@ -444,6 +444,7 @@ export const en = {
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
   'planner.hero.fact': 'Cleansed fact',
   'planner.hero.cumulative': 'Cumulative actual',
+  'planner.hero.windowCumulative': 'Path to target (−3 mo)',
   'planner.hero.planCumulative': 'Cumulative plan (if draft)',
   'planner.hero.draft': 'Draft simulation',
   'planner.hero.target': 'Target',
@@ -452,11 +453,14 @@ export const en = {
     'Monthly cleansed network equal-mean (fact) up to as-of.',
   'planner.hero.tip.cumulative':
     'Running average of monthly fact scores from the start of the series to each month.',
+  'planner.hero.tip.windowCumulative':
+    'Short-window running average from as-of − 3 months, then a straight cumulative path that reaches the plan target by the end of the horizon (if the plan hits target).',
   'planner.hero.tip.planCumulative':
-    'Continues cumulative actual from as-of, folding in draft monthly scores if the plan lands.',
+    'Absolute short-window running average from as-of with the draft’s monthly scores over the plan horizon (may miss target).',
   'planner.hero.tip.draft':
-    'Monthly draft plan path from as-of; starts on cumulative actual (handoff).',
-  'planner.hero.tip.target': 'Network target level for this plan run.',
+    'Monthly draft plan path from as-of; starts on absolute short-window cumulative (handoff).',
+  'planner.hero.tip.target':
+    'Network target — orange lands here at horizon end; green shows the draft’s own cumulative.',
   'planner.hero.tip.cone':
     'Soft allocation slack around the draft (±pp) — not a statistical confidence interval.',
   'planner.hero.tip.asOf':
