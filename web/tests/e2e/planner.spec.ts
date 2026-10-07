@@ -35,7 +35,7 @@ test.describe('Planner alt-UI smoke', () => {
 
     await page.getByRole('link', { name: /^Planner$/i }).click();
     await expect(page).toHaveURL(/\/planner/);
-    await expect(page.getByText(/Allocation levers/i)).toBeVisible();
+    await expect(page.getByText(/Plan controls/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /Run simulation/i })).toBeEnabled({
       timeout: 15_000,
     });

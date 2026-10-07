@@ -170,10 +170,10 @@ export const en = {
   'planner.needSanitization':
     'Run Sanitization first. Plan Run stays disabled until a cleansed baseline exists.',
   'planner.goSanitization': 'Sanitization',
-  'planner.leversTitle': 'Allocation levers',
+  'planner.leversTitle': 'Plan controls',
   'planner.leversSub': 'Q10012 top-box · equal-mean stores at reference month',
-  'planner.section.goalTime': '1. Goal & Time',
-  'planner.section.allocator': '2. Allocator',
+  'planner.section.goalTime': 'Goal & time',
+  'planner.section.allocator': 'Manual levers',
   'planner.current': 'Current:',
   'planner.currentHint':
     'Equal mean of cleansed store scores at the reference month (not Final over the whole period)',
@@ -222,6 +222,15 @@ export const en = {
   'planner.packs.frontLoaded.blurb':
     'You’ll get a plan with stronger gains early in the horizon, lighter toward the end.',
   'planner.packs.result.applied': 'Answer ready · plan refreshed on the canvas.',
+  'planner.answer.chip': 'Active answer: {label}',
+  'planner.answer.undo': 'Undo',
+  'planner.answer.undoTip': 'Restore the previous canvas answer',
+  'planner.answer.closeGap': 'Close the gap',
+  'planner.answer.steady': 'Steady path',
+  'planner.answer.frontLoaded': 'Front-loaded',
+  'planner.answer.liftBehind': 'Lift behind',
+  'planner.answer.rebalance': 'Rebalance flat',
+  'planner.answer.manual': 'Manual run',
   'planner.mix.title': 'Choose a store-mix question',
   'planner.mix.sub':
     'After a plan exists. Needs actuals at as-of with ahead and behind stores. Answer updates the draft — not a new Run.',
