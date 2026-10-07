@@ -35,11 +35,9 @@ async function ensureNetworkKpiScope(page: Page) {
   });
 }
 
-/** KPI Network delta card value (not Pipeline steps Δ vs prev cells). */
+/** KPI Network delta chip (not Pipeline steps Δ vs prev cells). */
 function networkDeltaValue(page: Page) {
-  return page
-    .getByText('Network delta', { exact: true })
-    .locator('xpath=following-sibling::*[1]');
+  return page.getByTestId('kpi-network-delta');
 }
 
 async function runPipeline(page: Page) {
