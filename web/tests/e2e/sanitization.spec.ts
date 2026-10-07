@@ -22,17 +22,12 @@ async function useSmallPreset(page: Page) {
 
 test.describe.configure({ timeout: 120_000 });
 
-/**
- * KPI strip follows chart Store|Network scope (default Store).
- * Network delta assertions need Network scope selected.
- */
-async function ensureNetworkKpiScope(page: Page) {
-  const networkScope = page.getByRole('button', { name: 'Network scope' });
-  await expect(networkScope).toBeVisible({ timeout: 30_000 });
-  await networkScope.click();
+/** Glance KPI strip is always network-scoped (no Store|Network toggle on Network Impact). */
+async function waitForNetworkKpis(page: Page) {
   await expect(page.getByText('Network delta', { exact: true })).toBeVisible({
-    timeout: 15_000,
+    timeout: 30_000,
   });
+  await expect(page.getByTestId('kpi-network-delta')).toBeVisible();
 }
 
 /** KPI Network delta chip (not Pipeline steps Δ vs prev cells). */
@@ -42,9 +37,8 @@ function networkDeltaValue(page: Page) {
 
 async function runPipeline(page: Page) {
   await page.getByRole('button', { name: 'Run Scenario' }).click();
-  await ensureNetworkKpiScope(page);
+  await waitForNetworkKpis(page);
   await expect(page.getByText('Baseline 5%', { exact: true })).toBeVisible();
-  await expect(networkDeltaValue(page)).toBeVisible();
 }
 
 async function readNetworkDelta(page: Page): Promise<string> {
@@ -67,7 +61,7 @@ test.describe('Sanitization flow', () => {
 
   test('small preset run shows KPI cards', async ({ page }) => {
     await useSmallPreset(page);
-    await ensureNetworkKpiScope(page);
+    await waitForNetworkKpis(page);
     await expect(page.getByText('Baseline 5%', { exact: true })).toBeVisible({
       timeout: 30_000,
     });
@@ -77,7 +71,7 @@ test.describe('Sanitization flow', () => {
 
   test('changing tier2 freq threshold changes network delta on re-run', async ({ page }) => {
     await useSmallPreset(page);
-    await ensureNetworkKpiScope(page);
+    await waitForNetworkKpis(page);
     const deltaDefault = await readNetworkDelta(page);
 
     const freq = page.getByLabel('Freq threshold');
