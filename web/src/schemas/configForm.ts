@@ -32,3 +32,7 @@ export const defaultConfigFormValues: ConfigFormValues = {
 export function toPipelineConfig(values: ConfigFormValues): PipelineConfig {
   return pipelineConfigSchema.parse(values);
 }
+
+export function pipelineConfigToFormValues(config: PipelineConfig): ConfigFormValues {
+  return configFormSchema.parse(config);
+}

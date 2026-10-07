@@ -3,9 +3,12 @@
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
 
 import { useT, type MessageKey } from '../../i18n';
+import { isPipelineStepEnabled, type PipelineConfig } from '../../schemas/api';
+import { STORE_IMPACT_COLORS } from '../charts/storeImpactChartData';
 
 export type EvaluationLegendSwatch =
   | 'solid'
+  | 'dash'
   | 'dashdot'
   | 'dot'
   | 'thick'
@@ -50,7 +53,13 @@ function LegendSwatch({ color, swatch }: { color: string; swatch: EvaluationLege
     );
   }
   const dasharray =
-    swatch === 'dashdot' ? '4 2 1 2' : swatch === 'dot' || swatch === 'target' ? '2 2' : undefined;
+    swatch === 'dash'
+      ? '4 3'
+      : swatch === 'dashdot'
+        ? '4 2 1 2'
+        : swatch === 'dot' || swatch === 'target'
+          ? '2 2'
+          : undefined;
   const strokeWidth = swatch === 'thick' ? 3 : swatch === 'target' ? 1.5 : 2;
   return (
     <Box
@@ -229,3 +238,66 @@ export const STORE_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     swatch: 'asOf',
   },
 ] as const;
+
+/** Sanitization Network / Store impact timeline legend (Actual + enabled tiers). */
+export const NETWORK_IMPACT_LEGEND: readonly EvaluationLegendItem[] = [
+  {
+    id: 'actual',
+    labelKey: 'chart.legend.actual',
+    tipKey: 'chart.tip.actual',
+    color: STORE_IMPACT_COLORS.actual,
+    swatch: 'thick',
+  },
+  {
+    id: 'tier1',
+    labelKey: 'chart.legend.tier1',
+    tipKey: 'chart.tip.tier1',
+    color: STORE_IMPACT_COLORS.tier1,
+    swatch: 'dash',
+  },
+  {
+    id: 'tier2',
+    labelKey: 'chart.legend.tier2',
+    tipKey: 'chart.tip.tier2',
+    color: STORE_IMPACT_COLORS.tier2,
+    swatch: 'dashdot',
+  },
+  {
+    id: 'tier3',
+    labelKey: 'chart.legend.tier3',
+    tipKey: 'chart.tip.tier3',
+    color: STORE_IMPACT_COLORS.tier3,
+    swatch: 'dot',
+  },
+  {
+    id: 'tier4',
+    labelKey: 'chart.legend.tier4',
+    tipKey: 'chart.tip.tier4',
+    color: STORE_IMPACT_COLORS.tier4,
+    swatch: 'thick',
+  },
+] as const;
+
+/** Drop legend rows for tiers disabled in the last run echo_config. */
+export function networkImpactLegendItems(
+  echoConfig?: PipelineConfig | null,
+): EvaluationLegendItem[] {
+  return NETWORK_IMPACT_LEGEND.filter((item) => {
+    if (item.id === 'actual') {
+      return true;
+    }
+    if (item.id === 'tier1') {
+      return isPipelineStepEnabled('tier1', echoConfig);
+    }
+    if (item.id === 'tier2') {
+      return isPipelineStepEnabled('tier2', echoConfig);
+    }
+    if (item.id === 'tier3') {
+      return isPipelineStepEnabled('tier3', echoConfig);
+    }
+    if (item.id === 'tier4') {
+      return isPipelineStepEnabled('tier4', echoConfig);
+    }
+    return false;
+  });
+}

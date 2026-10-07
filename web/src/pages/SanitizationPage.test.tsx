@@ -75,7 +75,18 @@ describe('SanitizationPage controls rail', () => {
   let mutate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mutate = vi.fn();
+    mutate = vi.fn((_request, options?: { onSuccess?: (data: unknown) => void }) => {
+      options?.onSuccess?.({
+        baseline_top_box_pct: 80,
+        final_top_box_pct: 75,
+        network_delta_pp: -5,
+        steps: [],
+        high_store_months: [],
+        store_impact_series: [],
+        echo_config: {},
+        meta: { execution_time_ms: 1, peak_memory_mb: 0.1, rows_scanned: 1 },
+      });
+    });
     mockUseProcess.mockReturnValue({
       mutate,
       isPending: false,
@@ -117,14 +128,14 @@ describe('SanitizationPage controls rail', () => {
 
     const rail = screen.getByTestId('controls-rail');
     expect(rail).toHaveAttribute('data-collapsed', 'false');
-    expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
+    expect(screen.getByText('Sanitization controls')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse controls' }));
 
     expect(rail).toHaveAttribute('data-collapsed', 'true');
     expect(screen.getByRole('button', { name: 'Expand controls' })).toBeInTheDocument();
     // Keep-mounted: form stays in the tree (hidden via CSS on md).
-    expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
+    expect(screen.getByText('Sanitization controls')).toBeInTheDocument();
     // Compact Play is deferred to avoid ghost-click on the collapse control.
     expect(screen.queryByTestId('collapsed-run')).not.toBeInTheDocument();
 
@@ -136,7 +147,7 @@ describe('SanitizationPage controls rail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Expand controls' }));
 
     expect(rail).toHaveAttribute('data-collapsed', 'false');
-    expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
+    expect(screen.getByText('Sanitization controls')).toBeInTheDocument();
     expect(screen.queryByTestId('collapsed-run')).not.toBeInTheDocument();
 
     vi.useRealTimers();
@@ -159,5 +170,82 @@ describe('SanitizationPage controls rail', () => {
 
     expect(mutate).not.toHaveBeenCalled();
     expect(useUiStore.getState().sampleGeneration).toBe(generationBefore);
+  });
+
+  it('lists scenario packs above manual tiers and runs pack recipe', async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(useUiStore.getState().sampleGeneration).toBeGreaterThan(0);
+    });
+    mutate.mockClear();
+
+    expect(screen.getByTestId('sanitization-scenario-packs-panel')).toBeInTheDocument();
+    expect(screen.getByText(/Choose a question/i)).toBeInTheDocument();
+    expect(screen.getByText('Manual tiers')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('sanitization-pack-apply-with_store_month'));
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalled();
+    });
+    const request = mutate.mock.calls.at(-1)?.[0];
+    expect(request.config.tier4_enabled).toBe(true);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sanitization-active-scenario')).toHaveTextContent(
+        /With store×month/i,
+      );
+    });
+    expect(screen.getByTestId('sanitization-undo-scenario')).toBeInTheDocument();
+    expect(screen.getByTestId('sanitization-manual-run')).toHaveClass('MuiButton-outlined');
+  });
+
+  it('active scenario chip scrolls to question packs', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(useUiStore.getState().sampleGeneration).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByTestId('sanitization-pack-apply-standard_spec'));
+    await waitFor(() => {
+      expect(screen.getByTestId('sanitization-active-scenario')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('sanitization-active-scenario'));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('undo restores previous config and clears one-level undo stack', async () => {
+    renderPage();
+
+    await waitFor(() => {
+      expect(useUiStore.getState().sampleGeneration).toBeGreaterThan(0);
+    });
+
+    fireEvent.click(screen.getByTestId('sanitization-pack-apply-with_store_month'));
+    await waitFor(() => {
+      expect(screen.getByTestId('sanitization-active-scenario')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('sanitization-pack-apply-core_only'));
+    await waitFor(() => {
+      expect(screen.getByTestId('sanitization-active-scenario')).toHaveTextContent(
+        /Blacklist \+ frequency/i,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId('sanitization-undo-scenario'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sanitization-active-scenario')).toHaveTextContent(
+        /With store×month/i,
+      );
+    });
+    expect(screen.queryByTestId('sanitization-undo-scenario')).not.toBeInTheDocument();
   });
 });

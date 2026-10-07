@@ -55,7 +55,7 @@ describe('KpiCards', () => {
     });
   });
 
-  it('renders verdict strip with network KPIs and run telemetry', () => {
+  it('renders compact glance strip with network KPIs and run telemetry', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <KpiCards result={processResult} />
@@ -69,25 +69,24 @@ describe('KpiCards', () => {
     expect(screen.getByText('Whole period · response-weighted')).toBeInTheDocument();
     expect(screen.getByText('82.10%')).toBeInTheDocument();
     expect(screen.getByText('Network delta')).toBeInTheDocument();
-    expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
+    expect(screen.getByTestId('kpi-network-delta')).toHaveTextContent('-3.40 pp');
     expect(screen.getByText('Run telemetry')).toBeInTheDocument();
-    expect(screen.getByTestId('run-telemetry-scroll')).toBeInTheDocument();
-    expect(screen.getByText('12.5 ms')).toBeInTheDocument();
-    expect(screen.getByText('0.50 MB')).toBeInTheDocument();
-    expect(screen.getByText('100')).toBeInTheDocument();
-    expect(screen.getByText(/A 4\.2 ms · B 8\.1 ms/)).toBeInTheDocument();
+    expect(screen.getByTestId('run-telemetry-summary')).toHaveTextContent(
+      'Time: 12.5 ms · RAM: 0.50 MB · Rows: 100 · A 4.2 ms · B 8.1 ms',
+    );
+    expect(screen.queryByTestId('run-telemetry-scroll')).not.toBeInTheDocument();
     expect(screen.queryByText('Tier 3 entities')).not.toBeInTheDocument();
     expect(screen.queryByText('Pipeline telemetry')).not.toBeInTheDocument();
   });
 
-  it('colors negative network delta as error', () => {
+  it('colors negative network delta as error Chip', () => {
     render(
       <ThemeProvider theme={appTheme}>
         <KpiCards result={processResult} />
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('-3.40 pp')).toHaveStyle({ color: 'rgb(211, 47, 47)' });
+    expect(screen.getByTestId('kpi-network-delta')).toHaveClass('MuiChip-colorError');
   });
 
   it('shows store-scoped KPIs when chart scope is Store', () => {
@@ -104,6 +103,16 @@ describe('KpiCards', () => {
     expect(screen.getByText('Store months · response-weighted')).toBeInTheDocument();
     expect(screen.getByText('70.00%')).toBeInTheDocument(); // (80+60)/2
     expect(screen.getByText('Store 1 delta')).toBeInTheDocument();
-    expect(screen.getByText('-10.00 pp')).toBeInTheDocument();
+    expect(screen.getByTestId('kpi-network-delta')).toHaveTextContent('-10.00 pp');
+  });
+
+  it('uses display:contents when embedded in a parent glance row', () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <KpiCards result={processResult} embedded />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId('kpi-telemetry-strip')).toHaveStyle({ display: 'contents' });
   });
 });
