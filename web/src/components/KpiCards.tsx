@@ -1,4 +1,5 @@
-import { Box, Card, CardContent, Grid2 as Grid, Stack, Typography } from '@mui/material';
+import { Box, Chip, Stack, Typography } from '@mui/material';
+import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 
 import { useT } from '../i18n';
@@ -11,15 +12,70 @@ import {
 
 interface KpiCardsProps {
   result: ProcessResponse;
+  /** Lock strip to network (main canvas) or follow chart Store|Network toggle. */
+  scopeMode?: 'auto' | 'network' | 'store';
+  /**
+   * When true, MiniCards participate in a parent flex glance row (`display: contents`).
+   * When false (default), this component owns a compact flex strip.
+   */
+  embedded?: boolean;
 }
 
-const denseCardContentSx = {
-  py: 0.5,
-  px: 1,
-  '&:last-child': { pb: 0.5 },
+const labelSx = {
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  color: 'text.secondary',
+  lineHeight: 1.15,
+  whiteSpace: 'nowrap',
 } as const;
 
-const TELEMETRY_SCROLL_MAX_HEIGHT_PX = 36;
+const valueSx = {
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  fontVariantNumeric: 'tabular-nums',
+  lineHeight: 1.2,
+  whiteSpace: 'nowrap',
+} as const;
+
+const hintSx = {
+  fontSize: '0.65rem',
+  fontWeight: 400,
+  color: 'text.secondary',
+  lineHeight: 1.15,
+  whiteSpace: 'nowrap',
+} as const;
+
+const chipSx = {
+  height: 18,
+  fontSize: '0.65rem',
+  fontWeight: 600,
+  '& .MuiChip-label': { px: 0.6 },
+} as const;
+
+function MiniCard({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      sx={{
+        width: 'fit-content',
+        maxWidth: '100%',
+        flex: '0 1 auto',
+        px: 1,
+        py: 0.5,
+        bgcolor: 'background.paper',
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 0.15,
+        overflow: 'hidden',
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
 
 function formatPct(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) {
@@ -53,82 +109,30 @@ function formatMb(value: number | undefined): string {
   return `${value.toFixed(2)} MB`;
 }
 
-function deltaColor(value: number | null | undefined): string | undefined {
+function deltaChipColor(
+  value: number | null | undefined,
+): 'default' | 'success' | 'error' {
   if (value == null || Number.isNaN(value) || value === 0) {
-    return undefined;
+    return 'default';
   }
   // Positive delta = KPI rose after sanitization; negative = fell.
-  return value > 0 ? 'success.main' : 'error.main';
+  return value > 0 ? 'success' : 'error';
 }
 
-function TelemetrySummary({ meta }: { meta: ResponseMeta }) {
-  const t = useT();
-  const lines = [
-    { label: t('kpi.time'), value: formatMs(meta.execution_time_ms) },
-    { label: t('kpi.ram'), value: formatMb(meta.peak_memory_mb) },
-    { label: t('kpi.rows'), value: String(meta.rows_scanned ?? '—') },
+function formatTelemetryLine(meta: ResponseMeta, t: ReturnType<typeof useT>): string {
+  const parts = [
+    `${t('kpi.time')}: ${formatMs(meta.execution_time_ms)}`,
+    `${t('kpi.ram')}: ${formatMb(meta.peak_memory_mb)}`,
+    `${t('kpi.rows')}: ${meta.rows_scanned ?? '—'}`,
   ];
-
   const queryBits = [
     meta.db_query_a_time_ms != null ? `A ${formatMs(meta.db_query_a_time_ms)}` : null,
     meta.db_query_b_time_ms != null ? `B ${formatMs(meta.db_query_b_time_ms)}` : null,
   ].filter(Boolean);
-
-  return (
-    <Stack spacing={0.25}>
-      {lines.map((line) => (
-        <Typography key={line.label} variant="caption" component="p" sx={{ m: 0 }}>
-          <Typography component="span" variant="caption" color="text.secondary">
-            {line.label}:{' '}
-          </Typography>
-          <Typography component="span" variant="caption" fontWeight={600}>
-            {line.value}
-          </Typography>
-        </Typography>
-      ))}
-      {queryBits.length > 0 && (
-        <Typography variant="caption" color="text.secondary">
-          {queryBits.join(' · ')}
-        </Typography>
-      )}
-    </Stack>
-  );
-}
-
-function KpiMetricCard({
-  label,
-  value,
-  valueColor,
-  hint,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-  hint?: string;
-}) {
-  return (
-    <Card variant="outlined" sx={{ height: '100%' }}>
-      <CardContent sx={denseCardContentSx}>
-        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0 }}>
-          {label}
-        </Typography>
-        <Typography
-          variant="subtitle1"
-          component="p"
-          fontWeight={700}
-          color={valueColor}
-          sx={{ m: 0, lineHeight: 1.25 }}
-        >
-          {value}
-        </Typography>
-        {hint ? (
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
-            {hint}
-          </Typography>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
+  if (queryBits.length > 0) {
+    parts.push(queryBits.join(' · '));
+  }
+  return parts.join(' · ');
 }
 
 function resolveStoreKpis(
@@ -141,8 +145,12 @@ function resolveStoreKpis(
   return computePeriodKpisFromPoints(filterStoreSeries(series, storeId));
 }
 
-/** Verdict strip: Baseline / Final / delta / Run telemetry. Scope follows chart Store|Network. */
-export function KpiCards({ result }: KpiCardsProps) {
+/** Compact verdict strip: Baseline / Final / delta / Run telemetry (Planner MiniCard glance). */
+export function KpiCards({
+  result,
+  scopeMode = 'auto',
+  embedded = false,
+}: KpiCardsProps) {
   const t = useT();
   const chartScope = useUiStore((state) => state.chartScope);
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
@@ -152,7 +160,9 @@ export function KpiCards({ result }: KpiCardsProps) {
     [result.store_impact_series, selectedStoreId],
   );
 
-  const useStoreScope = chartScope === 'store';
+  const effectiveScope =
+    scopeMode === 'auto' ? chartScope : scopeMode === 'network' ? 'network' : 'store';
+  const useStoreScope = effectiveScope === 'store';
   const baseline = useStoreScope ? storeKpis.baseline_top_box_pct : result.baseline_top_box_pct;
   const finalPct = useStoreScope ? storeKpis.final_top_box_pct : result.final_top_box_pct;
   const delta = useStoreScope ? storeKpis.delta_pp : result.network_delta_pp;
@@ -170,39 +180,55 @@ export function KpiCards({ result }: KpiCardsProps) {
     : t('kpi.deltaNetwork');
 
   return (
-    <Grid container spacing={0.75} alignItems="stretch" data-testid="kpi-telemetry-strip">
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard label={baselineLabel} value={formatPct(baseline)} />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard label={finalLabel} value={formatPct(finalPct)} hint={finalHint} />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <KpiMetricCard
-          label={deltaLabel}
-          value={formatDelta(delta)}
-          valueColor={deltaColor(delta)}
+    <Box
+      data-testid="kpi-telemetry-strip"
+      sx={
+        embedded
+          ? { display: 'contents' }
+          : {
+              display: 'flex',
+              flexWrap: { xs: 'wrap', md: 'nowrap' },
+              alignItems: 'stretch',
+              justifyContent: 'flex-start',
+              gap: 0.75,
+              width: '100%',
+              overflowX: { md: 'auto' },
+            }
+      }
+    >
+      <MiniCard>
+        <Typography sx={labelSx}>{baselineLabel}</Typography>
+        <Typography sx={valueSx}>{formatPct(baseline)}</Typography>
+      </MiniCard>
+
+      <MiniCard>
+        <Typography sx={labelSx}>{finalLabel}</Typography>
+        <Stack direction="row" spacing={0.5} alignItems="baseline" flexWrap="wrap" useFlexGap>
+          <Typography sx={valueSx}>{formatPct(finalPct)}</Typography>
+          <Typography sx={hintSx}>{finalHint}</Typography>
+        </Stack>
+      </MiniCard>
+
+      <MiniCard>
+        <Typography sx={labelSx}>{deltaLabel}</Typography>
+        <Chip
+          size="small"
+          label={formatDelta(delta)}
+          color={deltaChipColor(delta)}
+          data-testid="kpi-network-delta"
+          sx={chipSx}
         />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <Card variant="outlined" sx={{ height: '100%' }}>
-          <CardContent sx={denseCardContentSx}>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0 }}>
-              {t('kpi.telemetry')}
-            </Typography>
-            <Box
-              data-testid="run-telemetry-scroll"
-              sx={{
-                maxHeight: TELEMETRY_SCROLL_MAX_HEIGHT_PX,
-                overflowY: 'auto',
-                pr: 0.5,
-              }}
-            >
-              <TelemetrySummary meta={result.meta} />
-            </Box>
-          </CardContent>
-        </Card>
-      </Grid>
-    </Grid>
+      </MiniCard>
+
+      <MiniCard>
+        <Typography sx={labelSx}>{t('kpi.telemetry')}</Typography>
+        <Typography
+          sx={{ ...valueSx, fontWeight: 600 }}
+          data-testid="run-telemetry-summary"
+        >
+          {formatTelemetryLine(result.meta, t)}
+        </Typography>
+      </MiniCard>
+    </Box>
   );
 }

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -64,6 +64,7 @@ function makeRunner(overrides: Partial<PipelineRunner> = {}): PipelineRunner {
     error: null,
     displayResult: null,
     handleRun: vi.fn(),
+    restoreDisplayResult: vi.fn(),
     ...overrides,
   };
 }
@@ -98,18 +99,33 @@ describe('PipelineRunPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows KPI cards and audit sections when result is present', async () => {
+  it('shows KPI cards, network canvas entry, and steps when result is present', async () => {
     renderPanel(makeRunner({ displayResult: processResult }));
 
     await waitFor(() => {
+      expect(screen.getByTestId('sanitization-glance-row')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-telemetry-strip')).toBeInTheDocument();
       expect(screen.getAllByText('85.50%').length).toBeGreaterThan(0);
-      expect(screen.getByText('-3.40 pp')).toBeInTheDocument();
-      expect(screen.getByTestId('explore-split')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-network-delta')).toHaveTextContent('-3.40 pp');
+      expect(screen.getByTestId('sanitization-explore-stack')).toBeInTheDocument();
+      expect(screen.getByTestId('sanitization-network-card')).toBeInTheDocument();
+      expect(screen.getByTestId('sanitization-network-toolbar')).toBeInTheDocument();
+      expect(screen.getByTestId('sanitization-open-inspect')).toBeInTheDocument();
+      expect(screen.getByTestId('sanitization-flagged-entry')).toHaveTextContent(/Flagged · 1/i);
       expect(screen.getByTestId('pipeline-steps-overlay')).toBeInTheDocument();
-      expect(screen.getByText('Flagged store×months')).toBeInTheDocument();
+      expect(screen.queryByText('Flagged store×months')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Pipeline steps funnel/i })).toBeInTheDocument();
       expect(screen.getByText(/Largest Δ vs prev:/i)).toBeInTheDocument();
     });
+  });
+
+  it('opens store Inspect dialog from flagged entry chip', () => {
+    renderPanel(makeRunner({ displayResult: processResult }));
+
+    fireEvent.click(screen.getByTestId('sanitization-flagged-entry'));
+    expect(screen.getByTestId('sanitization-store-inspect')).toBeInTheDocument();
+    expect(screen.getByTestId('sanitization-inspect-glance')).toBeInTheDocument();
+    expect(screen.getByTestId('sanitization-inspect-flagged-panel')).toBeInTheDocument();
   });
 
   it('shows error state', () => {

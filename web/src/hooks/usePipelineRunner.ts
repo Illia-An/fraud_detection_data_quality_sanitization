@@ -9,6 +9,11 @@ import {
 } from '../schemas/period';
 import { useUiStore } from '../store/uiStore';
 
+export interface PipelineRunCallbacks {
+  onSuccess?: (data: ProcessResponse) => void;
+  onError?: () => void;
+}
+
 export interface PipelineRunner {
   canRun: boolean;
   noData: boolean;
@@ -16,7 +21,18 @@ export interface PipelineRunner {
   isError: boolean;
   error: Error | null;
   displayResult: ProcessResponse | null;
-  handleRun: () => void;
+  handleRun: (overrideConfig?: PipelineConfig, callbacks?: PipelineRunCallbacks) => void;
+  /** Clear mutation cache then restore a prior canvas result (one-level undo). */
+  restoreDisplayResult: (result: ProcessResponse | null) => void;
+}
+
+function isPipelineConfig(value: unknown): value is PipelineConfig {
+  return (
+    value != null &&
+    typeof value === 'object' &&
+    'tier1_blacklist_enabled' in value &&
+    typeof (value as PipelineConfig).tier1_blacklist_enabled === 'boolean'
+  );
 }
 
 function buildProcessRequest(
@@ -108,21 +124,37 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     customToDate,
   ]);
 
-  const handleRun = () => {
+  const handleRun = (overrideConfig?: PipelineConfig, callbacks?: PipelineRunCallbacks) => {
     if (!canRun) {
       return;
     }
+    const runConfig = isPipelineConfig(overrideConfig) ? overrideConfig : config;
     autoRunKeyRef.current = sampleGeneration;
     reset();
-    mutate(
-      buildProcessRequest(config, {
-        useDbSource,
-        surveyRows,
-        periodPreset,
-        customFromDate,
-        customToDate,
-      }),
-    );
+    const request = buildProcessRequest(runConfig, {
+      useDbSource,
+      surveyRows,
+      periodPreset,
+      customFromDate,
+      customToDate,
+    });
+    if (callbacks?.onSuccess || callbacks?.onError) {
+      mutate(request, {
+        onSuccess: (response) => {
+          callbacks.onSuccess?.(response);
+        },
+        onError: () => {
+          callbacks.onError?.();
+        },
+      });
+      return;
+    }
+    mutate(request);
+  };
+
+  const restoreDisplayResult = (result: ProcessResponse | null) => {
+    reset();
+    setProcessResult(result);
   };
 
   return {
@@ -133,5 +165,6 @@ export function usePipelineRunner(config: PipelineConfig): PipelineRunner {
     error: error instanceof Error ? error : error ? new Error(String(error)) : null,
     displayResult: data ?? processResult,
     handleRun,
+    restoreDisplayResult,
   };
 }
