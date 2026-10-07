@@ -65,8 +65,10 @@ describe('HeroSimulationChart', () => {
     const payload = screen.getByTestId('hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
     expect(payload).toContain('Cumulative actual');
+    expect(payload).toContain('Path to target (−3 mo)');
     expect(payload).toContain('Cumulative plan');
     expect(payload).toContain('Draft simulation');
+    expect(screen.getByTestId('evaluation-legend-item-windowCumulative')).toBeInTheDocument();
     expect(payload).not.toContain('Accepted plan');
     expect(payload).not.toContain('Reference baseline');
     expect(payload).toContain('as-of');

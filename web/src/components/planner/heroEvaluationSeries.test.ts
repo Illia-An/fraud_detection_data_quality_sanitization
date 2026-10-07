@@ -6,6 +6,8 @@ import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import {
   buildHeroEvaluationSeries,
   cumulativeMeanSeries,
+  linearCumulativePathToTarget,
+  shiftCalendarMonths,
 } from './heroEvaluationSeries';
 
 const panel: SanitizedPanel = {
@@ -49,52 +51,96 @@ describe('cumulativeMeanSeries', () => {
   });
 });
 
+describe('shiftCalendarMonths', () => {
+  it('shifts across year boundaries', () => {
+    expect(shiftCalendarMonths(2025, 3, -3)).toEqual({ year: 2024, month: 12 });
+    expect(shiftCalendarMonths(2025, 10, -3)).toEqual({ year: 2025, month: 7 });
+    expect(shiftCalendarMonths(2025, 1, 2)).toEqual({ year: 2025, month: 3 });
+  });
+});
+
+describe('linearCumulativePathToTarget', () => {
+  it('reaches target on the last horizon step', () => {
+    expect(linearCumulativePathToTarget(71, 75, 2)).toEqual([73, 75]);
+    expect(linearCumulativePathToTarget(85, 90, 1)).toEqual([90]);
+    expect(linearCumulativePathToTarget(80, 80, 3)).toEqual([80, 80, 80]);
+  });
+});
+
 describe('buildHeroEvaluationSeries', () => {
   it('puts cleansed fact left of as-of and draft forecast from as-of onward', () => {
     const series = buildHeroEvaluationSeries(draft, panel, { year: 2025, month: 3 }, 1.5);
 
     expect(series.asOfLabel).toBe('2025-03');
+    expect(series.windowStartLabel).toBe('2024-12');
     expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
-    // Feb network avg (68+72)/2 = 70; Mar (70+74)/2 = 72
     expect(series.factYs[0]).toBeCloseTo(70, 2);
     expect(series.factYs[1]).toBeCloseTo(72, 2);
-    expect(series.factYs[2]).toBeNull();
-    expect(series.factYs[3]).toBeNull();
 
-    // Cumulative: 70; (70+72)/2 = 71
     expect(series.cumulativeYs[0]).toBeCloseTo(70, 2);
     expect(series.cumulativeYs[1]).toBeCloseTo(71, 2);
-    expect(series.cumulativeYs[2]).toBeNull();
-    expect(series.cumulativeYs[3]).toBeNull();
 
-    // Green continues purple: handoff 71; then (70+72+73)/3; (70+72+73+74)/4
-    expect(series.planCumulativeYs[0]).toBeNull();
+    // Orange: short-window actual 70→71, then linear to target 75 over 2 months
+    expect(series.windowCumulativeYs[0]).toBeCloseTo(70, 2);
+    expect(series.windowCumulativeYs[1]).toBeCloseTo(71, 2);
+    expect(series.windowCumulativeYs[2]).toBeCloseTo(73, 2); // 71 + (75-71)/2
+    expect(series.windowCumulativeYs[3]).toBeCloseTo(75, 2); // lands on target
+
+    // Green: pure draft cumulative
     expect(series.planCumulativeYs[1]).toBeCloseTo(71, 2);
     expect(series.planCumulativeYs[2]).toBeCloseTo(71.67, 2);
     expect(series.planCumulativeYs[3]).toBeCloseTo(72.25, 2);
 
-    expect(series.draftYs[0]).toBeNull();
-    expect(series.draftYs[1]).toBeCloseTo(71, 5); // handoff = cumulative
+    expect(series.draftYs[1]).toBeCloseTo(71, 5);
     expect(series.draftYs[2]).toBeCloseTo(73, 5);
-    expect(series.draftYs[3]).toBeCloseTo(74, 5);
-
-    expect(series.upperYs[2]).toBeCloseTo(74.5, 5);
-    expect(series.lowerYs[2]).toBeCloseTo(71.5, 5);
     expect(series.target).toBe(75);
   });
 
-  it('anchors draft and plan-cumulative to purple when as-of is the first trajectory month', () => {
+  it('draws orange path-to-target from short-window handoff', () => {
+    const longPanel: SanitizedPanel = {
+      ...panel,
+      reference_month: 6,
+      rows: [
+        { store_id: 10, year: 2025, month: 1, five_percent: 50, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 2, five_percent: 60, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 3, five_percent: 70, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 4, five_percent: 80, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 5, five_percent: 90, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 6, five_percent: 100, survey_volume: 80 },
+      ],
+    };
+    const longDraft: FivePercentPlan = {
+      ...draft,
+      target: 90,
+      chain_trajectory: [{ year: 2025, month: 7, score: 101 }],
+      projections: [{ store_id: 10, months: [{ year: 2025, month: 7, score: 101 }] }],
+    };
+    const series = buildHeroEvaluationSeries(
+      longDraft,
+      longPanel,
+      { year: 2025, month: 6 },
+      1.5,
+    );
+
+    expect(series.windowStartLabel).toBe('2025-03');
+    expect(series.windowCumulativeYs[2]).toBeCloseTo(70, 2);
+    expect(series.windowCumulativeYs[5]).toBeCloseTo(85, 2); // handoff
+    // One horizon step → lands on target 90
+    expect(series.windowCumulativeYs[6]).toBeCloseTo(90, 2);
+    // Green still follows pure draft (88.2), not forced to target
+    expect(series.planCumulativeYs[5]).toBeCloseTo(85, 2);
+    expect(series.planCumulativeYs[6]).toBeCloseTo(88.2, 2);
+    expect(series.target).toBe(90);
+  });
+
+  it('keeps green on draft when as-of is first trajectory month', () => {
     const series = buildHeroEvaluationSeries(draft, panel, { year: 2025, month: 4 }, 1.5);
 
-    expect(series.labels).toEqual(['2025-02', '2025-03', '2025-04', '2025-05']);
-    expect(series.factYs[1]).toBeCloseTo(72, 2);
-    expect(series.cumulativeYs[1]).toBeCloseTo(71, 2);
-    expect(series.draftYs[0]).toBeNull();
-    expect(series.draftYs[1]).toBeCloseTo(71, 5); // blue starts on purple
-    expect(series.draftYs[2]).toBeCloseTo(73, 5);
-    expect(series.draftYs[3]).toBeCloseTo(74, 5);
-    expect(series.planCumulativeYs[0]).toBeNull();
-    expect(series.planCumulativeYs[1]).toBeCloseTo(71, 2); // green starts on purple
+    // Handoff Mar=71; horizon Apr+May → 73, 75 to target
+    expect(series.windowCumulativeYs[1]).toBeCloseTo(71, 2);
+    expect(series.windowCumulativeYs[2]).toBeCloseTo(73, 2);
+    expect(series.windowCumulativeYs[3]).toBeCloseTo(75, 2);
+    expect(series.planCumulativeYs[1]).toBeCloseTo(71, 2);
     expect(series.planCumulativeYs[2]).toBeCloseTo(71.67, 2);
     expect(series.planCumulativeYs[3]).toBeCloseTo(72.25, 2);
   });
