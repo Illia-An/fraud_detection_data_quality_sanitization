@@ -40,13 +40,15 @@ export function ScenarioPackCards({
   const t = useT();
 
   return (
-    <Stack spacing={1} data-testid="scenario-packs">
-      <Typography variant="caption" fontWeight={600}>
-        {t('planner.packs.title')}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" display="block">
-        {t('planner.packs.sub')}
-      </Typography>
+    <Stack spacing={1.25} data-testid="scenario-packs">
+      <Box>
+        <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.3 }}>
+          {t('planner.packs.title')}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: '0.8rem' }}>
+          {t('planner.packs.sub')}
+        </Typography>
+      </Box>
       <Typography
         variant="caption"
         color="text.secondary"
@@ -65,27 +67,27 @@ export function ScenarioPackCards({
             data-testid={`scenario-pack-${pack.id}`}
             sx={{
               border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              px: 1,
-              py: 0.75,
+              borderColor: 'primary.light',
+              borderRadius: 1.5,
+              px: 1.25,
+              py: 1,
               bgcolor: 'background.paper',
             }}
           >
-            <Stack spacing={0.5}>
-              <Typography variant="caption" fontWeight={700} sx={{ lineHeight: 1.3 }}>
+            <Stack spacing={0.75}>
+              <Typography variant="body2" fontWeight={700} sx={{ lineHeight: 1.35 }}>
                 {t(copy.title)}
               </Typography>
               <Typography
                 variant="caption"
                 color="text.secondary"
-                sx={{ fontSize: '0.68rem', lineHeight: 1.3 }}
+                sx={{ fontSize: '0.72rem', lineHeight: 1.35 }}
               >
                 {t(copy.blurb)}
               </Typography>
               <Button
-                size="small"
-                variant="outlined"
+                size="medium"
+                variant="contained"
                 fullWidth
                 disabled={disabled || otherBusy}
                 onClick={() => onApply(pack.id)}

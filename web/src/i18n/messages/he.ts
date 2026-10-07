@@ -163,10 +163,10 @@ export const he: Record<MessageKey, string> = {
   'planner.needSanitization':
     'הרץ סניטציה קודם. הרצת התוכנית מושבתת עד שקיים בסיס מנוקה.',
   'planner.goSanitization': 'סניטציה',
-  'planner.leversTitle': 'מנופי הקצאה',
+  'planner.leversTitle': 'בקרי תוכנית',
   'planner.leversSub': 'Q10012 top-box · ממוצע שווה של סניפים בחודש הייחוס',
-  'planner.section.goalTime': '1. יעד וזמן',
-  'planner.section.allocator': '2. מקצה',
+  'planner.section.goalTime': 'יעד וזמן',
+  'planner.section.allocator': 'מנופים ידניים',
   'planner.current': 'נוכחי:',
   'planner.currentHint':
     'ממוצע שווה של ציוני סניף מנוקים בחודש הייחוס (לא Final על כל התקופה)',
@@ -214,6 +214,15 @@ export const he: Record<MessageKey, string> = {
   'planner.packs.frontLoaded.blurb':
     'תקבלו תוכנית עם שיפור חזק יותר בתחילת האופק, וקל יותר לקראת הסוף.',
   'planner.packs.result.applied': 'התשובה מוכנה · התוכנית רועננה על המסך.',
+  'planner.answer.chip': 'תשובה פעילה: {label}',
+  'planner.answer.undo': 'בטל',
+  'planner.answer.undoTip': 'שחזר את התשובה הקודמת על המסך',
+  'planner.answer.closeGap': 'סגירת הפער',
+  'planner.answer.steady': 'מסלול יציב',
+  'planner.answer.frontLoaded': 'מוטה להתחלה',
+  'planner.answer.liftBehind': 'הרמת מאחור',
+  'planner.answer.rebalance': 'איזון מחדש',
+  'planner.answer.manual': 'הרצה ידנית',
   'planner.mix.title': 'בחרו שאלת תמהיל סניפים',
   'planner.mix.sub':
     'אחרי שיש תוכנית. נדרשים נתוני actual ב־as-of עם סניפים ahead ו־behind. התשובה מעדכנת את הטיוטה — לא הרצה חדשה.',
