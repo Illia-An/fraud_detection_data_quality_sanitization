@@ -23,7 +23,7 @@ describe('ConfigForm', () => {
   it('renders tier sections and default fields', () => {
     renderConfigForm();
 
-    expect(screen.getByText('Pipeline configuration')).toBeInTheDocument();
+    expect(screen.getByText('Sanitization controls')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 1/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 2/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Tier 3/i })).toBeInTheDocument();

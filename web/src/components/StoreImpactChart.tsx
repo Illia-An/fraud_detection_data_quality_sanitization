@@ -22,6 +22,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
+  Typography,
   type SelectChangeEvent,
 } from '@mui/material';
 import type { PlotMouseEvent } from 'plotly.js';
@@ -51,6 +52,10 @@ import {
   toggleLegendHiddenName,
   type StoreImpactYScaleMode,
 } from './charts/storeImpactChartData';
+import {
+  EvaluationLegend,
+  networkImpactLegendItems,
+} from './planner/EvaluationLegend';
 
 const Plot = lazy(async () => {
   const module = await import('react-plotly.js');
@@ -92,17 +97,35 @@ function usePlotContainerResize(enabled: boolean) {
   return containerRef;
 }
 
+export type StoreImpactChartLayout = 'default' | 'network' | 'store';
+
 interface StoreImpactChartProps {
   series: StoreImpactPoint[];
   highStoreMonths?: StoreMonthCell[];
   /** Last run echo_config — hides disabled tier curves. */
   echoConfig?: PipelineConfig | null;
+  /**
+   * `network` — main Sanitization canvas (no store picker / scope toggle).
+   * `store` — Inspect dialog (store picker, no Network toggle).
+   * `default` — full Store|Network chrome.
+   */
+  layout?: StoreImpactChartLayout;
+  /**
+   * When false, skip the outer Card chrome so a parent (e.g. Sanitization Hero card)
+   * can own the frame — mirrors Planner Hero wrapping HeroSimulationChart.
+   */
+  framed?: boolean;
+  /** Override store picker; default is hidden only for `layout="network"`. */
+  storeSelect?: boolean;
 }
 
 export function StoreImpactChart({
   series,
   highStoreMonths = [],
   echoConfig = null,
+  layout = 'default',
+  framed = true,
+  storeSelect,
 }: StoreImpactChartProps) {
   const t = useT();
   const selectedStoreId = useUiStore((state) => state.selectedStoreId);
@@ -116,11 +139,23 @@ export function StoreImpactChart({
   const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
   /** Trace names hidden via Plotly legend click — kept across hover re-renders. */
   const [legendHiddenNames, setLegendHiddenNames] = useState<Set<string>>(() => new Set());
+  /** Store+timeline: show Tier 4 flagged month bands/markers (toggle next to Timeline/YoY). */
+  const [showFlaggedOverlay, setShowFlaggedOverlay] = useState(true);
 
   const storeIds = useMemo(() => getStoreIds(series), [series]);
-  const isNetwork = chartScope === 'network';
+  const effectiveScope: ChartScopeMode =
+    layout === 'network' ? 'network' : layout === 'store' ? 'store' : chartScope;
+  const isNetwork = effectiveScope === 'network';
+  const showScopeToggle = layout === 'default';
+  const showStoreSelect = storeSelect ?? layout !== 'network';
   const isYoY = chartTimeMode === 'yoy';
+  /** Timeline: custom legend + tips (Hero pattern). YoY keeps Plotly legend (dynamic years). */
+  const useCustomLegend = !isYoY;
   const plotContainerRef = usePlotContainerResize(storeIds.length > 0);
+  const legendItems = useMemo(
+    () => networkImpactLegendItems(echoConfig),
+    [echoConfig],
+  );
 
   useEffect(() => {
     const nextStoreId = defaultSelectedStoreId(series, selectedStoreId);
@@ -146,13 +181,18 @@ export function StoreImpactChart({
     [highStoreMonths, activeStoreId],
   );
 
-  /** Store+timeline only: per-store Tier 4 overlays. Network/YoY declutter. */
+  const tier4Enabled = isPipelineStepEnabled('tier4', echoConfig);
+  /** Control visible on store timeline when Tier 4 is in the recipe (not Network). */
+  const showFlaggedControl = !isNetwork && tier4Enabled && !isYoY;
+  const flaggedOverlayAvailable = showFlaggedControl && flaggedForStore.length > 0;
+
+  /** Store+timeline only: per-store Tier 4 overlays. Network/YoY declutter; user toggle. */
   const flaggedForChart = useMemo(() => {
-    if (isNetwork || isYoY || !isPipelineStepEnabled('tier4', echoConfig)) {
+    if (!showFlaggedOverlay || !flaggedOverlayAvailable) {
       return [];
     }
     return flaggedForStore;
-  }, [isNetwork, isYoY, flaggedForStore, echoConfig]);
+  }, [showFlaggedOverlay, flaggedOverlayAvailable, flaggedForStore]);
 
   const baseTraces = useMemo(() => {
     if (isYoY) {
@@ -276,13 +316,8 @@ export function StoreImpactChart({
     return null;
   }
 
-  return (
-    <Card variant="outlined" sx={{ height: '100%', mb: 0 }}>
-      <CardHeader
-        title={t('chart.title')}
-        titleTypographyProps={{ variant: 'subtitle1' }}
-        sx={{ pb: 0, pt: 1.5, px: 2 }}
-        action={
+  const chartTitle = layout === 'network' ? t('chart.titleNetwork') : t('chart.title');
+  const controls = (
           <Stack
             direction="row"
             spacing={1}
@@ -290,22 +325,24 @@ export function StoreImpactChart({
             flexWrap="wrap"
             useFlexGap
             justifyContent="flex-end"
-            sx={{ mt: 0.5, mr: 1, maxWidth: { xs: '100%', md: 640 } }}
+            sx={{ mt: framed ? 0.5 : 0, mr: framed ? 1 : 0, maxWidth: { xs: '100%', md: 640 } }}
           >
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={chartScope}
-              onChange={handleScopeChange}
-              aria-label={t('chart.scopeAria')}
-            >
-              <ToggleButton value="store" aria-label={t('chart.scopeStoreAria')}>
-                {t('chart.scopeStore')}
-              </ToggleButton>
-              <ToggleButton value="network" aria-label={t('chart.scopeNetworkAria')}>
-                {t('chart.scopeNetwork')}
-              </ToggleButton>
-            </ToggleButtonGroup>
+            {showScopeToggle ? (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={chartScope}
+                onChange={handleScopeChange}
+                aria-label={t('chart.scopeAria')}
+              >
+                <ToggleButton value="store" aria-label={t('chart.scopeStoreAria')}>
+                  {t('chart.scopeStore')}
+                </ToggleButton>
+                <ToggleButton value="network" aria-label={t('chart.scopeNetworkAria')}>
+                  {t('chart.scopeNetwork')}
+                </ToggleButton>
+              </ToggleButtonGroup>
+            ) : null}
             <ToggleButtonGroup
               size="small"
               exclusive
@@ -320,6 +357,30 @@ export function StoreImpactChart({
                 {t('chart.yoy')}
               </ToggleButton>
             </ToggleButtonGroup>
+            {showFlaggedControl ? (
+              <Tooltip
+                title={
+                  flaggedOverlayAvailable
+                    ? t('chart.flaggedTip')
+                    : t('chart.flaggedDisabledTip')
+                }
+              >
+                <span>
+                  <ToggleButton
+                    size="small"
+                    value="flagged"
+                    selected={showFlaggedOverlay && flaggedOverlayAvailable}
+                    disabled={!flaggedOverlayAvailable}
+                    onChange={() => setShowFlaggedOverlay((prev) => !prev)}
+                    aria-label={t('chart.flaggedAria')}
+                    data-testid="chart-flagged-toggle"
+                    sx={{ px: 1 }}
+                  >
+                    {t('chart.flagged')}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+            ) : null}
             <ToggleButtonGroup
               size="small"
               exclusive
@@ -350,74 +411,145 @@ export function StoreImpactChart({
                 <Chip size="small" label={t('chart.yoyChip')} variant="outlined" sx={{ opacity: 0.85 }} />
               </Tooltip>
             ) : null}
-            <Tooltip
-              title={isNetwork ? t('chart.storeDisabledTip') : ''}
-              disableHoverListener={!isNetwork}
-            >
-              <span>
-                <FormControl
-                  size="small"
-                  sx={{
-                    minWidth: 120,
-                    opacity: isNetwork ? 0.5 : 1,
-                  }}
-                  disabled={isNetwork}
-                >
-                  <InputLabel id="store-impact-store-label">{t('common.store')}</InputLabel>
-                  <Select
-                    labelId="store-impact-store-label"
-                    label={t('common.store')}
-                    value={activeStoreId ?? ''}
-                    onChange={handleStoreChange}
-                    inputProps={{ 'aria-label': t('common.store') }}
-                    sx={{ cursor: isNetwork ? 'not-allowed' : undefined }}
+            {showStoreSelect ? (
+              <Tooltip
+                title={isNetwork ? t('chart.storeDisabledTip') : ''}
+                disableHoverListener={!isNetwork}
+              >
+                <span>
+                  <FormControl
+                    size="small"
+                    sx={{
+                      minWidth: 120,
+                      opacity: isNetwork ? 0.5 : 1,
+                    }}
+                    disabled={isNetwork}
                   >
-                    {storeIds.map((storeId) => (
-                      <MenuItem key={storeId} value={storeId}>
-                        {t('common.storeN', { id: storeId })}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </span>
-            </Tooltip>
+                    <InputLabel id="store-impact-store-label">{t('common.store')}</InputLabel>
+                    <Select
+                      labelId="store-impact-store-label"
+                      label={t('common.store')}
+                      value={activeStoreId ?? ''}
+                      onChange={handleStoreChange}
+                      inputProps={{ 'aria-label': t('common.store') }}
+                      sx={{ cursor: isNetwork ? 'not-allowed' : undefined }}
+                    >
+                      {storeIds.map((storeId) => (
+                        <MenuItem key={storeId} value={storeId}>
+                          {t('common.storeN', { id: storeId })}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </span>
+              </Tooltip>
+            ) : null}
           </Stack>
+  );
+
+  const plotBody = (
+    <Box
+      ref={plotContainerRef}
+      data-testid="store-impact-plot-container"
+      sx={{ width: '100%', minHeight: CHART_HEIGHT_PX }}
+    >
+      <Suspense
+        fallback={
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
         }
+      >
+        <Plot
+          data={traces}
+          layout={{
+            autosize: true,
+            height: CHART_HEIGHT_PX,
+            margin: { l: 48, r: 16, t: 12, b: useCustomLegend ? 40 : 56 },
+            xaxis: xAxis,
+            yaxis: yAxis,
+            shapes,
+            hovermode: 'closest',
+            showlegend: !useCustomLegend,
+            legend: useCustomLegend ? undefined : { orientation: 'h', y: -0.12 },
+          }}
+          config={{ displayModeBar: false, responsive: true }}
+          style={{ width: '100%', height: '100%' }}
+          useResizeHandler
+          onHover={handlePlotHover}
+          onUnhover={handlePlotUnhover}
+          onLegendClick={handleLegendClick}
+        />
+      </Suspense>
+    </Box>
+  );
+
+  const legendBlock = useCustomLegend ? (
+    <Stack spacing={0.35} sx={{ flexShrink: 0 }}>
+      <EvaluationLegend
+        items={legendItems}
+        testId="store-impact-legend"
+      />
+      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+        {t('chart.legendHint')}
+      </Typography>
+    </Stack>
+  ) : null;
+
+  if (!framed) {
+    return (
+      <Box
+        data-testid="store-impact-chart-bare"
+        sx={{
+          height: '100%',
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          mb: 0,
+        }}
+      >
+        <Stack
+          direction={{ xs: 'column', md: 'row' }}
+          spacing={1}
+          alignItems={{ xs: 'stretch', md: 'flex-start' }}
+          justifyContent="space-between"
+          sx={{ flexShrink: 0, px: 2, pt: 1, pb: 0 }}
+        >
+          <Box
+            component="h3"
+            sx={{
+              m: 0,
+              fontSize: '1rem',
+              fontWeight: 500,
+              lineHeight: 1.5,
+              alignSelf: { md: 'center' },
+            }}
+          >
+            {chartTitle}
+          </Box>
+          {controls}
+        </Stack>
+        <Stack spacing={0.75} sx={{ flex: 1, minHeight: 0, px: 2, pt: 1, pb: 1.5 }}>
+          {legendBlock}
+          <Box sx={{ flex: 1, minHeight: 0 }}>{plotBody}</Box>
+        </Stack>
+      </Box>
+    );
+  }
+
+  return (
+    <Card variant="outlined" sx={{ height: '100%', mb: 0 }}>
+      <CardHeader
+        title={chartTitle}
+        titleTypographyProps={{ variant: 'subtitle1' }}
+        sx={{ pb: 0, pt: 1.5, px: 2 }}
+        action={controls}
       />
       <CardContent sx={{ pt: 1, px: 2, pb: 1.5, '&:last-child': { pb: 1.5 } }}>
-        <Box
-          ref={plotContainerRef}
-          data-testid="store-impact-plot-container"
-          sx={{ width: '100%', minHeight: CHART_HEIGHT_PX }}
-        >
-          <Suspense
-            fallback={
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                <CircularProgress />
-              </Box>
-            }
-          >
-            <Plot
-              data={traces}
-              layout={{
-                autosize: true,
-                height: CHART_HEIGHT_PX,
-                margin: { l: 48, r: 16, t: 12, b: 40 },
-                xaxis: xAxis,
-                yaxis: yAxis,
-                shapes,
-                hovermode: 'closest',
-                legend: { orientation: 'h', y: -0.12 },
-              }}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: '100%', height: '100%' }}
-              useResizeHandler
-              onHover={handlePlotHover}
-              onUnhover={handlePlotUnhover}
-              onLegendClick={handleLegendClick}
-            />
-          </Suspense>
-        </Box>
+        <Stack spacing={0.75}>
+          {legendBlock}
+          {plotBody}
+        </Stack>
       </CardContent>
     </Card>
   );

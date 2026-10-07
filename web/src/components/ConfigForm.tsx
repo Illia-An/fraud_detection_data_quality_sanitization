@@ -18,20 +18,29 @@ import { useT } from '../i18n';
 import {
   configFormSchema,
   defaultConfigFormValues,
+  pipelineConfigToFormValues,
   toPipelineConfig,
   type ConfigFormValues,
 } from '../schemas/configForm';
-import type { PipelineConfig } from '../schemas/api';
+import { defaultPipelineConfig, type PipelineConfig } from '../schemas/api';
 
 interface ConfigFormProps {
   onValidConfigChange?: (config: PipelineConfig) => void;
+  /** Bump when parent applies a scenario pack so manual levers match the recipe. */
+  configRevision?: number;
+  seedConfig?: PipelineConfig;
 }
 
-export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
+export function ConfigForm({
+  onValidConfigChange,
+  configRevision = 0,
+  seedConfig,
+}: ConfigFormProps) {
   const t = useT();
   const {
     control,
     register,
+    reset,
     formState: { errors, isValid },
   } = useForm<ConfigFormValues>({
     resolver: zodResolver(configFormSchema),
@@ -40,6 +49,13 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   });
 
   const values = useWatch({ control });
+
+  useEffect(() => {
+    if (configRevision === 0) {
+      return;
+    }
+    reset(pipelineConfigToFormValues(seedConfig ?? defaultPipelineConfig));
+  }, [configRevision, reset, seedConfig]);
 
   useEffect(() => {
     if (!isValid || !values) {
@@ -55,8 +71,8 @@ export function ConfigForm({ onValidConfigChange }: ConfigFormProps) {
   return (
     <Card variant="outlined">
       <CardHeader
-        title={t('config.title')}
-        subheader={t('config.subheader')}
+        title={t('sanitization.controlsTitle')}
+        subheader={t('sanitization.controlsSub')}
         titleTypographyProps={{ variant: 'subtitle1' }}
         subheaderTypographyProps={{ variant: 'caption' }}
         sx={{ pb: 0 }}

@@ -49,7 +49,7 @@ function RunnerProbe({ onReady }: { onReady: (runner: ReturnType<typeof usePipel
   const runner = usePipelineRunner(defaultPipelineConfig);
   onReady(runner);
   return (
-    <button type="button" onClick={runner.handleRun} disabled={runner.noData || runner.isPending}>
+    <button type="button" onClick={() => runner.handleRun()} disabled={runner.noData || runner.isPending}>
       Run Scenario
     </button>
   );

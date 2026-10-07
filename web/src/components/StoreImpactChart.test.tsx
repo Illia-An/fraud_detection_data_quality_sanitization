@@ -1,10 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { defaultPipelineConfig } from '../schemas/api';
 import { appTheme } from '../theme';
-import { StoreImpactChart } from './StoreImpactChart';
 import { useUiStore } from '../store/uiStore';
+import { StoreImpactChart } from './StoreImpactChart';
 
 vi.mock('react-plotly.js', () => ({
   default: ({
@@ -58,6 +59,15 @@ const series = [
 ];
 
 describe('StoreImpactChart', () => {
+  beforeEach(() => {
+    useUiStore.setState({
+      selectedStoreId: 1,
+      chartScope: 'store',
+      chartTimeMode: 'timeline',
+      highlightedPeriodLabel: null,
+    });
+  });
+
   it('renders store selector and lazy plotly chart', async () => {
     useUiStore.setState({ selectedStoreId: 1 });
     render(
@@ -76,6 +86,12 @@ describe('StoreImpactChart', () => {
     await waitFor(() => {
       expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
     });
+    expect(screen.getByTestId('store-impact-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-actual')).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/Actual.*Raw top-box/i),
+    );
+    expect(screen.getByText('Hover legend labels for short tips.')).toBeInTheDocument();
   });
 
   it('toggles Y-scale between Fit and 0–100%', () => {
@@ -153,10 +169,12 @@ describe('StoreImpactChart', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Year over year mode' }));
     expect(useUiStore.getState().chartTimeMode).toBe('yoy');
     expect(screen.getByText('YoY overlay')).toBeInTheDocument();
+    expect(screen.queryByTestId('store-impact-legend')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Timeline mode' }));
     expect(useUiStore.getState().chartTimeMode).toBe('timeline');
     expect(screen.queryByText('YoY overlay')).not.toBeInTheDocument();
+    expect(screen.getByTestId('store-impact-legend')).toBeInTheDocument();
   });
 
   it('accepts highStoreMonths for Tier 4 overlays without crashing', async () => {
@@ -183,6 +201,44 @@ describe('StoreImpactChart', () => {
     await waitFor(() => {
       expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
     });
+  });
+
+  it('toggles Flagged overlay on/off next to Timeline/YoY when Tier 4 is enabled', async () => {
+    useUiStore.setState({ selectedStoreId: 1, chartScope: 'store', chartTimeMode: 'timeline' });
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreImpactChart
+          series={series}
+          echoConfig={{
+            ...defaultPipelineConfig,
+            tier4_enabled: true,
+          }}
+          highStoreMonths={[
+            {
+              store_id: 1,
+              year: 2025,
+              month: 1,
+              volume: 40,
+              five_pct: 95,
+              z: 2.5,
+              flagged: true,
+            },
+          ]}
+        />
+      </ThemeProvider>,
+    );
+
+    const toggle = await screen.findByTestId('chart-flagged-toggle');
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Year over year mode' }));
+    expect(screen.queryByTestId('chart-flagged-toggle')).not.toBeInTheDocument();
   });
 
   it('dims sibling series on hover and restores on unhover', async () => {
