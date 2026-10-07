@@ -12,6 +12,8 @@
 # ---- frontend build ----
 FROM node:20-bookworm-slim AS frontend
 WORKDIR /web
+# node:* images often default NODE_ENV=production → npm ci skips devDeps (no tsc/vite).
+ENV NODE_ENV=development
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
@@ -49,4 +51,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-CMD ["sh", "-c", "uv run uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Use the venv baked by `uv sync` — do not `uv run` at start (avoids PyPI/SSL
+# re-resolve for hatchling on corporate networks).
+CMD ["/app/.venv/bin/uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
