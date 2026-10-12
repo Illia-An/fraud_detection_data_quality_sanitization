@@ -8,21 +8,33 @@ import {
 } from '../../schemas/planActualGap';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
-import { cumulativeMeanSeries } from './heroEvaluationSeries';
+import {
+  CUMULATIVE_WINDOW_LAG_MONTHS,
+  cumulativeMeanSeries,
+  linearCumulativePathToTarget,
+  monthlyFromCumulativePath,
+  shiftCalendarMonths,
+} from './heroEvaluationSeries';
 
 export interface StoreHeroEvaluationSeries {
   labels: string[];
-  /** Monthly store fact ≤ as-of (Hero black). */
+  /** Monthly store fact from panel (may continue past as-of). */
   actualYs: (number | null)[];
   /** Monthly store plan; purple handoff then plan months (Hero blue). */
   planYs: (number | null)[];
-  /** Running mean of store actuals ≤ as-of (Hero purple). */
+  /** Running mean of store actuals wherever present (Hero purple). */
   cumulativeYs: (number | null)[];
   /**
-   * Continues from cumulative actual: fact months, then store plan months
+   * Continues from cumulative actual at as-of: fact ≤ as-of, then store plan months
    * (YTD if this store's draft lands). Drawn from purple handoff onward (Hero green).
    */
   planCumulativeYs: (number | null)[];
+  /**
+   * Monthlies after as-of that make short-window (−3) cum hit target (Network gray dash).
+   */
+  requiredMonthlyYs: (number | null)[];
+  /** Cum of short-window facts + required monthlies → target (Network gray solid). */
+  requiredCumulativeYs: (number | null)[];
   /** Network/store target line (Hero red). */
   target: number;
   asOfLabel: string | null;
@@ -62,7 +74,9 @@ function storeActual(
 
 /**
  * Same Evaluation grammar as network Hero, scoped to one store.
- * Timeline = store panel months ≤ as-of ∪ plan trajectory (fact history + plan).
+ * Timeline = store panel months (incl. after as-of) ∪ plan trajectory.
+ * Post-as-of fact is display-only; plan handoff / green stay locked at as-of.
+ * Required pair uses short-window (−3 … as-of) like Network Hero.
  * Optional sandbox draftLast patches the last estimate month (ephemeral).
  * Gap model stays plan-horizon only (Inspect table / deviation caption).
  */
@@ -91,9 +105,7 @@ export function buildStoreHeroEvaluationSeries(
       continue;
     }
     const point = { year: row.year, month: row.month };
-    if (atOrBefore(point, asOf)) {
-      periodMap.set(periodLabel(point.year, point.month), point);
-    }
+    periodMap.set(periodLabel(point.year, point.month), point);
   }
   for (const point of plan.chain_trajectory) {
     periodMap.set(periodLabel(point.year, point.month), {
@@ -110,12 +122,7 @@ export function buildStoreHeroEvaluationSeries(
     model.points.map((p) => [p.label, p.planned] as const).filter(([, v]) => v != null),
   );
 
-  const actualYs = periods.map((p) => {
-    if (!atOrBefore(p, asOf)) {
-      return null;
-    }
-    return storeActual(panel, storeId, p.year, p.month);
-  });
+  const actualYs = periods.map((p) => storeActual(panel, storeId, p.year, p.month));
   // Prefer monitoring as-of actual when panel cell missing (matches gap caption).
   const asOfIdxOnTimeline = labels.indexOf(asOfLabel);
   if (asOfIdxOnTimeline >= 0 && actualYs[asOfIdxOnTimeline] == null && model.actualAtAsOf != null) {
@@ -135,20 +142,19 @@ export function buildStoreHeroEvaluationSeries(
     return null;
   });
 
-  const planHandoffMonthlyYs = periods.map((_, i) => {
-    const fact = actualYs[i];
-    if (fact != null) {
-      return fact;
+  // Green grammar: facts ≤ as-of, then plan (ignore realized months after as-of).
+  const planHandoffMonthlyYs = periods.map((p, i) => {
+    if (atOrBefore(p, asOf) && actualYs[i] != null) {
+      return actualYs[i];
     }
     return planYs[i];
   });
   const planCumulativeFull = cumulativeMeanSeries(planHandoffMonthlyYs);
 
   let handoffIdx = -1;
-  for (let i = cumulativeYs.length - 1; i >= 0; i -= 1) {
-    if (cumulativeYs[i] != null) {
+  for (let i = 0; i < periods.length; i += 1) {
+    if (atOrBefore(periods[i], asOf) && cumulativeYs[i] != null) {
       handoffIdx = i;
-      break;
     }
   }
 
@@ -167,12 +173,89 @@ export function buildStoreHeroEvaluationSeries(
     return value;
   });
 
+  // Required pair — short-window (−3 … as-of), same invert as Network Hero.
+  const windowStart = shiftCalendarMonths(
+    asOf.year,
+    asOf.month,
+    -CUMULATIVE_WINDOW_LAG_MONTHS,
+  );
+  const windowFactYs = periods.map((p, i) => {
+    const fact = actualYs[i];
+    if (fact == null || periodCmp(p, windowStart) < 0 || !atOrBefore(p, asOf)) {
+      return null;
+    }
+    return fact;
+  });
+  const windowFactCumYs = cumulativeMeanSeries(windowFactYs);
+
+  let requiredHandoffIdx = -1;
+  for (let i = 0; i < periods.length; i += 1) {
+    if (atOrBefore(periods[i], asOf) && windowFactYs[i] != null) {
+      requiredHandoffIdx = i;
+    }
+  }
+
+  const horizonIdxs: number[] = [];
+  if (requiredHandoffIdx >= 0) {
+    for (let i = requiredHandoffIdx + 1; i < periods.length; i += 1) {
+      horizonIdxs.push(i);
+    }
+  }
+  const startCum =
+    requiredHandoffIdx >= 0 && windowFactCumYs[requiredHandoffIdx] != null
+      ? windowFactCumYs[requiredHandoffIdx]!
+      : null;
+
+  let handoffCount = 0;
+  if (requiredHandoffIdx >= 0) {
+    for (let i = 0; i <= requiredHandoffIdx; i += 1) {
+      if (windowFactYs[i] != null) {
+        handoffCount += 1;
+      }
+    }
+  }
+  const pathToTarget =
+    startCum == null
+      ? []
+      : linearCumulativePathToTarget(startCum, plan.target, horizonIdxs.length);
+  const requiredMonthlies =
+    startCum == null || handoffCount < 1 || pathToTarget.length === 0
+      ? []
+      : monthlyFromCumulativePath(startCum, handoffCount, pathToTarget);
+  const requiredByIdx = new Map(horizonIdxs.map((idx, k) => [idx, requiredMonthlies[k]!]));
+
+  const requiredMonthlyYs = periods.map((_p, i) => {
+    if (requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    if (requiredHandoffIdx >= 0 && i === requiredHandoffIdx) {
+      return windowFactYs[i];
+    }
+    return null;
+  });
+
+  const requiredPlanMonthlyYs = periods.map((_p, i) => {
+    if (requiredHandoffIdx >= 0 && i > requiredHandoffIdx && requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    return windowFactYs[i];
+  });
+  const requiredCumFull = cumulativeMeanSeries(requiredPlanMonthlyYs);
+  const requiredCumulativeYs = requiredCumFull.map((value, i) => {
+    if (requiredHandoffIdx < 0 || i < requiredHandoffIdx) {
+      return null;
+    }
+    return value;
+  });
+
   return {
     labels,
     actualYs,
     planYs,
     cumulativeYs,
     planCumulativeYs,
+    requiredMonthlyYs,
+    requiredCumulativeYs,
     target: plan.target,
     asOfLabel,
     asOfIndex: asOfIdxOnTimeline >= 0 ? asOfIdxOnTimeline : null,
