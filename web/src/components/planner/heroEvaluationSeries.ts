@@ -4,21 +4,43 @@ import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 
+/** Months before as-of where the short-window cumulative may start (inclusive). */
+export const CUMULATIVE_WINDOW_LAG_MONTHS = 3;
+
 export interface HeroEvaluationSeries {
   labels: string[];
   factYs: (number | null)[];
   /** Running mean of monthly network equal-means from first fact month (product lock). */
   cumulativeYs: (number | null)[];
   /**
-   * Running mean continuing from cumulative actual: fact months, then plan months
-   * (client YTD if the draft lands). Drawn from the purple handoff onward only.
+   * Short-window running mean from as-of − lag through as-of, then a linear cumulative
+   * path that reaches {@link HeroEvaluationSeries.target} at the end of the plan horizon
+   * (“if the plan hits target”).
+   */
+  windowCumulativeYs: (number | null)[];
+  /**
+   * Absolute short-window + pure-draft horizon mean from the fact handoff onward (green).
    */
   planCumulativeYs: (number | null)[];
   draftYs: (number | null)[];
+  /**
+   * Monthly scores after as-of that make the short-window cumulative (green grammar)
+   * follow orange and land on target. Not fact — inverted from Path to target (−3 mo).
+   * Stitches the last window fact at handoff for continuity with black.
+   */
+  requiredMonthlyYs: (number | null)[];
+  /**
+   * Cumulative of (short-window facts + required monthlies) — twin of gray dashed.
+   * Lands on target by construction; orange stays the independent linear path.
+   */
+  requiredCumulativeYs: (number | null)[];
   upperYs: (number | null)[];
   lowerYs: (number | null)[];
+  /** Plan target level (drawn as a horizontal reference on the hero). */
   target: number;
   asOfLabel: string;
+  /** Inclusive start of the short-window cumulative (as-of − lag). */
+  windowStartLabel: string;
 }
 
 interface PeriodPoint {
@@ -40,6 +62,19 @@ function atOrAfter(a: PeriodPoint, b: PeriodPoint): boolean {
 
 function roundPct(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/** Shift calendar month by delta (negative = earlier). */
+export function shiftCalendarMonths(
+  year: number,
+  month: number,
+  delta: number,
+): PeriodPoint {
+  const zeroBased = year * 12 + (month - 1) + delta;
+  return {
+    year: Math.floor(zeroBased / 12),
+    month: (zeroBased % 12) + 1,
+  };
 }
 
 function networkActual(
@@ -82,10 +117,56 @@ export function cumulativeMeanSeries(monthly: (number | null)[]): (number | null
 }
 
 /**
- * Timeline = cleansed panel months ≤ as-of ∪ plan trajectory months.
- * Fact / cumulative: solid left of / on as-of.
- * Draft / cone: from as-of onward (soft slack, not CI).
- * Blue (draft) and green (plan cumulative) both hand off from purple.
+ * Cumulative levels after handoff that land on target at step N (1-based).
+ * step k → startCum + (target − startCum) * k / N.
+ */
+export function linearCumulativePathToTarget(
+  startCum: number,
+  target: number,
+  horizonSteps: number,
+): number[] {
+  if (horizonSteps <= 0) {
+    return [];
+  }
+  return Array.from({ length: horizonSteps }, (_, i) =>
+    roundPct(startCum + ((target - startCum) * (i + 1)) / horizonSteps),
+  );
+}
+
+/**
+ * Invert running-mean cumulative levels into monthly scores.
+ * Handoff mean c0 over `startCount` months; then c1…cN:
+ * m_k = (n+k)·c_k − (n+k−1)·c_{k−1}.
+ */
+export function monthlyFromCumulativePath(
+  startCum: number,
+  startCount: number,
+  cumulativePath: number[],
+): number[] {
+  if (startCount < 1) {
+    throw new Error('startCount must be >= 1');
+  }
+  const out: number[] = [];
+  let prevCum = startCum;
+  let prevCount = startCount;
+  for (const nextCum of cumulativePath) {
+    const nextCount = prevCount + 1;
+    out.push(roundPct(nextCount * nextCum - prevCount * prevCum));
+    prevCum = nextCum;
+    prevCount = nextCount;
+  }
+  return out;
+}
+
+/**
+ * Timeline = cleansed panel months (incl. after as-of) ∪ plan trajectory (horizon).
+ * Fact / full cumulative (purple): realized panel scores wherever present.
+ * Planning handoff stays at as-of: short-window / required / draft ignore post-as-of fact.
+ * Orange: short-window actual mean, then linear cumulative path that reaches target.
+ * Green: short-window + pure draft cumulative (what the draft actually scores).
+ * Required monthly (dashed near-black): monthlies that make green grammar hit target.
+ * Required cumulative (solid near-black): cum of window facts + required monthlies → target.
+ * Blue / cone: monthly draft from absolute short-window handoff.
  * Session approved/baseline is kept for Revert only — not drawn on Hero.
  */
 export function buildHeroEvaluationSeries(
@@ -103,9 +184,7 @@ export function buildHeroEvaluationSeries(
       continue;
     }
     const point = { year: row.year, month: row.month };
-    if (atOrBefore(point, asOf)) {
-      periodMap.set(periodLabel(point.year, point.month), point);
-    }
+    periodMap.set(periodLabel(point.year, point.month), point);
   }
   for (const point of draftPlan.chain_trajectory) {
     periodMap.set(periodLabel(point.year, point.month), {
@@ -115,6 +194,15 @@ export function buildHeroEvaluationSeries(
   }
   periodMap.set(asOfLabel, { year: asOf.year, month: asOf.month });
 
+  const windowStart = shiftCalendarMonths(
+    asOf.year,
+    asOf.month,
+    -CUMULATIVE_WINDOW_LAG_MONTHS,
+  );
+  const windowStartLabel = periodLabel(windowStart.year, windowStart.month);
+  // Ensure −3 mo window marker has an x category even when panel has no row there.
+  periodMap.set(windowStartLabel, windowStart);
+
   const periods = [...periodMap.values()].sort(periodCmp);
   const labels = periods.map((p) => periodLabel(p.year, p.month));
 
@@ -122,19 +210,24 @@ export function buildHeroEvaluationSeries(
     draftPlan.chain_trajectory.map((p) => [periodLabel(p.year, p.month), p.score]),
   );
 
-  const factYs = periods.map((p) => {
-    if (!atOrBefore(p, asOf)) {
+  // Realized cleansed fact wherever the panel has it (may continue past as-of).
+  const factYs = periods.map((p) => networkActual(panel, p.year, p.month, storeIds));
+  const cumulativeYs = cumulativeMeanSeries(factYs);
+  // Short-window planning facts: as-of − lag … as-of only (post-as-of fact stays display-only).
+  const windowFactYs = periods.map((p, i) => {
+    const fact = factYs[i];
+    if (fact == null || periodCmp(p, windowStart) < 0 || !atOrBefore(p, asOf)) {
       return null;
     }
-    return networkActual(panel, p.year, p.month, storeIds);
+    return fact;
   });
-  const cumulativeYs = cumulativeMeanSeries(factYs);
+  const windowFactCumYs = cumulativeMeanSeries(windowFactYs);
 
-  // Hybrid monthly: facts through history, then draft plan months — one running mean.
-  const planHandoffMonthlyYs = periods.map((p, i) => {
-    const fact = factYs[i];
-    if (fact != null) {
-      return fact;
+  // Green monthly: window facts, then pure draft on the horizon.
+  const planMonthlyYs = periods.map((p, i) => {
+    const windowFact = windowFactYs[i];
+    if (windowFact != null) {
+      return windowFact;
     }
     const key = periodLabel(p.year, p.month);
     if (draftByLabel.has(key)) {
@@ -142,7 +235,7 @@ export function buildHeroEvaluationSeries(
     }
     return null;
   });
-  const planCumulativeFull = cumulativeMeanSeries(planHandoffMonthlyYs);
+  const absoluteWindowCumYs = cumulativeMeanSeries(planMonthlyYs);
 
   const draftYs = periods.map((p) => {
     if (!atOrAfter(p, asOf)) {
@@ -158,25 +251,90 @@ export function buildHeroEvaluationSeries(
     return null;
   });
 
-  // Last purple point = handoff for blue (monthly) and green (cumulative).
+  // Last window *fact* point = absolute handoff for blue / green / orange start.
   let handoffIdx = -1;
-  for (let i = cumulativeYs.length - 1; i >= 0; i -= 1) {
-    if (cumulativeYs[i] != null) {
+  for (let i = 0; i < periods.length; i += 1) {
+    if (atOrBefore(periods[i], asOf) && windowFactYs[i] != null) {
       handoffIdx = i;
-      break;
     }
   }
-  if (handoffIdx >= 0) {
-    draftYs[handoffIdx] = cumulativeYs[handoffIdx];
+  if (handoffIdx >= 0 && absoluteWindowCumYs[handoffIdx] != null) {
+    draftYs[handoffIdx] = absoluteWindowCumYs[handoffIdx];
   }
 
-  // Green from handoff onward only (same start as purple; then folds in plan months).
-  const planCumulativeYs = planCumulativeFull.map((value, i) => {
+  const planCumulativeYs = absoluteWindowCumYs.map((value, i) => {
     if (handoffIdx < 0 || i < handoffIdx) {
       return null;
     }
-    if (i === handoffIdx) {
-      return cumulativeYs[handoffIdx];
+    return value;
+  });
+
+  // Orange: short-window actual through handoff, then linear path to target on horizon.
+  const horizonIdxs: number[] = [];
+  if (handoffIdx >= 0) {
+    for (let i = handoffIdx + 1; i < periods.length; i += 1) {
+      horizonIdxs.push(i);
+    }
+  }
+  const startCum =
+    handoffIdx >= 0 && windowFactCumYs[handoffIdx] != null
+      ? windowFactCumYs[handoffIdx]!
+      : null;
+  const pathToTarget =
+    startCum == null
+      ? []
+      : linearCumulativePathToTarget(startCum, draftPlan.target, horizonIdxs.length);
+  const pathByIdx = new Map(horizonIdxs.map((idx, k) => [idx, pathToTarget[k]!]));
+
+  const windowCumulativeYs = periods.map((_p, i) => {
+    if (handoffIdx >= 0 && i === handoffIdx) {
+      return startCum;
+    }
+    if (pathByIdx.has(i)) {
+      return pathByIdx.get(i)!;
+    }
+    if (handoffIdx >= 0 && i > handoffIdx) {
+      return null;
+    }
+    return windowFactCumYs[i];
+  });
+
+  // Required monthly = invert orange so short-window (−3) running mean lands on target.
+  let handoffCount = 0;
+  if (handoffIdx >= 0) {
+    for (let i = 0; i <= handoffIdx; i += 1) {
+      if (windowFactYs[i] != null) {
+        handoffCount += 1;
+      }
+    }
+  }
+  const requiredMonthlies =
+    startCum == null || handoffCount < 1 || pathToTarget.length === 0
+      ? []
+      : monthlyFromCumulativePath(startCum, handoffCount, pathToTarget);
+  const requiredByIdx = new Map(horizonIdxs.map((idx, k) => [idx, requiredMonthlies[k]!]));
+
+  const requiredMonthlyYs = periods.map((_p, i) => {
+    if (requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    if (handoffIdx >= 0 && i === handoffIdx) {
+      return windowFactYs[i];
+    }
+    return null;
+  });
+
+  // Required cumulative = green grammar fed with required monthlies (pair with gray).
+  const requiredPlanMonthlyYs = periods.map((_p, i) => {
+    if (handoffIdx >= 0 && i > handoffIdx && requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    return windowFactYs[i];
+  });
+  const requiredCumFull = cumulativeMeanSeries(requiredPlanMonthlyYs);
+  const requiredCumulativeYs = requiredCumFull.map((value, i) => {
+    if (handoffIdx < 0 || i < handoffIdx) {
+      return null;
     }
     return value;
   });
@@ -188,11 +346,15 @@ export function buildHeroEvaluationSeries(
     labels,
     factYs,
     cumulativeYs,
+    windowCumulativeYs,
     planCumulativeYs,
     draftYs,
+    requiredMonthlyYs,
+    requiredCumulativeYs,
     upperYs,
     lowerYs,
     target: draftPlan.target,
     asOfLabel,
+    windowStartLabel,
   };
 }

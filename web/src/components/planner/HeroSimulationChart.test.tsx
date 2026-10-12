@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -64,20 +64,51 @@ describe('HeroSimulationChart', () => {
     });
     const payload = screen.getByTestId('hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
+    expect(payload).toContain('Required monthly (to hit target)');
+    expect(payload).toContain('Required cumulative (if required monthly)');
     expect(payload).toContain('Cumulative actual');
+    expect(payload).toContain('Path to target (−3 mo)');
     expect(payload).toContain('Cumulative plan');
     expect(payload).toContain('Draft simulation');
+    expect(screen.getByTestId('evaluation-legend-item-windowCumulative')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-requiredMonthly')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-windowHandoff')).toBeInTheDocument();
+    expect(payload).toContain('−3 mo window');
+    expect(payload).toContain('2024-12');
     expect(payload).not.toContain('Accepted plan');
     expect(payload).not.toContain('Reference baseline');
     expect(payload).toContain('as-of');
     expect(payload).toContain('2025-03');
     expect(payload).toContain('"showlegend":false');
     expect(payload).toContain('"scrollZoom":true');
+    expect(payload).toContain('"hovermode":"x unified"');
+    expect(payload).toContain('"showspikes":true');
+    expect(payload).toContain('"xref":"paper"');
+    expect(payload).toContain('"bgcolor":"rgba(33, 33, 33, 0.9)"');
+    expect(payload).toContain('"size":10');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
     expect(screen.getByTestId('hero-evaluation-legend')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
     expect(screen.getByText(/not a statistical confidence interval/i)).toBeInTheDocument();
+    expect(screen.getByText(/plan cutover/i)).toBeInTheDocument();
     expect(screen.getByText(/mouse wheel zooms/i)).toBeInTheDocument();
+    expect(screen.getByText(/Click legend labels to show\/hide/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('evaluation-legend-item-draft'));
+    await waitFor(() => {
+      const afterHide = screen.getByTestId('hero-plotly').textContent ?? '';
+      expect(afterHide).not.toContain('Draft simulation');
+    });
+    expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveAttribute(
+      'data-hidden',
+      'true',
+    );
+
+    fireEvent.click(screen.getByTestId('evaluation-legend-item-draft'));
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-plotly').textContent ?? '').toContain('Draft simulation');
+    });
   });
 });

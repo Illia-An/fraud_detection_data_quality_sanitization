@@ -1,5 +1,6 @@
 /** Shared Evaluation-view legend with hover tips (Plotly legend has no i18n tooltips). */
 
+import type { KeyboardEvent } from 'react';
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
 
 import { useT, type MessageKey } from '../../i18n';
@@ -85,14 +86,21 @@ interface EvaluationLegendProps {
   items: readonly EvaluationLegendItem[];
   /** Optional test id override (default evaluation-legend). */
   testId?: string;
+  /** When set with onToggle, items toggle series visibility (click / Enter / Space). */
+  hiddenIds?: ReadonlySet<string>;
+  onToggle?: (id: string) => void;
 }
 
 /** Compact horizontal legend; hover each item for a short EN/HE tip. */
 export function EvaluationLegend({
   items,
   testId = 'evaluation-legend',
+  hiddenIds,
+  onToggle,
 }: EvaluationLegendProps) {
   const t = useT();
+  const interactive = typeof onToggle === 'function';
+
   return (
     <Stack
       direction="row"
@@ -102,40 +110,88 @@ export function EvaluationLegend({
       data-testid={testId}
       sx={{ flexShrink: 0, columnGap: 1.25, rowGap: 0.5 }}
     >
-      {items.map((item) => (
-        <Tooltip
-          key={item.id}
-          title={t(item.tipKey)}
-          enterDelay={200}
-          describeChild
-        >
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0.5}
-            component="span"
-            tabIndex={0}
-            aria-label={`${t(item.labelKey)}. ${t(item.tipKey)}`}
-            data-testid={`evaluation-legend-item-${item.id}`}
-            sx={{
-              cursor: 'help',
-              outline: 'none',
-              '&:focus-visible': {
-                borderRadius: 0.5,
-                boxShadow: (theme) => `0 0 0 2px ${theme.palette.primary.main}`,
-              },
-            }}
+      {items.map((item) => {
+        const hidden = hiddenIds?.has(item.id) ?? false;
+        const label = t(item.labelKey);
+        const tip = t(item.tipKey);
+        const toggleHint = interactive
+          ? hidden
+            ? t('planner.hero.legendShow')
+            : t('planner.hero.legendHide')
+          : null;
+
+        return (
+          <Tooltip
+            key={item.id}
+            title={toggleHint ? `${tip} · ${toggleHint}` : tip}
+            enterDelay={200}
+            describeChild
           >
-            <LegendSwatch color={item.color} swatch={item.swatch} />
-            <Typography
-              component="span"
-              sx={{ fontSize: '0.7rem', fontWeight: 600, lineHeight: 1.2, color: 'text.secondary' }}
+            <Box
+              component={interactive ? 'button' : 'span'}
+              type={interactive ? 'button' : undefined}
+              tabIndex={0}
+              aria-label={
+                toggleHint ? `${label}. ${tip}. ${toggleHint}` : `${label}. ${tip}`
+              }
+              aria-pressed={interactive ? !hidden : undefined}
+              data-testid={`evaluation-legend-item-${item.id}`}
+              data-hidden={hidden ? 'true' : 'false'}
+              onClick={
+                interactive
+                  ? () => {
+                      onToggle(item.id);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                interactive
+                  ? (event: KeyboardEvent) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onToggle(item.id);
+                      }
+                    }
+                  : undefined
+              }
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                cursor: interactive ? 'pointer' : 'help',
+                outline: 'none',
+                border: 'none',
+                background: 'none',
+                p: 0,
+                m: 0,
+                font: 'inherit',
+                opacity: hidden ? 0.35 : 1,
+                textDecoration: hidden ? 'line-through' : 'none',
+                '&:focus-visible': {
+                  borderRadius: 0.5,
+                  boxShadow: (theme) => `0 0 0 2px ${theme.palette.primary.main}`,
+                },
+                '&:hover': interactive
+                  ? { opacity: hidden ? 0.55 : 0.85 }
+                  : undefined,
+              }}
             >
-              {t(item.labelKey)}
-            </Typography>
-          </Stack>
-        </Tooltip>
-      ))}
+              <LegendSwatch color={item.color} swatch={item.swatch} />
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  lineHeight: 1.2,
+                  color: 'text.secondary',
+                }}
+              >
+                {label}
+              </Typography>
+            </Box>
+          </Tooltip>
+        );
+      })}
     </Stack>
   );
 }
@@ -150,11 +206,32 @@ export const HERO_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     swatch: 'solid',
   },
   {
+    id: 'requiredMonthly',
+    labelKey: 'planner.hero.requiredMonthly',
+    tipKey: 'planner.hero.tip.requiredMonthly',
+    color: '#424242',
+    swatch: 'dash',
+  },
+  {
+    id: 'requiredCumulative',
+    labelKey: 'planner.hero.requiredCumulative',
+    tipKey: 'planner.hero.tip.requiredCumulative',
+    color: '#616161',
+    swatch: 'thick',
+  },
+  {
     id: 'cumulative',
     labelKey: 'planner.hero.cumulative',
     tipKey: 'planner.hero.tip.cumulative',
     color: '#6a1b9a',
     swatch: 'dashdot',
+  },
+  {
+    id: 'windowCumulative',
+    labelKey: 'planner.hero.windowCumulative',
+    tipKey: 'planner.hero.tip.windowCumulative',
+    color: '#ef6c00',
+    swatch: 'dash',
   },
   {
     id: 'planCumulative',
@@ -176,6 +253,13 @@ export const HERO_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     tipKey: 'planner.hero.tip.target',
     color: '#c62828',
     swatch: 'target',
+  },
+  {
+    id: 'windowHandoff',
+    labelKey: 'planner.hero.windowHandoff',
+    tipKey: 'planner.hero.tip.windowHandoff',
+    color: '#9e9e9e',
+    swatch: 'asOf',
   },
   {
     id: 'cone',
@@ -201,6 +285,20 @@ export const STORE_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     tipKey: 'planner.hero.tip.fact',
     color: '#212121',
     swatch: 'solid',
+  },
+  {
+    id: 'requiredMonthly',
+    labelKey: 'planner.hero.requiredMonthly',
+    tipKey: 'planner.hero.tip.requiredMonthly',
+    color: '#424242',
+    swatch: 'dash',
+  },
+  {
+    id: 'requiredCumulative',
+    labelKey: 'planner.hero.requiredCumulative',
+    tipKey: 'planner.hero.tip.requiredCumulative',
+    color: '#616161',
+    swatch: 'thick',
   },
   {
     id: 'cumulative',
