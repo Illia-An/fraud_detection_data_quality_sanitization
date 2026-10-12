@@ -428,14 +428,21 @@ export const he: Record<MessageKey, string> = {
   'planner.hero.cone': 'חרוט תחזית',
   'planner.hero.coneSlack': 'חרוט תחזית (±רזרבה)',
   'planner.hero.fact': 'עובדה מנוקה',
+  'planner.hero.requiredMonthly': 'חודשי נדרש (להגיע ליעד)',
+  'planner.hero.requiredCumulative': 'מצטבר נדרש (אם חודשי נדרש)',
   'planner.hero.cumulative': 'Actual מצטבר',
   'planner.hero.windowCumulative': 'מסלול ליעד (−3 חוד׳)',
   'planner.hero.planCumulative': 'יעד מצטבר (אם הטיוטה)',
   'planner.hero.draft': 'סימולציית טיוטה',
   'planner.hero.target': 'יעד',
+  'planner.hero.windowHandoff': 'חלון −3 חוד׳',
   'planner.hero.asOf': 'as-of',
   'planner.hero.tip.fact':
-    'ממוצע שווה חודשי מנוקה של הרשת (עובדה) עד as-of.',
+    'ממוצע שווה חודשי מנוקה של הרשת (עובדה) בכל מקום שיש בפאנל — ממשיך אחרי as-of כשיש חודשים ממומשים. מסירת התכנון נשארת ב־as-of.',
+  'planner.hero.tip.requiredMonthly':
+    'לא עובדה: ציונים חודשיים אחרי as-of שיגרמו למצטבר בחלון (−3 חוד׳) לעקוב אחרי הכתום ולהגיע ליעד. הופכי מ־Path to target; להשוות לטיוטה הכחולה.',
+  'planner.hero.tip.requiredCumulative':
+    'מצטבר בחלון הקצר שנבנה מהחודשיים הנדרשים (אפור מקווקו) — מגיע ליעד. תאום של Required monthly; הכתום הוא מסלול ליניארי עצמאי (יכול לחפוף).',
   'planner.hero.tip.cumulative':
     'ממוצע מצטבר של ציוני העובדה החודשיים מתחילת הסדרה עד כל חודש.',
   'planner.hero.tip.windowCumulative':
@@ -446,10 +453,14 @@ export const he: Record<MessageKey, string> = {
     'מסלול תוכנית חודשי מה־as-of; מתחיל ממצטבר מוחלט בחלון הקצר (מסירה).',
   'planner.hero.tip.target':
     'יעד הרשת — הקו הכתום מגיע אליו בסוף האופק; הירוק מציג את המצטבר של הטיוטה עצמה.',
+  'planner.hero.tip.windowHandoff':
+    'תחילת החלון הקצר (as-of − 3 חודשים) שממנו החודשי הנדרש / Path to target לוקחים היסטוריה. סמן אנכי — לא רמת ציון.',
   'planner.hero.tip.cone':
     'רזרבת הקצאה רכה סביב הטיוטה (±נק׳) — לא מרווח סמך סטטיסטי.',
   'planner.hero.tip.asOf':
-    'חודש מעבר: עובדה ומצטבר משמאל; טיוטה / יעד מצטבר מימין.',
+    'מעבר תכנון: טיוטה / נדרש / path-to-target מתחילים כאן. עובדה מנוקה ממומשת עדיין יכולה להופיע אחרי as-of כשיש חודשים מאוחרים בפאנל.',
   'planner.hero.caption':
-    'תצוגת הערכה · עובדה מלאה משמאל ל־as-of ({asOf}) · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. העבירו עכבר על תוויות המקרא לטיפים קצרים.',
+    'תצוגת הערכה · as-of ({asOf}) הוא מעבר תכנון · עובדה ממומשת יכולה להמשיך אחרי as-of · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. לחצו על תוויות המקרא להצגה/הסתרה · העבירו עכבר לטיפים קצרים.',
+  'planner.hero.legendHide': 'לחצו להסתרה',
+  'planner.hero.legendShow': 'לחצו להצגה',
 };

@@ -100,4 +100,31 @@ describe('buildStoreHeroEvaluationSeries', () => {
     expect(series!.planCumulativeYs[2]).toBeCloseTo(63.33, 2);
     expect(series!.planCumulativeYs[3]).toBeCloseTo(65, 2); // (60+64+66+70)/4
   });
+
+  it('draws realized fact after as-of without shifting plan handoff', () => {
+    const panelWithLater: SanitizedPanel = {
+      ...panel,
+      reference_month: 5,
+      rows: [
+        ...panel.rows,
+        { store_id: 10, year: 2025, month: 5, five_percent: 90, survey_volume: 100 },
+      ],
+    };
+    const series = buildStoreHeroEvaluationSeries(plan, 10, panelWithLater, insights);
+    expect(series!.actualYs[3]).toBe(90);
+    expect(series!.cumulativeYs[3]).toBeCloseTo(70, 2); // (60+64+66+90)/4
+    // Green still uses plan May (72), not realized 90
+    expect(series!.planYs[2]).toBeCloseTo(63.33, 2);
+    expect(series!.planYs[3]).toBe(72);
+    expect(series!.planCumulativeYs[3]).toBeCloseTo(65.5, 2);
+  });
+
+  it('builds required monthly/cumulative from short-window handoff to target', () => {
+    const series = buildStoreHeroEvaluationSeries(plan, 10, panel, insights);
+    // Window Feb–Apr: 60,64,66 → startCum 63.33; one horizon step → target 75
+    expect(series!.requiredMonthlyYs[2]).toBeCloseTo(66, 2); // stitch as-of fact
+    expect(series!.requiredMonthlyYs[3]).toBeCloseTo(110.01, 2); // 4*75 − 3*63.33
+    expect(series!.requiredCumulativeYs[2]).toBeCloseTo(63.33, 2);
+    expect(series!.requiredCumulativeYs[3]).toBeCloseTo(75, 2);
+  });
 });

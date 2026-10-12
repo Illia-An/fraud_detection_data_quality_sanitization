@@ -7,6 +7,14 @@ import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
 import { EvaluationLegend, STORE_EVALUATION_LEGEND } from './EvaluationLegend';
+import {
+  asOfHorizontalShape,
+  HERO_HOVER_TEMPLATE,
+  HERO_HOVERLABEL,
+  HERO_HOVERMODE,
+  HERO_X_SPIKES,
+  HERO_Y_SPIKES,
+} from './heroChartCrosshair';
 import { buildStoreHeroEvaluationSeries } from './storeHeroEvaluationSeries';
 
 const Plot = lazy(async () => {
@@ -115,14 +123,19 @@ export function StoreHeroEvaluationChart({
     planYs,
     cumulativeYs,
     planCumulativeYs,
+    requiredMonthlyYs,
+    requiredCumulativeYs,
     target,
     asOfLabel,
+    asOfIndex,
   } = series;
   const yValues = [
     ...actualYs.filter((v): v is number => v != null),
     ...planYs.filter((v): v is number => v != null),
     ...cumulativeYs.filter((v): v is number => v != null),
     ...planCumulativeYs.filter((v): v is number => v != null),
+    ...requiredMonthlyYs.filter((v): v is number => v != null),
+    ...requiredCumulativeYs.filter((v): v is number => v != null),
     target,
   ];
   /** Same fit-scale helper as Sanitization Store impact (auto Y ticks, no dtick:1). */
@@ -131,7 +144,6 @@ export function StoreHeroEvaluationChart({
   const yMax = fitY.range?.[1] ?? 100;
   const contentMinWidth = Math.max(labels.length, 1) * STORE_HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
-  const hoverPct = '%{x}<br>%{fullData.name}: %{y:.2f}%<extra></extra>';
 
   const data = [
     {
@@ -143,7 +155,28 @@ export function StoreHeroEvaluationChart({
       line: { color: '#212121', width: 2.5 },
       marker: { size: 7, color: '#212121' },
       connectgaps: false,
-      hovertemplate: hoverPct,
+      hovertemplate: HERO_HOVER_TEMPLATE,
+    },
+    {
+      x: labels,
+      y: requiredMonthlyYs,
+      type: 'scatter' as const,
+      mode: 'lines+markers' as const,
+      name: t('planner.hero.requiredMonthly'),
+      line: { color: '#424242', width: 2, dash: 'dash' as const },
+      marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
+      connectgaps: false,
+      hovertemplate: HERO_HOVER_TEMPLATE,
+    },
+    {
+      x: labels,
+      y: requiredCumulativeYs,
+      type: 'scatter' as const,
+      mode: 'lines' as const,
+      name: t('planner.hero.requiredCumulative'),
+      line: { color: '#616161', width: 2.5 },
+      connectgaps: false,
+      hovertemplate: HERO_HOVER_TEMPLATE,
     },
     {
       x: labels,
@@ -154,7 +187,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
       marker: { size: 6, color: '#6a1b9a' },
       connectgaps: false,
-      hovertemplate: hoverPct,
+      hovertemplate: HERO_HOVER_TEMPLATE,
     },
     {
       x: labels,
@@ -165,7 +198,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
       marker: { size: 6, color: '#2e7d32' },
       connectgaps: false,
-      hovertemplate: hoverPct,
+      hovertemplate: HERO_HOVER_TEMPLATE,
     },
     {
       x: labels,
@@ -176,7 +209,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#1565c0', width: 3 },
       marker: { size: 7, color: '#1565c0' },
       connectgaps: false,
-      hovertemplate: hoverPct,
+      hovertemplate: HERO_HOVER_TEMPLATE,
     },
     {
       x: labels,
@@ -185,9 +218,18 @@ export function StoreHeroEvaluationChart({
       mode: 'lines' as const,
       name: t('planner.storeHero.target'),
       line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
-      hovertemplate: hoverPct,
+      hovertemplate: HERO_HOVER_TEMPLATE,
     },
   ];
+
+  const asOfCrosshairY =
+    asOfIndex != null
+      ? (requiredCumulativeYs[asOfIndex] ??
+        planCumulativeYs[asOfIndex] ??
+        cumulativeYs[asOfIndex] ??
+        actualYs[asOfIndex] ??
+        null)
+      : null;
 
   const shapes =
     asOfLabel != null
@@ -200,6 +242,9 @@ export function StoreHeroEvaluationChart({
             y1: yMax,
             line: { color: '#9e9e9e', width: 1, dash: 'dot' as const },
           },
+          ...(asOfCrosshairY != null
+            ? [asOfHorizontalShape(asOfCrosshairY, '#9e9e9e')]
+            : []),
         ]
       : [];
 
@@ -271,6 +316,8 @@ export function StoreHeroEvaluationChart({
                 paper_bgcolor: 'transparent',
                 plot_bgcolor: 'transparent',
                 dragmode: 'zoom',
+                hovermode: HERO_HOVERMODE,
+                hoverlabel: HERO_HOVERLABEL,
                 showlegend: false,
                 xaxis: {
                   title: { text: '' },
@@ -279,6 +326,7 @@ export function StoreHeroEvaluationChart({
                   showgrid: true,
                   gridcolor: 'rgba(0, 0, 0, 0.06)',
                   zeroline: false,
+                  ...HERO_X_SPIKES,
                 },
                 yaxis: {
                   title: { text: '5%' },
@@ -288,6 +336,7 @@ export function StoreHeroEvaluationChart({
                   showgrid: true,
                   gridcolor: 'rgba(0, 0, 0, 0.08)',
                   zeroline: false,
+                  ...HERO_Y_SPIKES,
                 },
                 shapes,
                 annotations,
