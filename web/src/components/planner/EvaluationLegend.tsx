@@ -1,5 +1,6 @@
 /** Shared Evaluation-view legend with hover tips (Plotly legend has no i18n tooltips). */
 
+import type { KeyboardEvent } from 'react';
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
 
 import { useT, type MessageKey } from '../../i18n';
@@ -145,7 +146,7 @@ export function EvaluationLegend({
               }
               onKeyDown={
                 interactive
-                  ? (event) => {
+                  ? (event: KeyboardEvent) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         onToggle(item.id);
