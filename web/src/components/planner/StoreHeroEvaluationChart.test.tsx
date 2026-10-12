@@ -88,6 +88,8 @@ describe('StoreHeroEvaluationChart', () => {
     });
     const payload = screen.getByTestId('store-hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
+    expect(payload).toContain('Required monthly (to hit target)');
+    expect(payload).toContain('Required cumulative (if required monthly)');
     expect(payload).toContain('Cumulative actual');
     expect(payload).toContain('Cumulative plan (if draft)');
     expect(payload).toContain('Draft simulation');
@@ -96,9 +98,16 @@ describe('StoreHeroEvaluationChart', () => {
     expect(payload).toContain('2025-04');
     expect(payload).toContain('"showlegend":false');
     expect(payload).toContain('"scrollZoom":true');
+    expect(payload).toContain('"hovermode":"x unified"');
+    expect(payload).toContain('"showspikes":true');
+    expect(payload).toContain('"xref":"paper"');
+    expect(payload).toContain('"bgcolor":"rgba(33, 33, 33, 0.9)"');
+    expect(payload).toContain('"size":10');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
     expect(screen.getByTestId('store-evaluation-legend')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-requiredMonthly')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
   });
 });

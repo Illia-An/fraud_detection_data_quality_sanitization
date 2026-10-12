@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { appTheme } from '../../theme';
 import { defaultPipelineConfig } from '../../schemas/api';
@@ -26,6 +26,25 @@ describe('EvaluationLegend', () => {
       'aria-label',
       expect.stringMatching(/Draft simulation.*monthly draft plan/i),
     );
+  });
+
+  it('toggles series visibility when interactive', () => {
+    const onToggle = vi.fn();
+    render(
+      <ThemeProvider theme={appTheme}>
+        <EvaluationLegend
+          items={HERO_EVALUATION_LEGEND}
+          hiddenIds={new Set(['draft'])}
+          onToggle={onToggle}
+        />
+      </ThemeProvider>,
+    );
+
+    const draft = screen.getByTestId('evaluation-legend-item-draft');
+    expect(draft).toHaveAttribute('data-hidden', 'true');
+    expect(draft).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(draft);
+    expect(onToggle).toHaveBeenCalledWith('draft');
   });
 
   it('filters network impact legend by enabled tiers', () => {

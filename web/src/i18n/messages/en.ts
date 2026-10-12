@@ -443,26 +443,41 @@ export const en = {
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
   'planner.hero.fact': 'Cleansed fact',
+  'planner.hero.requiredMonthly': 'Required monthly (to hit target)',
+  'planner.hero.requiredCumulative': 'Required cumulative (if required monthly)',
   'planner.hero.cumulative': 'Cumulative actual',
+  'planner.hero.windowCumulative': 'Path to target (−3 mo)',
   'planner.hero.planCumulative': 'Cumulative plan (if draft)',
   'planner.hero.draft': 'Draft simulation',
   'planner.hero.target': 'Target',
+  'planner.hero.windowHandoff': '−3 mo window',
   'planner.hero.asOf': 'as-of',
   'planner.hero.tip.fact':
-    'Monthly cleansed network equal-mean (fact) up to as-of.',
+    'Monthly cleansed network equal-mean (fact) wherever the panel has it — continues after as-of when realized months exist. Planning handoff stays at as-of.',
+  'planner.hero.tip.requiredMonthly':
+    'Not fact: monthly scores after as-of that would make the short-window (−3 mo) cumulative follow orange and land on target. Inverted from Path to target; compare with blue draft.',
+  'planner.hero.tip.requiredCumulative':
+    'Short-window cumulative built from required monthlies (gray dashed) — lands on target. Twin of Required monthly; orange is the independent linear path (may overlap).',
   'planner.hero.tip.cumulative':
     'Running average of monthly fact scores from the start of the series to each month.',
+  'planner.hero.tip.windowCumulative':
+    'Short-window running average from as-of − 3 months, then a straight cumulative path that reaches the plan target by the end of the horizon (if the plan hits target).',
   'planner.hero.tip.planCumulative':
-    'Continues cumulative actual from as-of, folding in draft monthly scores if the plan lands.',
+    'Absolute short-window running average from as-of with the draft’s monthly scores over the plan horizon (may miss target).',
   'planner.hero.tip.draft':
-    'Monthly draft plan path from as-of; starts on cumulative actual (handoff).',
-  'planner.hero.tip.target': 'Network target level for this plan run.',
+    'Monthly draft plan path from as-of; starts on absolute short-window cumulative (handoff).',
+  'planner.hero.tip.target':
+    'Network target — orange lands here at horizon end; green shows the draft’s own cumulative.',
+  'planner.hero.tip.windowHandoff':
+    'Start of the short window (as-of − 3 months) that required monthly / Path to target use as history. Vertical marker — not a score level.',
   'planner.hero.tip.cone':
     'Soft allocation slack around the draft (±pp) — not a statistical confidence interval.',
   'planner.hero.tip.asOf':
-    'Cutover month: fact and cumulative to the left; draft / plan-cumulative to the right.',
+    'Plan cutover: draft / required / path-to-target start here. Realized cleansed fact may still appear after as-of when the panel has later months.',
   'planner.hero.caption':
-    'Evaluation view · solid fact left of as-of ({asOf}) · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Hover legend labels for short tips.',
+    'Evaluation view · as-of ({asOf}) is plan cutover · realized fact may continue after as-of · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
+  'planner.hero.legendHide': 'Click to hide',
+  'planner.hero.legendShow': 'Click to show',
 } as const;
 
 export type MessageKey = keyof typeof en;
