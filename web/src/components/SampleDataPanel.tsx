@@ -161,7 +161,7 @@ export function SampleDataPanel() {
 
   return (
     <>
-      <Card variant="outlined">
+      <Card variant="outlined" data-onboarding="sanitization-sample">
         <CardHeader
           title={t('sample.title')}
           subheader={t('sample.subheader')}
