@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { dismissOnboarding } from './dismissOnboarding';
+
 async function waitForApiOk(page: Page) {
   await expect(page.getByText('API: ok')).toBeVisible({ timeout: 30_000 });
 }
@@ -47,6 +49,7 @@ async function readNetworkDelta(page: Page): Promise<string> {
 
 test.describe('Sanitization flow', () => {
   test.beforeEach(async ({ page }) => {
+    await dismissOnboarding(page);
     await page.goto('/');
     await waitForApiOk(page);
     await waitForSourceLoaded(page);
