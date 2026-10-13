@@ -91,7 +91,7 @@ export default function SideMenu() {
           flexDirection: 'column',
         }}
       >
-        <MenuContent collapsed={!open} />
+        <MenuContent collapsed={!open} surface="desktop" />
       </Box>
     </MuiDrawer>
   );

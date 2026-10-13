@@ -5,6 +5,7 @@ import Stack from '@mui/material/Stack';
 import { Outlet } from 'react-router-dom';
 
 import { LocaleDocumentEffects } from '../i18n/LocaleDocumentEffects';
+import { OnboardingHost } from '../onboarding';
 import AppTheme from '../shared-theme/AppTheme';
 import AppNavbar from './components/AppNavbar';
 import DashboardHeader from './components/DashboardHeader';
@@ -62,6 +63,7 @@ export function DashboardLayout() {
               </Box>
             </Stack>
           </Box>
+          <OnboardingHost />
         </Box>
       </AppTheme>
     </LocaleDocumentEffects>

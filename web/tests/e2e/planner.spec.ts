@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { dismissOnboarding } from './dismissOnboarding';
+
 async function waitForApiOk(page: Page) {
   await expect(page.getByText('API: ok')).toBeVisible({ timeout: 30_000 });
 }
@@ -28,6 +30,7 @@ test.describe('Planner alt-UI smoke', () => {
   }) => {
     test.setTimeout(120_000);
 
+    await dismissOnboarding(page);
     await page.goto('/');
     await waitForApiOk(page);
     await useSmallPreset(page);

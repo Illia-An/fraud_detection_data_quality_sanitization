@@ -463,4 +463,50 @@ export const he: Record<MessageKey, string> = {
     'תצוגת הערכה · as-of ({asOf}) הוא מעבר תכנון · עובדה ממומשת יכולה להמשיך אחרי as-of · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. לחצו על תוויות המקרא להצגה/הסתרה · העבירו עכבר לטיפים קצרים.',
   'planner.hero.legendHide': 'לחצו להסתרה',
   'planner.hero.legendShow': 'לחצו להצגה',
+
+  // —— Onboarding tour ——
+  'nav.tour': 'סיור במוצר',
+  'onboarding.progress': 'שלב {current} מתוך {total}',
+  'onboarding.start': 'התחלת סיור',
+  'onboarding.next': 'הבא',
+  'onboarding.back': 'הקודם',
+  'onboarding.skipTour': 'דילוג על הסיור',
+  'onboarding.exit': 'יציאה מהסיור',
+  'onboarding.finish': 'חזרה ללוח הבקרה',
+  'onboarding.welcome.title': 'מנתונים לתוכנית KPI',
+  'onboarding.welcome.body':
+    'למדו איך לסקור נתוני סקר מנוקים, להבין תוצאות סינון, ולבנות תוכנית KPI על בסיס הזמין.',
+  'onboarding.workspace.title': 'סביבת האנליטיקה שלכם',
+  'onboarding.workspace.body':
+    'השתמשו בניווט הצדדי כדי לעבור בין סניטציה (איכות נתונים) למתכנן (תכנון KPI), וכן לתיעוד.',
+  'onboarding.sanitizationIntro.title': 'הבינו את איכות הנתונים',
+  'onboarding.sanitizationIntro.body':
+    'בחרו כאן מקור נתוני סקר, ואז הריצו תרחיש כדי לראות איך כללי הסינון משפיעים על הנתונים לניתוח.',
+  'onboarding.sanitizationControls.title': 'פקדי סניטציה',
+  'onboarding.sanitizationControls.body':
+    'שכבות ידניות קובעות עד כמה אגרסיבי הסינון. חבילות תרחישים ממלאות אותן עבורכם; ערכו כאן כשצריך כללים מותאמים, ואז Run Scenario. הסיור לא משנה ספים ולא מריץ pipeline במקומכם.',
+  'onboarding.sanitizationResults.title': 'הבינו מה השתנה',
+  'onboarding.sanitizationResults.body':
+    'לאחר הרצה, סקרו את השפעת ה־KPI, תרשים הסניפים ושלבי ה־pipeline. תשובות שנפסלו לפי כללי הסינון — לא כל פסילה היא הונאה מאושרת.',
+  'onboarding.sanitizationInspect.title': 'בדקו סניף בפירוט',
+  'onboarding.sanitizationInspect.body':
+    'פתחו Inspect כדי להיכנס לסניף אחד: חודשים מסומנים, הקשר בתרשים, ואיך הסינון שינה את הציון. השתמשו בזה כששינוי KPI ברשת דורש הסבר ברמת סניף — תשובות שנפסלו עדיין לפי כללים, לא פסק דין הונאה.',
+  'onboarding.plannerEntry.title': 'הפכו נתונים מנוקים לתוכנית',
+  'onboarding.plannerEntry.body':
+    'פתחו את המתכנן כדי לבנות תוכנית שיפור סניפים על בסיס Q10012 מנוקה מסניטציה.',
+  'onboarding.plannerHero.title': 'הבינו את תוכנית ה־KPI',
+  'onboarding.plannerHero.body':
+    'תרשים ההערכה מציג היסטוריה מנוקה, נקודת as-of, מסלול נדרש ליעד וטיוטת התוכנית. השתמשו במקרא כדי להתמקד בסדרות החשובות.',
+  'onboarding.plannerLevers.title': 'פקדי תוכנית ומנופים ידניים',
+  'onboarding.plannerLevers.body':
+    'יעד, אופק ומגבלות שיפור חודשי מניעים את הטיוטה. התחילו מחבילות או שאלות, ואז כוונו Manual levers כאן לפני Run simulation. Advanced allocator נשאר מכווץ עד שצריך — הסיור לא מריץ תוכנית במקומכם.',
+  'onboarding.plannerAtRisk.title': 'תעדפו את רשימת At-risk',
+  'onboarding.plannerAtRisk.body':
+    'לאחר סימולציה, רשימת החריגים At-risk מדרגת סניפים Behind או Ahead ביחס לתוכנית ב־as-of. הרחיבו אותה כדי לסנן Behind מול All Stores ולסרוק gap, streak ו־MoM — זו תור העבודה שלכם, לא כל הרשת.',
+  'onboarding.plannerInspect.title': 'Inspect לסניף מהתוכנית',
+  'onboarding.plannerInspect.body':
+    'לחצו Inspect בשורה כדי לפתוח את מגירת הסניף: תרשים הערכה, estimate מול actual, ו־sandbox אופציונלי ל־what-if. מעבר בשלבים בסיור לא מחיל טיוטה — Inspect לקריאה ולניסויים מכוונים בלבד.',
+  'onboarding.complete.title': 'אתם מוכנים להתחיל',
+  'onboarding.complete.body':
+    'אתם יודעים איך לכוון פקדי סניטציה ומנופי תוכנית, לסקור תוצאות, להשתמש ב־Inspect ולנווט ב־At-risk. אפשר להפעיל מחדש את הסיור בכל עת מתפריט הניווט.',
 };

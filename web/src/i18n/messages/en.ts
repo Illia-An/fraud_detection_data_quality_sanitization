@@ -478,6 +478,52 @@ export const en = {
     'Evaluation view · as-of ({asOf}) is plan cutover · realized fact may continue after as-of · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
   'planner.hero.legendHide': 'Click to hide',
   'planner.hero.legendShow': 'Click to show',
+
+  // —— Onboarding tour ——
+  'nav.tour': 'Product tour',
+  'onboarding.progress': 'Step {current} of {total}',
+  'onboarding.start': 'Start tour',
+  'onboarding.next': 'Next',
+  'onboarding.back': 'Back',
+  'onboarding.skipTour': 'Skip tour',
+  'onboarding.exit': 'Exit tour',
+  'onboarding.finish': 'Return to dashboard',
+  'onboarding.welcome.title': 'From Data to KPI Plan',
+  'onboarding.welcome.body':
+    'Learn how to review cleaned survey data, understand filtering results, and build a KPI plan from the available baseline.',
+  'onboarding.workspace.title': 'Your analytics workspace',
+  'onboarding.workspace.body':
+    'Use the side navigation to move between Sanitization (data quality) and Planner (KPI planning), plus Documentation.',
+  'onboarding.sanitizationIntro.title': 'Understand your data quality',
+  'onboarding.sanitizationIntro.body':
+    'Choose a survey data source here, then run a scenario to see how filtering rules affect the dataset used for analysis.',
+  'onboarding.sanitizationControls.title': 'Sanitization controls',
+  'onboarding.sanitizationControls.body':
+    'Manual tiers set how aggressively answers are filtered. Scenario packs fill these for you; edit here when you need a custom rule set, then Run Scenario. The tour never changes thresholds or runs the pipeline for you.',
+  'onboarding.sanitizationResults.title': 'Understand what changed',
+  'onboarding.sanitizationResults.body':
+    'After a run, review KPI impact, the store chart, and pipeline steps. Excluded answers follow configured filters — not every exclusion is confirmed fraud.',
+  'onboarding.sanitizationInspect.title': 'Inspect a store in detail',
+  'onboarding.sanitizationInspect.body':
+    'Open Inspect to drill into one store: flagged months, chart context, and how filtering changed the score. Use it when a network KPI shift needs a store-level explanation — excluded answers still follow rules, not a fraud verdict.',
+  'onboarding.plannerEntry.title': 'Turn cleaned data into a plan',
+  'onboarding.plannerEntry.body':
+    'Open Planner to build a store improvement plan on the cleansed Q10012 baseline from Sanitization.',
+  'onboarding.plannerHero.title': 'Understand your KPI plan',
+  'onboarding.plannerHero.body':
+    'The evaluation chart shows cleansed history, as-of cutover, required path to target, and your draft plan. Use the legend to focus on the series that matter.',
+  'onboarding.plannerLevers.title': 'Plan controls and manual levers',
+  'onboarding.plannerLevers.body':
+    'Target, horizon, and monthly improve caps drive the draft. Start from packs or questions, then fine-tune Manual levers here before Run simulation. Advanced allocator options stay collapsed until you need them — the tour never runs a plan for you.',
+  'onboarding.plannerAtRisk.title': 'Prioritize the At-risk list',
+  'onboarding.plannerAtRisk.body':
+    'After a simulation, the At-risk exception list ranks stores Behind or Ahead of plan at as-of. Expand it to filter Behind vs All Stores and scan gap, streak, and MoM — this is your attention queue, not the full network.',
+  'onboarding.plannerInspect.title': 'Inspect a store from the plan',
+  'onboarding.plannerInspect.body':
+    'Click Inspect on a row to open the store drawer: evaluation hero, estimate vs actual, and optional sandbox what-if. Advancing the tour never applies a draft — Inspect is for reading and deliberate experiments only.',
+  'onboarding.complete.title': "You're ready to get started",
+  'onboarding.complete.body':
+    'You know how to tune Sanitization controls and Plan levers, review results, use Inspect, and navigate At-risk. Restart this tour anytime from the navigation menu.',
 } as const;
 
 export type MessageKey = keyof typeof en;
