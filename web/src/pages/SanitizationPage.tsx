@@ -13,6 +13,7 @@ import {
 } from '../components/sanitization/scenarioUndo';
 import { usePipelineRunner } from '../hooks/usePipelineRunner';
 import { useT } from '../i18n';
+import { useOnboardingStore } from '../onboarding';
 import { defaultPipelineConfig, type PipelineConfig } from '../schemas/api';
 import {
   getSanitizationScenarioPack,
@@ -49,10 +50,44 @@ export function SanitizationPage() {
   const [scenarioUndo, setScenarioUndo] = useState<ScenarioUndoSnapshot | null>(null);
   const [controlsOpen, setControlsOpen] = useState(true);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
+  const onboardingStatus = useOnboardingStore((s) => s.status);
+  const onboardingStepId = useOnboardingStore((s) => s.stepId);
   const runner = usePipelineRunner(pipelineConfig);
+
+  // Keep the controls rail open when the tour spotlights sample / tiers.
+  useEffect(() => {
+    if (onboardingStatus !== 'active') {
+      return;
+    }
+    if (
+      onboardingStepId === 'sanitization-intro' ||
+      onboardingStepId === 'sanitization-controls'
+    ) {
+      setControlsOpen(true);
+    }
+    if (onboardingStepId === 'sanitization-intro') {
+      const timerId = window.setTimeout(() => {
+        document
+          .querySelector<HTMLElement>('[data-onboarding="sanitization-sample"]')
+          ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 50);
+      return () => window.clearTimeout(timerId);
+    }
+    if (onboardingStepId === 'sanitization-controls') {
+      // Defer until rail is open and layout paints — ConfigForm sits below packs.
+      const timerId = window.setTimeout(() => {
+        controlsPanelRef.current?.scrollIntoView({
+          block: 'center',
+          behavior: 'smooth',
+        });
+      }, 50);
+      return () => window.clearTimeout(timerId);
+    }
+  }, [onboardingStatus, onboardingStepId]);
   const pendingRunConfigRef = useRef<PipelineConfig | null>(null);
   const pendingPackAnswerRef = useRef<SanitizationScenarioPackId | null>(null);
   const packsPanelRef = useRef<HTMLDivElement | null>(null);
+  const controlsPanelRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollToPacksRef = useRef(false);
   const handleRunRef = useRef(runner.handleRun);
   handleRunRef.current = runner.handleRun;
@@ -263,18 +298,20 @@ export function SanitizationPage() {
                   onApply={handleApplyScenarioPack}
                 />
               </Box>
-              <Typography
-                variant="overline"
-                color="text.secondary"
-                sx={{ letterSpacing: 0.8, pt: 0.5 }}
-              >
-                {t('sanitization.section.manualTiers')}
-              </Typography>
-              <ConfigForm
-                onValidConfigChange={setPipelineConfig}
-                configRevision={configRevision}
-                seedConfig={configSeed}
-              />
+              <Box ref={controlsPanelRef}>
+                <Typography
+                  variant="overline"
+                  color="text.secondary"
+                  sx={{ letterSpacing: 0.8, pt: 0.5 }}
+                >
+                  {t('sanitization.section.manualTiers')}
+                </Typography>
+                <ConfigForm
+                  onValidConfigChange={setPipelineConfig}
+                  configRevision={configRevision}
+                  seedConfig={configSeed}
+                />
+              </Box>
             </Stack>
           </Box>
 

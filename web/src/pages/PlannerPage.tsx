@@ -71,6 +71,7 @@ import {
   type StoreMixQuestionId,
 } from '../schemas/storeMixQuestions';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
+import { useOnboardingStore } from '../onboarding';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import { useUiStore } from '../store/uiStore';
 
@@ -173,6 +174,45 @@ export function PlannerPage() {
   const [controlsOpen, setControlsOpen] = useState(true);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+
+  const onboardingStatus = useOnboardingStore((s) => s.status);
+  const onboardingStepId = useOnboardingStore((s) => s.stepId);
+
+  // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
+  useEffect(() => {
+    if (onboardingStatus !== 'active') {
+      return;
+    }
+    if (onboardingStepId === 'planner-levers') {
+      setControlsOpen(true);
+      setAtRiskExpanded(false);
+      return;
+    }
+    if (onboardingStepId === 'planner-hero') {
+      setAtRiskExpanded(false);
+      const timerId = window.setTimeout(() => {
+        document
+          .querySelector<HTMLElement>('[data-onboarding="planner-hero"]')
+          ?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      }, 80);
+      return () => window.clearTimeout(timerId);
+    }
+    if (onboardingStepId === 'planner-at-risk' || onboardingStepId === 'planner-inspect') {
+      setAtRiskExpanded(true);
+      // After Accordion opens, bring the sheet into view for spotlight.
+      const timerId = window.setTimeout(() => {
+        document
+          .querySelector<HTMLElement>('[data-onboarding="planner-at-risk"]')
+          ?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        if (onboardingStepId === 'planner-inspect') {
+          document
+            .querySelector<HTMLElement>('[data-onboarding="planner-inspect"]')
+            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }, 80);
+      return () => window.clearTimeout(timerId);
+    }
+  }, [onboardingStatus, onboardingStepId]);
 
   const panel = useMemo(() => {
     if (!processResult) {
@@ -533,6 +573,7 @@ export function PlannerPage() {
         <Card
           variant="outlined"
           data-testid="allocation-levers"
+          data-onboarding="planner-levers"
           sx={{
             flex: { xs: 'none', md: 1 },
             minHeight: { md: 0 },
@@ -1045,6 +1086,7 @@ export function PlannerPage() {
               >
                 <Card
                   variant="outlined"
+                  data-onboarding="planner-hero"
                   sx={{
                     flex: 1,
                     width: '100%',
@@ -1105,6 +1147,7 @@ export function PlannerPage() {
               {panel && monitoring && (
                 <Box
                   data-testid="planner-at-risk-sheet"
+                  data-onboarding="planner-at-risk"
                   sx={{
                     // xs: normal flow under Hero. md: bottom overlay over the pane.
                     position: { xs: 'relative', md: 'absolute' },

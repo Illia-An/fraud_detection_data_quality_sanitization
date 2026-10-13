@@ -69,7 +69,7 @@ export function ConfigForm({
   }, [values, isValid, onValidConfigChange]);
 
   return (
-    <Card variant="outlined">
+    <Card variant="outlined" data-onboarding="sanitization-controls">
       <CardHeader
         title={t('sanitization.controlsTitle')}
         subheader={t('sanitization.controlsSub')}

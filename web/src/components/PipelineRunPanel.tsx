@@ -106,6 +106,7 @@ export function PipelineRunPanel({
 
   return (
     <Box
+      data-onboarding="sanitization-results"
       sx={{
         position: 'relative',
         flex: { md: 1 },
@@ -254,6 +255,7 @@ export function PipelineRunPanel({
                   onClick={openInspect}
                   disabled={!canInspect}
                   data-testid="sanitization-open-inspect"
+                  data-onboarding="sanitization-inspect"
                 >
                   {t('sanitization.inspect.open')}
                 </Button>

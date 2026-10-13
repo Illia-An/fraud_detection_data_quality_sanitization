@@ -384,7 +384,11 @@ export function AtRiskDeltaTable({
               <TableCell sx={{ ...headSx, minWidth: 88 }}>
                 {t('planner.atRisk.col.deficit')}
               </TableCell>
-              <TableCell align="right" sx={headSx}>
+              <TableCell
+                align="right"
+                sx={headSx}
+                {...(rows.length === 0 ? { 'data-onboarding': 'planner-inspect' } : {})}
+              >
                 {t('planner.atRisk.col.action')}
               </TableCell>
             </TableRow>
@@ -399,7 +403,7 @@ export function AtRiskDeltaTable({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => {
+              rows.map((row, rowIndex) => {
                 const deficit = deficitProgress01(row.gapPp);
                 const negativeGap = row.gapPp != null && row.gapPp < 0;
                 const momNeg = row.momPp != null && row.momPp < 0;
@@ -510,6 +514,7 @@ export function AtRiskDeltaTable({
                         color="primary"
                         endIcon={<ArrowForwardIcon sx={{ fontSize: 14 }} />}
                         onClick={() => onInspect(row.storeId)}
+                        {...(rowIndex === 0 ? { 'data-onboarding': 'planner-inspect' } : {})}
                         sx={{
                           fontWeight: 600,
                           textTransform: 'none',
