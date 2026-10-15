@@ -478,6 +478,26 @@ export const en = {
     'Evaluation view · as-of ({asOf}) is plan cutover · realized fact may continue after as-of · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
   'planner.hero.legendHide': 'Click to hide',
   'planner.hero.legendShow': 'Click to show',
+  'planner.hero.modeAria': 'Required path mode',
+  'planner.hero.modePlan': 'Plan (−3)',
+  'planner.hero.modePressure': 'Pressure (YTD)',
+  'planner.hero.modePlanAria': 'Plan required path from as-of with −3 month window',
+  'planner.hero.modePressureAria':
+    'YTD pressure to target from January through last cleansed fact',
+  'planner.hero.pressureMonthly': 'Pressure monthly (to hit target)',
+  'planner.hero.pressureCumulative': 'Pressure cumulative (if pressure monthly)',
+  'planner.hero.yearStart': 'YTD start (Jan)',
+  'planner.hero.lastFact': 'last fact',
+  'planner.hero.tip.pressureMonthly':
+    'Not fact: monthly scores after the last cleansed month that would make the year-to-date cumulative land on target. Recalculates when a new fact month appears.',
+  'planner.hero.tip.pressureCumulative':
+    'YTD running mean from January through last cleansed fact, then continues with pressure monthlies to land on target. Twin of Pressure monthly; history is fact-based, forward path is not.',
+  'planner.hero.tip.yearStart':
+    'January of the pressure year — start of YTD knowledge for the pressure pair. Vertical marker — not a score level.',
+  'planner.hero.tip.lastFact':
+    'Last cleansed fact month: pressure required curves start here. Moves right as new actual months appear.',
+  'planner.hero.captionPressure':
+    'Pressure view · YTD from {yearStart} · cutover at last cleansed fact ({lastFact}) · H through plan target month ({horizonEnd}) · required pair recalculates as new months appear · target {target}%. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
 
   // —— Onboarding tour ——
   'nav.tour': 'Product tour',

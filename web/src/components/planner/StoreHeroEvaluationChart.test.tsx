@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -45,8 +45,12 @@ const panel: SanitizedPanel = {
   echo_config: defaultPipelineConfig,
   reference_year: 2025,
   reference_month: 4,
-  row_count: 1,
-  rows: [{ store_id: 10, year: 2025, month: 4, five_percent: 66, survey_volume: 100 }],
+  row_count: 3,
+  rows: [
+    { store_id: 10, year: 2025, month: 1, five_percent: 60, survey_volume: 100 },
+    { store_id: 10, year: 2025, month: 2, five_percent: 64, survey_volume: 100 },
+    { store_id: 10, year: 2025, month: 4, five_percent: 66, survey_volume: 100 },
+  ],
 };
 
 const insights: PlanMonitoringInsights = {
@@ -109,5 +113,49 @@ describe('StoreHeroEvaluationChart', () => {
     expect(screen.getByTestId('evaluation-legend-item-requiredMonthly')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
+    expect(screen.getByTestId('store-hero-required-mode')).toBeInTheDocument();
+    expect(screen.getByTestId('store-hero-evaluation-chart')).toHaveAttribute(
+      'data-required-mode',
+      'plan',
+    );
+  });
+
+  it('switches store Inspect to YTD pressure mode', async () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreHeroEvaluationChart
+          plan={plan}
+          storeId={10}
+          panel={panel}
+          insights={insights}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('store-hero-plotly')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText(/YTD pressure to target/i));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('store-hero-evaluation-chart')).toHaveAttribute(
+        'data-required-mode',
+        'pressure',
+      );
+    });
+    const payload = screen.getByTestId('store-hero-plotly').textContent ?? '';
+    expect(payload).toContain('Pressure monthly (to hit target)');
+    expect(payload).toContain('Pressure cumulative (if pressure monthly)');
+    expect(payload).toContain('last fact');
+    expect(payload).not.toContain('Draft simulation');
+    expect(payload).not.toContain('Cumulative plan (if draft)');
+    expect(screen.getByTestId('evaluation-legend-item-lastFact')).toBeInTheDocument();
+    expect(screen.queryByTestId('evaluation-legend-item-draft')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Pressure view · YTD from 2025-01 · cutover at last cleansed fact \(2025-04\) · H through plan target month \(2025-05\)/i,
+      ),
+    ).toBeInTheDocument();
   });
 });
