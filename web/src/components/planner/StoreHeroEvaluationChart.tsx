@@ -1,12 +1,32 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, CircularProgress, Stack, Typography } from '@mui/material';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from 'react';
+import {
+  Box,
+  CircularProgress,
+  Stack,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+} from '@mui/material';
 
 import { useT } from '../../i18n';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
-import { EvaluationLegend, STORE_EVALUATION_LEGEND } from './EvaluationLegend';
+import {
+  EvaluationLegend,
+  STORE_EVALUATION_LEGEND,
+  STORE_PRESSURE_LEGEND,
+} from './EvaluationLegend';
 import {
   asOfHorizontalShape,
   HERO_HOVER_TEMPLATE,
@@ -15,6 +35,11 @@ import {
   HERO_X_SPIKES,
   HERO_Y_SPIKES,
 } from './heroChartCrosshair';
+import {
+  buildPressureRequiredPair,
+  planTargetMonthLabel,
+  type HeroRequiredMode,
+} from './pressureEvaluationSeries';
 import { buildStoreHeroEvaluationSeries } from './storeHeroEvaluationSeries';
 
 const Plot = lazy(async () => {
@@ -46,7 +71,7 @@ interface StoreHeroEvaluationChartProps {
 
 /**
  * Store-level Evaluation View — same grammar as network Hero (fact · cumulative · plan · as-of).
- * Gap / metric snapshot lives in Inspect glance strip; legend tips explain line colors.
+ * Plan (−3) and Pressure (YTD) modes mirror Network Hero; gap snapshot stays in Inspect strip.
  */
 export function StoreHeroEvaluationChart({
   plan,
@@ -61,6 +86,18 @@ export function StoreHeroEvaluationChart({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [plotHeight, setPlotHeight] = useState(plotHeightPx);
   const [plotWidth, setPlotWidth] = useState(0);
+  const [requiredMode, setRequiredMode] = useState<HeroRequiredMode>('plan');
+  const isPressure = requiredMode === 'pressure';
+
+  const handleRequiredMode = useCallback(
+    (_event: MouseEvent<HTMLElement>, next: HeroRequiredMode | null) => {
+      if (next == null) {
+        return;
+      }
+      setRequiredMode(next);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!fillParent) {
@@ -104,6 +141,19 @@ export function StoreHeroEvaluationChart({
     [plan, storeId, panel, insights, draftLast],
   );
 
+  const pressurePair = useMemo(() => {
+    if (!series) {
+      return null;
+    }
+    return buildPressureRequiredPair(
+      series.labels,
+      series.actualYs,
+      series.target,
+      insights.as_of_year,
+      planTargetMonthLabel(plan),
+    );
+  }, [series, insights.as_of_year, plan]);
+
   if (!series) {
     return (
       <Box data-testid="store-hero-evaluation-chart">
@@ -123,17 +173,27 @@ export function StoreHeroEvaluationChart({
     planYs,
     cumulativeYs,
     planCumulativeYs,
-    requiredMonthlyYs,
-    requiredCumulativeYs,
     target,
     asOfLabel,
     asOfIndex,
   } = series;
+
+  const requiredMonthlyYs = isPressure
+    ? (pressurePair?.requiredMonthlyYs ?? series.requiredMonthlyYs)
+    : series.requiredMonthlyYs;
+  const requiredCumulativeYs = isPressure
+    ? (pressurePair?.requiredCumulativeYs ?? series.requiredCumulativeYs)
+    : series.requiredCumulativeYs;
+  const yearStartLabel = pressurePair?.yearStartLabel ?? null;
+  const lastFactLabel = pressurePair?.lastFactLabel ?? null;
+  const horizonEndLabel = pressurePair?.horizonEndLabel ?? null;
+  const legendItems = isPressure ? STORE_PRESSURE_LEGEND : STORE_EVALUATION_LEGEND;
+
   const yValues = [
     ...actualYs.filter((v): v is number => v != null),
-    ...planYs.filter((v): v is number => v != null),
+    ...(!isPressure ? planYs.filter((v): v is number => v != null) : []),
     ...cumulativeYs.filter((v): v is number => v != null),
-    ...planCumulativeYs.filter((v): v is number => v != null),
+    ...(!isPressure ? planCumulativeYs.filter((v): v is number => v != null) : []),
     ...requiredMonthlyYs.filter((v): v is number => v != null),
     ...requiredCumulativeYs.filter((v): v is number => v != null),
     target,
@@ -144,6 +204,13 @@ export function StoreHeroEvaluationChart({
   const yMax = fitY.range?.[1] ?? 100;
   const contentMinWidth = Math.max(labels.length, 1) * STORE_HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
+
+  const requiredMonthlyName = isPressure
+    ? t('planner.hero.pressureMonthly')
+    : t('planner.hero.requiredMonthly');
+  const requiredCumulativeName = isPressure
+    ? t('planner.hero.pressureCumulative')
+    : t('planner.hero.requiredCumulative');
 
   const data = [
     {
@@ -162,7 +229,7 @@ export function StoreHeroEvaluationChart({
       y: requiredMonthlyYs,
       type: 'scatter' as const,
       mode: 'lines+markers' as const,
-      name: t('planner.hero.requiredMonthly'),
+      name: requiredMonthlyName,
       line: { color: '#424242', width: 2, dash: 'dash' as const },
       marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
       connectgaps: false,
@@ -172,9 +239,10 @@ export function StoreHeroEvaluationChart({
       x: labels,
       y: requiredCumulativeYs,
       type: 'scatter' as const,
-      mode: 'lines' as const,
-      name: t('planner.hero.requiredCumulative'),
+      mode: 'lines+markers' as const,
+      name: requiredCumulativeName,
       line: { color: '#616161', width: 2.5 },
+      marker: { size: 6, color: '#616161', symbol: 'diamond' as const },
       connectgaps: false,
       hovertemplate: HERO_HOVER_TEMPLATE,
     },
@@ -189,28 +257,32 @@ export function StoreHeroEvaluationChart({
       connectgaps: false,
       hovertemplate: HERO_HOVER_TEMPLATE,
     },
-    {
-      x: labels,
-      y: planCumulativeYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: t('planner.storeHero.planCumulative'),
-      line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
-      marker: { size: 6, color: '#2e7d32' },
-      connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
-    },
-    {
-      x: labels,
-      y: planYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: t('planner.storeHero.plan'),
-      line: { color: '#1565c0', width: 3 },
-      marker: { size: 7, color: '#1565c0' },
-      connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
-    },
+    ...(!isPressure
+      ? [
+          {
+            x: labels,
+            y: planCumulativeYs,
+            type: 'scatter' as const,
+            mode: 'lines+markers' as const,
+            name: t('planner.storeHero.planCumulative'),
+            line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
+            marker: { size: 6, color: '#2e7d32' },
+            connectgaps: false,
+            hovertemplate: HERO_HOVER_TEMPLATE,
+          },
+          {
+            x: labels,
+            y: planYs,
+            type: 'scatter' as const,
+            mode: 'lines+markers' as const,
+            name: t('planner.storeHero.plan'),
+            line: { color: '#1565c0', width: 3 },
+            marker: { size: 7, color: '#1565c0' },
+            connectgaps: false,
+            hovertemplate: HERO_HOVER_TEMPLATE,
+          },
+        ]
+      : []),
     {
       x: labels,
       y: labels.map(() => target),
@@ -222,58 +294,136 @@ export function StoreHeroEvaluationChart({
     },
   ];
 
-  const asOfCrosshairY =
-    asOfIndex != null
-      ? (requiredCumulativeYs[asOfIndex] ??
-        planCumulativeYs[asOfIndex] ??
-        cumulativeYs[asOfIndex] ??
-        actualYs[asOfIndex] ??
+  const cutoverLabel = isPressure ? lastFactLabel : asOfLabel;
+  const cutoverIdx = isPressure
+    ? lastFactLabel != null
+      ? labels.indexOf(lastFactLabel)
+      : -1
+    : asOfIndex;
+  const cutoverCrosshairY =
+    cutoverIdx != null && cutoverIdx >= 0
+      ? (requiredCumulativeYs[cutoverIdx] ??
+        (!isPressure ? planCumulativeYs[cutoverIdx] : null) ??
+        cumulativeYs[cutoverIdx] ??
+        actualYs[cutoverIdx] ??
         null)
       : null;
 
-  const shapes =
-    asOfLabel != null
+  const yearStartOnAxis =
+    yearStartLabel != null && labels.includes(yearStartLabel);
+
+  const shapes = [
+    ...(isPressure && yearStartOnAxis && yearStartLabel != null
       ? [
           {
             type: 'line' as const,
-            x0: asOfLabel,
-            x1: asOfLabel,
+            x0: yearStartLabel,
+            x1: yearStartLabel,
             y0: yMin,
             y1: yMax,
-            line: { color: '#9e9e9e', width: 1, dash: 'dot' as const },
+            line: { color: '#bdbdbd', width: 1, dash: 'dot' as const },
           },
-          ...(asOfCrosshairY != null
-            ? [asOfHorizontalShape(asOfCrosshairY, '#9e9e9e')]
-            : []),
         ]
-      : [];
-
-  const annotations =
-    asOfLabel != null
+      : []),
+    ...(cutoverLabel != null
       ? [
           {
-            x: asOfLabel,
+            type: 'line' as const,
+            x0: cutoverLabel,
+            x1: cutoverLabel,
+            y0: yMin,
+            y1: yMax,
+            line: {
+              color: isPressure ? '#616161' : '#9e9e9e',
+              width: 1,
+              dash: 'dot' as const,
+            },
+          },
+          ...(cutoverCrosshairY != null
+            ? [
+                asOfHorizontalShape(
+                  cutoverCrosshairY,
+                  isPressure ? '#616161' : '#9e9e9e',
+                ),
+              ]
+            : []),
+        ]
+      : []),
+  ];
+
+  const annotations = [
+    ...(isPressure && yearStartOnAxis && yearStartLabel != null
+      ? [
+          {
+            x: yearStartLabel,
             y: yMax,
-            text: t('planner.storeHero.asOf'),
+            text: t('planner.hero.yearStart'),
             showarrow: false,
             yanchor: 'bottom' as const,
-            font: { size: 10, color: '#757575' },
+            font: { size: 10, color: '#9e9e9e' },
           },
         ]
-      : [];
+      : []),
+    ...(cutoverLabel != null
+      ? [
+          {
+            x: cutoverLabel,
+            y: yMax,
+            text: isPressure
+              ? t('planner.hero.lastFact')
+              : t('planner.storeHero.asOf'),
+            showarrow: false,
+            yanchor: 'bottom' as const,
+            font: {
+              size: 10,
+              color: isPressure ? '#616161' : '#757575',
+            },
+          },
+        ]
+      : []),
+  ];
 
   return (
     <Stack
       spacing={0.35}
       data-testid="store-hero-evaluation-chart"
+      data-required-mode={requiredMode}
       sx={fillParent ? { flex: 1, minHeight: 0, height: '100%' } : undefined}
     >
-      <Typography
-        sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
+      <Stack
+        direction="row"
+        flexWrap="wrap"
+        useFlexGap
+        spacing={1}
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ flexShrink: 0 }}
       >
-        {t('planner.storeHero.title')}
-      </Typography>
-      <EvaluationLegend items={STORE_EVALUATION_LEGEND} testId="store-evaluation-legend" />
+        <Typography
+          sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2 }}
+        >
+          {t('planner.storeHero.title')}
+        </Typography>
+        <ToggleButtonGroup
+          size="small"
+          exclusive
+          value={requiredMode}
+          onChange={handleRequiredMode}
+          aria-label={t('planner.hero.modeAria')}
+          data-testid="store-hero-required-mode"
+        >
+          <ToggleButton value="plan" aria-label={t('planner.hero.modePlanAria')}>
+            {t('planner.hero.modePlan')}
+          </ToggleButton>
+          <ToggleButton
+            value="pressure"
+            aria-label={t('planner.hero.modePressureAria')}
+          >
+            {t('planner.hero.modePressure')}
+          </ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+      <EvaluationLegend items={legendItems} testId="store-evaluation-legend" />
       <Box
         ref={containerRef}
         sx={{
@@ -354,6 +504,20 @@ export function StoreHeroEvaluationChart({
           </Suspense>
         </Box>
       </Box>
+      {isPressure ? (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flexShrink: 0 }}
+        >
+          {t('planner.hero.captionPressure', {
+            yearStart: yearStartLabel ?? '—',
+            lastFact: lastFactLabel ?? '—',
+            horizonEnd: horizonEndLabel ?? '—',
+            target: String(target),
+          })}
+        </Typography>
+      ) : null}
     </Stack>
   );
 }

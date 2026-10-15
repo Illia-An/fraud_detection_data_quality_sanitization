@@ -463,6 +463,26 @@ export const he: Record<MessageKey, string> = {
     'תצוגת הערכה · as-of ({asOf}) הוא מעבר תכנון · עובדה ממומשת יכולה להמשיך אחרי as-of · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. לחצו על תוויות המקרא להצגה/הסתרה · העבירו עכבר לטיפים קצרים.',
   'planner.hero.legendHide': 'לחצו להסתרה',
   'planner.hero.legendShow': 'לחצו להצגה',
+  'planner.hero.modeAria': 'מצב מסלול נדרש',
+  'planner.hero.modePlan': 'תוכנית (−3)',
+  'planner.hero.modePressure': 'לחץ (YTD)',
+  'planner.hero.modePlanAria': 'מסלול נדרש מהתוכנית מ־as-of עם חלון −3 חודשים',
+  'planner.hero.modePressureAria':
+    'לחץ YTD ליעד מינואר עד חודש העובדה המנוקה האחרון',
+  'planner.hero.pressureMonthly': 'לחץ חודשי (להגיע ליעד)',
+  'planner.hero.pressureCumulative': 'לחץ מצטבר (אם לחץ חודשי)',
+  'planner.hero.yearStart': 'תחילת YTD (ינו׳)',
+  'planner.hero.lastFact': 'עובדה אחרונה',
+  'planner.hero.tip.pressureMonthly':
+    'לא עובדה: ציונים חודשיים אחרי חודש העובדה המנוקה האחרון שיגרמו למצטבר מתחילת השנה להגיע ליעד. מחושב מחדש כשמופיע חודש עובדה חדש.',
+  'planner.hero.tip.pressureCumulative':
+    'ממוצע מצטבר YTD מינואר עד העובדה המנוקה האחרונה, ואז ממשיך עם חודשי הלחץ עד היעד. תאום של Pressure monthly; ההיסטוריה מבוססת עובדה, המסלול קדימה — לא.',
+  'planner.hero.tip.yearStart':
+    'ינואר של שנת הלחץ — תחילת ידע YTD לזוג הלחץ. סמן אנכי — לא רמת ציון.',
+  'planner.hero.tip.lastFact':
+    'חודש העובדה המנוקה האחרון: עקומות הלחץ הנדרש מתחילות כאן. זז ימינה כשמופיעים חודשי actual חדשים.',
+  'planner.hero.captionPressure':
+    'תצוגת לחץ · YTD מ־{yearStart} · מעבר בעובדה המנוקה האחרונה ({lastFact}) · H עד חודש יעד התוכנית ({horizonEnd}) · הזוג הנדרש מחושב מחדש כשמופיעים חודשים חדשים · יעד {target}%. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. לחצו על תוויות המקרא להצגה/הסתרה · העבירו עכבר לטיפים קצרים.',
 
   // —— Onboarding tour ——
   'nav.tour': 'סיור במוצר',
