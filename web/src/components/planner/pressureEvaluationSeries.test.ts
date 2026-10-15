@@ -19,7 +19,7 @@ describe('buildPressureRequiredPair', () => {
     expect(pair.requiredMonthlyYs[0]).toBeNull();
     expect(pair.requiredMonthlyYs[1]).toBeNull();
 
-    const startCum = 72;
+    
     // m1 = 4*73.5 - 3*72 = 294 - 216 = 78; m2 = 5*75 - 4*73.5 = 375 - 294 = 81
     expect(pair.requiredMonthlyYs[3]).toBeCloseTo(78, 2);
     expect(pair.requiredMonthlyYs[4]).toBeCloseTo(81, 2);
