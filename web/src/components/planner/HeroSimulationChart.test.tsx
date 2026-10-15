@@ -111,4 +111,66 @@ describe('HeroSimulationChart', () => {
       expect(screen.getByTestId('hero-plotly').textContent ?? '').toContain('Draft simulation');
     });
   });
+
+  it('switches to YTD pressure mode with last-fact cutover', async () => {
+    const panelWithYtd: SanitizedPanel = {
+      ...panel,
+      reference_year: 2025,
+      reference_month: 4,
+      rows: [
+        { store_id: 10, year: 2025, month: 1, five_percent: 70, survey_volume: 90 },
+        { store_id: 20, year: 2025, month: 1, five_percent: 70, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 2, five_percent: 72, survey_volume: 90 },
+        { store_id: 20, year: 2025, month: 2, five_percent: 72, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 3, five_percent: 74, survey_volume: 90 },
+        { store_id: 20, year: 2025, month: 3, five_percent: 74, survey_volume: 80 },
+        { store_id: 10, year: 2025, month: 4, five_percent: 80, survey_volume: 90 },
+        { store_id: 20, year: 2025, month: 4, five_percent: 80, survey_volume: 80 },
+      ],
+    };
+
+    render(
+      <ThemeProvider theme={appTheme}>
+        <HeroSimulationChart
+          draftPlan={draft}
+          panel={panelWithYtd}
+          asOfYear={2025}
+          asOfMonth={3}
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-plotly')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('hero-evaluation-chart')).toHaveAttribute(
+      'data-required-mode',
+      'plan',
+    );
+    expect(screen.getByTestId('hero-required-mode')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/YTD pressure to target/i));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-evaluation-chart')).toHaveAttribute(
+        'data-required-mode',
+        'pressure',
+      );
+    });
+    const payload = screen.getByTestId('hero-plotly').textContent ?? '';
+    expect(payload).toContain('Pressure monthly (to hit target)');
+    expect(payload).toContain('Pressure cumulative (if pressure monthly)');
+    expect(payload).toContain('last fact');
+    expect(payload).not.toContain('Path to target (−3 mo)');
+    expect(payload).not.toContain('Draft simulation');
+    expect(screen.getByTestId('evaluation-legend-item-lastFact')).toBeInTheDocument();
+    expect(screen.getByTestId('evaluation-legend-item-yearStart')).toBeInTheDocument();
+    expect(screen.queryByTestId('evaluation-legend-item-draft')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Pressure view · YTD from 2025-01 · cutover at last cleansed fact \(2025-04\) · H through plan target month \(2025-05\)/i,
+      ),
+    ).toBeInTheDocument();
+    expect(payload).toContain('"x0":"2025-04"');
+  });
 });
