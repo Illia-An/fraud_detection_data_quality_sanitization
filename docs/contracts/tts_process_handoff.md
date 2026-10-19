@@ -43,7 +43,7 @@ Q10012 `/process` and `docs/contracts/sanitized_panel_handoff.md` stay unchanged
 | Field | Notes |
 |-------|--------|
 | `source` | v1: `db` only; snapshot backlog |
-| `from_date` / `to_date` | Inclusive sale/business window — exact timestamp column confirmed in Stage 1 (`SaleDate` vs `UpDatetime`) |
+| `from_date` / `to_date` | Inclusive **SaleDate** business-day window (Stage 1 lock) |
 | `config` | Omitted → defaults from `TtsPipelineConfig` |
 | `store_ids` | Optional filter |
 
