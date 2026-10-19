@@ -100,6 +100,7 @@ describe('TtsSanitizationPage', () => {
     useTtsUiStore.setState({
       bumpRows: [],
       processResult: null,
+      sanitizedPanel: null,
       sampleMeta: null,
       sampleGeneration: 0,
       sampleDataKey: null,
@@ -147,7 +148,7 @@ describe('TtsSanitizationPage', () => {
     );
   });
 
-  it('shows KPI delta after a successful run', async () => {
+  it('shows KPI delta and panel handoff after a successful run', async () => {
     mockUseProcessTts.mockReturnValue({
       mutate,
       isPending: false,
@@ -157,12 +158,18 @@ describe('TtsSanitizationPage', () => {
       reset: vi.fn(),
     } as unknown as ReturnType<typeof useProcessTts>);
 
+    // Simulate store panel build the same way useTtsPipelineRunner does on success.
+    useTtsUiStore.getState().setProcessResult(processResult);
+
     renderPage();
     await waitFor(() => {
       expect(screen.getByTestId('tts-kpi-cards')).toBeInTheDocument();
     });
     expect(screen.getByTestId('tts-kpi-cards')).toHaveTextContent('+20.0 s');
     expect(screen.getByTestId('tts-impact-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('tts-panel-handoff')).toBeInTheDocument();
+    expect(screen.getByTestId('tts-panel-chip')).toHaveTextContent('1 cells');
+    expect(screen.getByTestId('tts-panel-export-csv')).toBeInTheDocument();
   });
 
   it('allows manual Run when sample is ready', async () => {
