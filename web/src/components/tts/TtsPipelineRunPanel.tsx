@@ -12,7 +12,9 @@ import { useState } from 'react';
 
 import type { TtsPipelineRunner } from '../../hooks/useTtsPipelineRunner';
 import { useT } from '../../i18n';
+import { useTtsUiStore } from '../../store/ttsUiStore';
 import { TtsKpiCards } from './TtsKpiCards';
+import { TtsPanelHandoffBar } from './TtsPanelHandoffBar';
 import { TtsStepsTable } from './TtsStepsTable';
 import { TtsStoreImpactChart } from './TtsStoreImpactChart';
 
@@ -23,6 +25,7 @@ interface TtsPipelineRunPanelProps {
 export function TtsPipelineRunPanel({ runner }: TtsPipelineRunPanelProps) {
   const t = useT();
   const { noData, isPending, isError, error, displayResult } = runner;
+  const sanitizedPanel = useTtsUiStore((s) => s.sanitizedPanel);
   const [stepsExpanded, setStepsExpanded] = useState(false);
   const showResults = Boolean(displayResult && !isPending);
 
@@ -53,6 +56,7 @@ export function TtsPipelineRunPanel({ runner }: TtsPipelineRunPanelProps) {
       {showResults && displayResult ? (
         <>
           <TtsKpiCards result={displayResult} />
+          <TtsPanelHandoffBar panel={sanitizedPanel} />
           <Box
             sx={{
               flex: 1,

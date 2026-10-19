@@ -1,6 +1,6 @@
 # Contract: TTS process API & panel handoff (draft)
 
-**Status:** Implemented API — Stage 3; UI — Stage 4 (`exp/tts-ui-sanitize`); panel later (Stage 5)  
+**Status:** Implemented API — Stage 3; UI — Stage 4; panel — Stage 5 (`docs/contracts/tts_sanitized_panel_handoff.md`)  
 **SPEC:** `SPEC-tts.md`  
 **Metric:** Monitor dwell TTS (seconds), McKiti bump view  
 **Flow:** `POST /api/v1/process-tts` → cleansed series → (Stage 5) panel → (Stage 6) planner-like  
@@ -145,7 +145,7 @@ Echoed in result `meta`: `order_agg_applied_after_ge30`, `grain_final` (`bump` |
 | `volume` | Count of bumps or orders after clean |
 | `reference_*` | Suggested last month in panel (planner later) |
 
-Full Stage 5 doc: `docs/contracts/tts_sanitized_panel_handoff.md` (create when implementing panel).
+Full Stage 5 doc: `docs/contracts/tts_sanitized_panel_handoff.md`.
 
 ---
 
