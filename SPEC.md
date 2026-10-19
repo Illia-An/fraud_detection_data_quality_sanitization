@@ -3,6 +3,9 @@
 **Status:** Approved  
 **Domain:** Q10012 Top-Box Network Impact Engine
 
+> **Related track (TTS):** Time To Serve is specified separately in [`SPEC-tts.md`](SPEC-tts.md)  
+> (roadmap: `docs/plan-tts-into-product-staged.md`). This document remains Q10012-only.
+
 ---
 
 ## 1. Context & Boundaries
