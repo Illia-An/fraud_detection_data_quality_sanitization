@@ -134,21 +134,24 @@ Research (done)
 ## Stage 2 — Pure sanitization engine
 
 **Branch:** `exp/tts-engine-ge30`  
-**Status:** pending
+**Status:** done (on branch; merge when reviewed)
 
 **Goal:** Pure logic in `src/` (parallel to `fraud_guard`), no FastAPI/UI.
 
 **Deliverables**
 
-- Module e.g. `src/tts_guard/`: compute `tts_sec`, apply `>= tts_min_sec`, before/after stats
-- `order_agg` implemented or stubbed (`none` required; `avg`/`max` if cheap — otherwise stub + tests for `none` only)
-- Unit tests on synthetic rows (negatives removed, mean rises, drop ~order of research)
+- [x] `src/tts_guard/` — clock + `run_tts_sanitize` (actual → ge30)
+- [x] `src/schemas/tts.py` — `TtsPipelineConfig` / result contracts
+- [x] `order_agg`: `none` | `avg` | `max` (ge30 on bumps **then** collapse; echoed in meta)
+- [x] `tests/test_tts_guard.py` — shorts/negatives, mean rises, MAX > AVG
 
 **DoD**
 
 - pytest green; I/O-free pure module; qualitative match to research
 
 **Depends on:** Stage 0; Stage 1 preferred for integration later
+
+**Next:** Stage 3 — `exp/tts-api-process`
 
 ---
 
@@ -271,4 +274,4 @@ After each merge: short note — what landed, how to verify, what’s still open
 
 ## Immediate next step
 
-**Stages 0–1 done on trunk path.** After Stage 1 PR merge: start **Stage 2** — `exp/tts-engine-ge30` (pure ≥30 filter on bump TTS).
+**Stages 0–2 done on trunk path.** After Stage 2 PR merge: start **Stage 3** — `exp/tts-api-process` (`POST /api/v1/process-tts`).
