@@ -193,6 +193,11 @@ export const en = {
   'tts.steps.col.dropped': 'Dropped',
   'tts.steps.col.mean': 'Mean TTS',
   'tts.steps.col.median': 'Median TTS',
+  'tts.panel.ready': 'TTS panel ready · {count} cells',
+  'tts.panel.missing': 'TTS panel not ready',
+  'tts.panel.meta':
+    '{count} store×month · ref {ref} · period {start}{end}',
+  'tts.panel.exportCsv': 'Export CSV',
 
   'kpi.baselineNetwork': 'Baseline 5%',
   'kpi.finalNetwork': 'Final 5%',

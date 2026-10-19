@@ -205,22 +205,25 @@ Research (done)
 ## Stage 5 — Cleansed panel handoff
 
 **Branch:** `exp/tts-panel-handoff`  
-**Status:** pending
+**Status:** done (this branch)
 
 **Goal:** Store×month cleansed TTS panel (mirror of 5% `sanitizedPanel`).
 
 **Deliverables**
 
-- Panel schema: `store_id, year, month, tts_sec, volume` (+ echo/meta)
-- Derive from process result (client and/or API)
-- Optional CSV export
-- `docs/contracts/tts_sanitized_panel_handoff.md`
+- [x] Panel schema: `store_id, year, month, tts_sec, volume` (+ echo/meta)
+- [x] Derive from process result (`buildTtsSanitizedPanelFromProcess`)
+- [x] Session persist + CSV export (`TtsPanelHandoffBar`)
+- [x] `docs/contracts/tts_sanitized_panel_handoff.md`
+- [x] `isTtsPanelReady` gate helper for Stage 6
 
 **DoD**
 
-- After successful TTS Run, panel ready for planner gate
+- [x] After successful TTS Run, panel ready for planner gate
 
 **Depends on:** Stages 3–4
+
+**Next:** Stage 6 — planner-like (split 6a/6b/6c); start only with target clarity
 
 ---
 
@@ -279,4 +282,4 @@ After each merge: short note — what landed, how to verify, what’s still open
 
 ## Immediate next step
 
-**Stages 0–4 done on trunk path (Stage 4 on `exp/tts-ui-sanitize`).** Next: **Stage 5** — `exp/tts-panel-handoff`.
+**Stages 0–5 done on trunk path (Stage 5 on `exp/tts-panel-handoff`).** Next: **Stage 6** — planner-like (split).

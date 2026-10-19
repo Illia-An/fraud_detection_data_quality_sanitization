@@ -181,6 +181,11 @@ export const he: Record<MessageKey, string> = {
   'tts.steps.col.dropped': 'הוסרו',
   'tts.steps.col.mean': 'ממוצע TTS',
   'tts.steps.col.median': 'חציון TTS',
+  'tts.panel.ready': 'פאנל TTS מוכן · {count} תאים',
+  'tts.panel.missing': 'פאנל TTS לא מוכן',
+  'tts.panel.meta':
+    '{count} סניף×חודש · ref {ref} · תקופה {start}{end}',
+  'tts.panel.exportCsv': 'ייצוא CSV',
 
   'kpi.baselineNetwork': 'בסיס 5%',
   'kpi.finalNetwork': 'סופי 5%',

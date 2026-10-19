@@ -12,6 +12,11 @@ import {
   type TtsSanitizationResponse,
 } from '../schemas/tts';
 import {
+  buildTtsSanitizedPanelFromProcess,
+  ttsSanitizedPanelSchema,
+  type TtsSanitizedPanel,
+} from '../schemas/ttsSanitizedPanel';
+import {
   DEFAULT_PERIOD_PRESET,
   periodPresetSchema,
   type PeriodPreset,
@@ -32,6 +37,8 @@ interface TtsUiState {
   sampleGeneration: number;
   sampleDataKey: string | null;
   processResult: TtsSanitizationResponse | null;
+  /** Stage 5 cleansed store×month panel for Stage 6 planner gate. */
+  sanitizedPanel: TtsSanitizedPanel | null;
   setSelectedStoreId: (storeId: number | null) => void;
   setLastPreset: (preset: TtsDataSource) => void;
   setPeriodPreset: (preset: PeriodPreset) => void;
@@ -59,6 +66,15 @@ export function buildTtsSampleDataKey(
   return `${preset}:${loadToken}:${meta.row_count}:${meta.store_count}:${meta.month_count}:${rows.length}`;
 }
 
+function panelFromResult(
+  result: TtsSanitizationResponse | null,
+): TtsSanitizedPanel | null {
+  if (!result) {
+    return null;
+  }
+  return buildTtsSanitizedPanelFromProcess(result);
+}
+
 const ttsSessionSchema = z.object({
   selectedStoreId: z.number().nullable(),
   lastPreset: ttsDataSourceSchema,
@@ -67,6 +83,7 @@ const ttsSessionSchema = z.object({
   customToDate: z.string(),
   chartScope: z.enum(['store', 'network']),
   processResult: ttsSanitizationResponseSchema.nullable().optional(),
+  sanitizedPanel: ttsSanitizedPanelSchema.nullable().optional(),
 });
 
 function loadSession(): Partial<TtsUiState> {
@@ -79,6 +96,9 @@ function loadSession(): Partial<TtsUiState> {
     removeSessionKey(TTS_UI_SESSION_STORAGE_KEY);
     return {};
   }
+  const processResult = parsed.data.processResult ?? null;
+  const sanitizedPanel =
+    parsed.data.sanitizedPanel ?? panelFromResult(processResult);
   return {
     selectedStoreId: parsed.data.selectedStoreId,
     lastPreset: parsed.data.lastPreset,
@@ -86,7 +106,8 @@ function loadSession(): Partial<TtsUiState> {
     customFromDate: parsed.data.customFromDate,
     customToDate: parsed.data.customToDate,
     chartScope: parsed.data.chartScope,
-    processResult: parsed.data.processResult ?? null,
+    processResult,
+    sanitizedPanel,
   };
 }
 
@@ -99,6 +120,7 @@ function persistSession(state: TtsUiState): void {
     customToDate: state.customToDate,
     chartScope: state.chartScope,
     processResult: state.processResult,
+    sanitizedPanel: state.sanitizedPanel,
   });
 }
 
@@ -116,6 +138,7 @@ export const useTtsUiStore = create<TtsUiState>((set, get) => ({
   sampleGeneration: 0,
   sampleDataKey: null,
   processResult: initialSession.processResult ?? null,
+  sanitizedPanel: initialSession.sanitizedPanel ?? null,
 
   setSelectedStoreId: (storeId) => {
     set({ selectedStoreId: storeId });
@@ -156,6 +179,7 @@ export const useTtsUiStore = create<TtsUiState>((set, get) => ({
       sampleDataKey: key,
       sampleGeneration: state.sampleGeneration + 1,
       processResult: null,
+      sanitizedPanel: null,
     }));
     persistSession(get());
     return true;
@@ -166,7 +190,10 @@ export const useTtsUiStore = create<TtsUiState>((set, get) => ({
   },
 
   setProcessResult: (result) => {
-    set({ processResult: result });
+    set({
+      processResult: result,
+      sanitizedPanel: panelFromResult(result),
+    });
     persistSession(get());
   },
 
@@ -176,6 +203,7 @@ export const useTtsUiStore = create<TtsUiState>((set, get) => ({
       sampleMeta: null,
       sampleDataKey: null,
       processResult: null,
+      sanitizedPanel: null,
     });
     persistSession(get());
   },
@@ -189,6 +217,7 @@ export const useTtsUiStore = create<TtsUiState>((set, get) => ({
       sampleDataKey: `db-ready:${parsedMeta.row_count}`,
       sampleGeneration: state.sampleGeneration + 1,
       processResult: null,
+      sanitizedPanel: null,
     }));
     persistSession(get());
   },
