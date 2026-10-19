@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import Any, Sequence
 
+import pandas as pd
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -57,6 +58,14 @@ class TtsActualBaseline:
 
 class TtsQueryError(RuntimeError):
     """TTS SQL / config failure (mirrors DbSampleError role for Q10012)."""
+
+    def __init__(self, message: str, *, status_code: int = 503) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+# Soft default for TTS SaleDate window (research coverage starts ~2026-09).
+DEFAULT_TTS_FROM_DATE = date(2026, 9, 1)
 
 
 def network_mean_tts_sec(sum_tts_sec: float, bump_count: int) -> float:
@@ -228,6 +237,55 @@ def load_tts_actual_baseline_from_settings(
     from db.connection import get_tts_engine
 
     return get_tts_actual_baseline_aggregates(
+        get_tts_engine(),
+        period_start,
+        period_end,
+        store_ids=store_ids,
+    )
+
+
+def get_tts_bump_rows(
+    engine: Engine,
+    period_start: date,
+    period_end: date | None = None,
+    store_ids: Sequence[int | float] | None = None,
+    *,
+    view_name: str | None = None,
+) -> tuple[pd.DataFrame, float]:
+    """Load audit-column bump rows for the TTS engine (Stage 3).
+
+    Returns ``(dataframe, query_time_ms)``. Only ``TTS_AUDIT_COLUMNS``.
+    """
+    from db.config import get_settings
+
+    resolved_view = view_name or get_settings().tts_view
+    sql, params = build_tts_bump_rows_sql(
+        period_start,
+        period_end,
+        store_ids=store_ids,
+        view_name=resolved_view,
+    )
+    started = time.perf_counter()
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(sql), params)
+            rows = [dict(m) for m in result.mappings()]
+    except SQLAlchemyError as exc:
+        logger.exception("TTS bump-row fetch failed")
+        raise TtsQueryError("TTS database query failed") from exc
+    query_time_ms = (time.perf_counter() - started) * 1000.0
+    return pd.DataFrame(rows), query_time_ms
+
+
+def load_tts_bump_rows_from_settings(
+    period_start: date,
+    period_end: date | None = None,
+    store_ids: Sequence[int | float] | None = None,
+) -> tuple[pd.DataFrame, float]:
+    """Bump rows via ``get_tts_engine()``."""
+    from db.connection import get_tts_engine
+
+    return get_tts_bump_rows(
         get_tts_engine(),
         period_start,
         period_end,
