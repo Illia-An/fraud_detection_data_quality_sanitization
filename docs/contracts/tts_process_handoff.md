@@ -109,7 +109,8 @@ Numbers above are **illustrative** (aligned with research order of magnitude), n
 | `actual` | Baseline mean TTS on included bump rows (valid timestamps), before ge30 |
 | `ge30` | After applying `TTS_sec >= tts_min_sec` |
 
-When `order_agg` is `avg` or `max`, Stage 2/3 MUST document whether volumes/means are **order-grain** and whether ge30 applied pre- or post-collapse (open question in SPEC §6 — pick one in Stage 2 and echo in `meta`).
+**Stage 2 lock:** ge30 applies on **bump rows** first; then `order_agg` avg/max collapses to order grain.  
+Echoed in result `meta`: `order_agg_applied_after_ge30`, `grain_final` (`bump` | `order`).
 
 ---
 
