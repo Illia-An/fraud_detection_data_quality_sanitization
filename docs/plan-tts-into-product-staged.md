@@ -158,22 +158,25 @@ Research (done)
 ## Stage 3 — API endpoint
 
 **Branch:** `exp/tts-api-process`  
-**Status:** pending
+**Status:** done (on branch; merge when reviewed)
 
 **Goal:** Separate TTS process path (avoid breaking 5% `/process`).
 
 **Deliverables**
 
-- `POST /api/v1/process-tts` (name final in Stage 0)
-- `TtsPipelineConfig` / `TtsSanitizationResponse` (Pydantic)
-- Wire: queries → engine → store series + network delta + `echo_config`
-- Contract tests
+- [x] `POST /api/v1/process-tts` (`backend/tts_service.py`, `tts_schemas.py`)
+- [x] `source=inline|db`; bump-row fetch via `load_tts_bump_rows_from_settings`
+- [x] Profiling meta + `db_tts_rows_time_ms`; echo_config
+- [x] `tests/test_tts_process_api.py`
+- [x] Synthetic presets (`tts_guard.synthetic`) + `GET /api/v1/sample/tts/{small|medium|stress}` (demo without MC)
 
 **DoD**
 
 - Documented OpenAPI; 5% `/process` behavior unchanged; `source=db` for TTS
 
 **Backlog:** TTS sqlite snapshot fast-path (like Q10012)
+
+**Next:** Stage 4 — `exp/tts-ui-sanitize`
 
 ---
 
@@ -274,4 +277,4 @@ After each merge: short note — what landed, how to verify, what’s still open
 
 ## Immediate next step
 
-**Stages 0–2 done on trunk path.** After Stage 2 PR merge: start **Stage 3** — `exp/tts-api-process` (`POST /api/v1/process-tts`).
+**Stages 0–3 done on trunk path.** After Stage 3 PR merge: start **Stage 4** — `exp/tts-ui-sanitize` (TTS what-if UI).
