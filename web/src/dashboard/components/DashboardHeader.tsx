@@ -12,6 +12,10 @@ const PAGE_HEADER_KEYS: Record<string, { title: MessageKey; subtitle: MessageKey
     title: 'header.sanitization.title',
     subtitle: 'header.sanitization.subtitle',
   },
+  '/tts': {
+    title: 'header.tts.title',
+    subtitle: 'header.tts.subtitle',
+  },
   '/planner': {
     title: 'header.planner.title',
     subtitle: 'header.planner.subtitle',

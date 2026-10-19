@@ -1,6 +1,6 @@
 # Contract: TTS process API & panel handoff (draft)
 
-**Status:** Implemented API — Stage 3 (`exp/tts-api-process`); UI/panel later  
+**Status:** Implemented API — Stage 3; UI — Stage 4 (`exp/tts-ui-sanitize`); panel later (Stage 5)  
 **SPEC:** `SPEC-tts.md`  
 **Metric:** Monitor dwell TTS (seconds), McKiti bump view  
 **Flow:** `POST /api/v1/process-tts` → cleansed series → (Stage 5) panel → (Stage 6) planner-like  
