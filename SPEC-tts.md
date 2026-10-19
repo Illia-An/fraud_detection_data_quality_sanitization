@@ -189,7 +189,7 @@ Snapshot fast-path for TTS is **backlog**, not v1 blocker.
 ## 6. Open questions (non-blocking)
 
 1. Confirm with ops/customer: Up→Bump is the official TTS clock.
-2. When enabling `order_agg`: filter bumps ≥30 **then** MAX/AVG, vs filter on order metric only.
+2. ~~When enabling `order_agg`: filter bumps ≥30 then MAX/AVG vs filter on order metric~~ — **Stage 2 lock:** ge30 on bumps **then** collapse (`meta.order_agg_applied_after_ge30`).
 3. Strict `< 30` vs `<= 30` wording — implementation uses `TTS_sec >= tts_min_sec` (default 30).
 4. Which `KVSGroup` values (21 / 31) enter the official KPI?
 5. Optional long-tail cap (e.g. > 1h) — research: low mean impact after ≥30.
