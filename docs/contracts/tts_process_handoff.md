@@ -1,11 +1,14 @@
 # Contract: TTS process API & panel handoff (draft)
 
-**Status:** Draft — Stage 0 (`exp/tts-spec-contract`)  
+**Status:** Implemented API — Stage 3 (`exp/tts-api-process`); UI/panel later  
 **SPEC:** `SPEC-tts.md`  
 **Metric:** Monitor dwell TTS (seconds), McKiti bump view  
-**Flow (target):** UI/API `POST /api/v1/process-tts` → cleansed series → (Stage 5) panel → (Stage 6) planner-like  
+**Flow:** `POST /api/v1/process-tts` → cleansed series → (Stage 5) panel → (Stage 6) planner-like  
 
 Q10012 `/process` and `docs/contracts/sanitized_panel_handoff.md` stay unchanged.
+
+**Code:** `backend/tts_schemas.py`, `backend/tts_service.py`, `backend/tts_queries.get_tts_bump_rows`  
+**Synthetic (no DB):** `GET /api/v1/sample/tts/{small|medium|stress}` → rows for `POST /process-tts` with `source=inline`
 
 ---
 

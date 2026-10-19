@@ -40,8 +40,18 @@ from backend.schemas import (
 from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
 from backend.service import run_pipeline, run_pipeline_pushdown
 from backend.static_ui import mount_frontend
+from backend.tts_queries import TtsQueryError
+from backend.tts_schemas import (
+    TtsBumpRow,
+    TtsProcessRequest,
+    TtsSamplePresetMeta,
+    TtsSampleResponse,
+    TtsSanitizationResponse,
+)
+from backend.tts_service import run_tts_process
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
 from planner.five_percent import plan_five_percent
+from tts_guard.synthetic import TtsPresetName, generate_tts_preset, tts_preset_meta
 
 _ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(_ROOT / ".env")
@@ -143,6 +153,24 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # TTS synthetic sample (static path before generic /sample/{preset} for clarity).
+    @app.get(
+        f"{API_PREFIX}/sample/tts/{{preset}}",
+        response_model=TtsSampleResponse,
+        tags=["sample-tts"],
+        responses={404: {"description": "Unknown TTS preset"}},
+    )
+    def sample_tts(preset: TtsPresetName) -> TtsSampleResponse:
+        """Synthetic McKitiBump rows for TTS demos without live MC SQL."""
+        raw_rows = generate_tts_preset(preset)
+        rows = [TtsBumpRow.model_validate(r) for r in raw_rows]
+        meta_raw = tts_preset_meta(preset, raw_rows)
+        return TtsSampleResponse(
+            preset=preset,
+            rows=rows,
+            meta=TtsSamplePresetMeta.model_validate(meta_raw),
+        )
 
     @app.get(
         f"{API_PREFIX}/sample/{{preset}}",
@@ -277,6 +305,34 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.exception("pipeline failed")
             raise HTTPException(status_code=500, detail="Pipeline execution failed") from exc
+
+    @app.post(
+        f"{API_PREFIX}/process-tts",
+        response_model=TtsSanitizationResponse,
+        response_model_exclude_unset=False,
+        response_model_exclude_none=False,
+        tags=["process-tts"],
+        responses={
+            422: {"description": "Validation error or empty period"},
+            500: {"description": "TTS pipeline execution error"},
+            503: {"description": "Database unavailable when source=db"},
+        },
+    )
+    def process_tts(body: TtsProcessRequest) -> TtsSanitizationResponse:
+        """Run TTS sanitization (actual → ge30) per SPEC-tts; isolated from Q10012."""
+        try:
+            return run_tts_process(body)
+        except HTTPException:
+            raise
+        except TtsQueryError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception("TTS pipeline failed")
+            raise HTTPException(
+                status_code=500, detail="TTS pipeline execution failed"
+            ) from exc
 
     @app.post(
         f"{API_PREFIX}/plans",
