@@ -1,6 +1,7 @@
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
+import TimerRoundedIcon from '@mui/icons-material/TimerRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import TourRoundedIcon from '@mui/icons-material/TourRounded';
 import List from '@mui/material/List';
@@ -25,6 +26,7 @@ const mainListItems: {
   onboarding?: string;
 }[] = [
   { textKey: 'nav.sanitization', icon: <ScienceRoundedIcon />, path: '/' },
+  { textKey: 'nav.tts', icon: <TimerRoundedIcon />, path: '/tts' },
   {
     textKey: 'nav.planner',
     icon: <CalendarMonthRoundedIcon />,
