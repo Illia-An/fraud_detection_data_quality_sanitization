@@ -18,6 +18,16 @@ import {
   type SampleResponse,
 } from '../schemas/api';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
+import {
+  ttsProcessRequestSchema,
+  ttsSamplePresetSchema,
+  ttsSampleResponseSchema,
+  ttsSanitizationResponseSchema,
+  type TtsProcessRequest,
+  type TtsSamplePreset,
+  type TtsSampleResponse,
+  type TtsSanitizationResponse,
+} from '../schemas/tts';
 
 export class ApiError extends Error {
   constructor(
@@ -119,4 +129,20 @@ export function parseProcessRequest(input: unknown): ProcessRequest {
 
 export function parsePipelineConfig(input: unknown): PipelineConfig {
   return pipelineConfigSchema.parse(input);
+}
+
+export function fetchTtsSample(preset: TtsSamplePreset): Promise<TtsSampleResponse> {
+  const validPreset = ttsSamplePresetSchema.parse(preset);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/sample/tts/${validPreset}`,
+    ttsSampleResponseSchema,
+  );
+}
+
+export function postProcessTts(request: TtsProcessRequest): Promise<TtsSanitizationResponse> {
+  const body = ttsProcessRequestSchema.parse(request);
+  return fetchJson(`${API_BASE_URL}${API_PREFIX}/process-tts`, ttsSanitizationResponseSchema, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }

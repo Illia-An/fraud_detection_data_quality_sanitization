@@ -1,6 +1,14 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { fetchHealth, fetchSample, fetchSampleDb, postPlan, postProcess } from './client';
+import {
+  fetchHealth,
+  fetchSample,
+  fetchSampleDb,
+  fetchTtsSample,
+  postPlan,
+  postProcess,
+  postProcessTts,
+} from './client';
 import {
   sampleDbParamsSchema,
   type ProcessRequest,
@@ -8,6 +16,7 @@ import {
   type SamplePreset,
 } from '../schemas/api';
 import type { PlanRequest } from '../schemas/plan';
+import type { TtsProcessRequest, TtsSamplePreset } from '../schemas/tts';
 
 export const queryKeys = {
   health: ['health'] as const,
@@ -22,6 +31,7 @@ export const queryKeys = {
       parsed.month ?? null,
     ] as const;
   },
+  ttsSample: (preset: TtsSamplePreset) => ['tts-sample', preset] as const,
 };
 
 export function useHealth() {
@@ -62,5 +72,20 @@ export function useProcess() {
 export function usePlan() {
   return useMutation({
     mutationFn: (request: PlanRequest) => postPlan(request),
+  });
+}
+
+export function useTtsSample(preset: TtsSamplePreset, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.ttsSample(preset),
+    queryFn: () => fetchTtsSample(preset),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useProcessTts() {
+  return useMutation({
+    mutationFn: (request: TtsProcessRequest) => postProcessTts(request),
   });
 }

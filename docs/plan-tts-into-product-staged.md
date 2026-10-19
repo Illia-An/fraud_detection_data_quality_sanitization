@@ -176,27 +176,29 @@ Research (done)
 
 **Backlog:** TTS sqlite snapshot fast-path (like Q10012)
 
-**Next:** Stage 4 — `exp/tts-ui-sanitize`
+**Next:** Stage 4 done on `exp/tts-ui-sanitize` → Stage 5 panel handoff
 
 ---
 
 ## Stage 4 — Sanitization UI (TTS)
 
 **Branch:** `exp/tts-ui-sanitize`  
-**Status:** pending
+**Status:** done (this branch)
 
 **Goal:** What-if surface like Sanitization, **no** planner. UX polish / compose can wait.
 
 **Deliverables**
 
-- Route/nav for TTS sanitization (minimal; may feel additive)
-- Period + Run; threshold default 30 (editability per Stage 0)
-- Network/store before→after charts; i18n EN/HE minimum
-- `order_agg` control: hidden or disabled in v1 if default `none`
+- [x] Route/nav for TTS sanitization (`/tts`, nav item) — isolated from Q10012
+- [x] Period + Run; threshold default 30; synthetic presets + optional db
+- [x] Network/store before→after charts (seconds); i18n EN/HE
+- [x] `order_agg` control: disabled in v1 (default `none`)
 
 **DoD**
 
-- Successful Run shows delta; empty/error states; lint + unit; 5% onboarding anchors intact
+- [x] Successful Run shows delta; empty/error states; unit tests; 5% onboarding anchors untouched
+
+**Next:** Stage 5 — `exp/tts-panel-handoff`
 
 ---
 
@@ -277,4 +279,4 @@ After each merge: short note — what landed, how to verify, what’s still open
 
 ## Immediate next step
 
-**Stages 0–3 done on trunk path.** After Stage 3 PR merge: start **Stage 4** — `exp/tts-ui-sanitize` (TTS what-if UI).
+**Stages 0–4 done on trunk path (Stage 4 on `exp/tts-ui-sanitize`).** Next: **Stage 5** — `exp/tts-panel-handoff`.
