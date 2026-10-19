@@ -110,21 +110,24 @@ Research (done)
 ## Stage 1 — Data access (read-only)
 
 **Branch:** `exp/tts-db-read`  
-**Status:** pending
+**Status:** done (on branch; merge when reviewed)
 
 **Goal:** Read McKitiBump with same discipline as 5% Query A (no `SELECT *`).
 
 **Deliverables**
 
-- Config for `MC` (dedicated `DATABASE_URL` / DB name as needed)
-- Query helpers: period filter; store×period aggregates; audit-approved columns only
-- Tests: builders/mocks (no live SQL in CI)
+- [x] Config: optional `TTS_DATABASE_URL` + `TTS_VIEW` (`.env.example`, `db/config.py`, `get_tts_engine`)
+- [x] `backend/tts_queries.py` — Query A store×month aggregates; bump-row SELECT builder (audit cols)
+- [x] Period on `SaleDate` (inclusive); `BumpDateTime IS NOT NULL`; `query_time_ms` on baseline
+- [x] Tests: `tests/test_tts_queries.py` (builders/mocks; no live SQL in CI)
 
 **DoD**
 
-- Baseline aggregates callable; timing in meta where applicable; 5% path no regression
+- Baseline aggregates callable; timing on baseline; 5% path unchanged
 
 **Depends on:** Stage 0 field names / grain
+
+**Next:** Stage 2 — `exp/tts-engine-ge30`
 
 ---
 
@@ -268,4 +271,4 @@ After each merge: short note — what landed, how to verify, what’s still open
 
 ## Immediate next step
 
-**Stage 0 done on branch.** After PR merge to `main`: start **Stage 1** — `exp/tts-db-read` (read-only McKitiBump queries).
+**Stages 0–1 done on trunk path.** After Stage 1 PR merge: start **Stage 2** — `exp/tts-engine-ge30` (pure ≥30 filter on bump TTS).
