@@ -28,6 +28,16 @@ import {
   type TtsSampleResponse,
   type TtsSanitizationResponse,
 } from '../schemas/tts';
+import {
+  orderBumpPresetSchema,
+  orderBumpProcessRequestSchema,
+  orderBumpProcessResponseSchema,
+  orderBumpSampleResponseSchema,
+  type OrderBumpPreset,
+  type OrderBumpProcessRequest,
+  type OrderBumpProcessResponse,
+  type OrderBumpSampleResponse,
+} from '../schemas/ttsOrderBump';
 
 export class ApiError extends Error {
   constructor(
@@ -145,4 +155,28 @@ export function postProcessTts(request: TtsProcessRequest): Promise<TtsSanitizat
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function fetchOrderBumpSample(
+  preset: OrderBumpPreset,
+): Promise<OrderBumpSampleResponse> {
+  const validPreset = orderBumpPresetSchema.parse(preset);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/sample/tts-order-bump/${validPreset}`,
+    orderBumpSampleResponseSchema,
+  );
+}
+
+export function postProcessOrderBump(
+  request: OrderBumpProcessRequest,
+): Promise<OrderBumpProcessResponse> {
+  const body = orderBumpProcessRequestSchema.parse(request);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/process-tts-order-bump`,
+    orderBumpProcessResponseSchema,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
 }

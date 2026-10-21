@@ -35,7 +35,10 @@ class OrderBumpSyntheticConfig:
     # Extra bumps beyond the first (~1.9 mean with these rates).
     extra_bump_rate: float = 0.55
     triple_bump_rate: float = 0.12
-    short_tts_rate: float = 0.10
+    # Baseline short rate for KVS 21; KVS 31 uses ``kvs31_short_tts_rate``.
+    short_tts_rate: float = 0.07
+    # Demo skew: KVS 31 monitors accumulate more sub-30s bumps.
+    kvs31_short_tts_rate: float = 0.32
     short_tts_max_sec: int = 25
     normal_bump_mean_sec: float = 95.0
     normal_bump_jitter_sec: float = 40.0
@@ -91,8 +94,16 @@ def _sample_order_tts_sec(rng: random.Random, cfg: OrderBumpSyntheticConfig) -> 
     return round(clipped, 2)
 
 
-def _sample_bump_tts_sec(rng: random.Random, cfg: OrderBumpSyntheticConfig) -> int:
-    if rng.random() < cfg.short_tts_rate:
+def _sample_bump_tts_sec(
+    rng: random.Random,
+    cfg: OrderBumpSyntheticConfig,
+    *,
+    kvs_group: int,
+) -> int:
+    short_rate = (
+        cfg.kvs31_short_tts_rate if int(kvs_group) == 31 else cfg.short_tts_rate
+    )
+    if rng.random() < short_rate:
         return rng.randint(1, cfg.short_tts_max_sec)
     value = cfg.normal_bump_mean_sec + rng.gauss(0, cfg.normal_bump_jitter_sec)
     return max(30, int(round(value)))
@@ -146,7 +157,14 @@ def generate_order_bump_preset(
                     if rng.random() < cfg.null_bump_rate:
                         bump_plans.append((up, None, kvs, sort_i + 1))
                     else:
-                        bump_plans.append((up, _sample_bump_tts_sec(rng, cfg), kvs, sort_i + 1))
+                        bump_plans.append(
+                            (
+                                up,
+                                _sample_bump_tts_sec(rng, cfg, kvs_group=kvs),
+                                kvs,
+                                sort_i + 1,
+                            )
+                        )
 
                 bump_plans.sort(key=lambda p: (p[0], p[3]))
 
