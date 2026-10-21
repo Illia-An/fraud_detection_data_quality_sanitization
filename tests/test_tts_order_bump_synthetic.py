@@ -90,3 +90,24 @@ def test_deterministic_seed() -> None:
     a = generate_order_bump_preset("small")
     b = generate_order_bump_preset("small")
     assert a == b
+
+
+def test_kvs31_has_higher_short_share_than_kvs21() -> None:
+    """Demo skew: monitor 31 accumulates more sub-30s bumps than 21."""
+    rows = generate_order_bump_preset("stress")
+    valid = [r for r in rows if r["bump_valid"] and r["kvs_group"] in (21, 31)]
+    by_kvs: dict[int, list[dict]] = {21: [], 31: []}
+    for row in valid:
+        by_kvs[int(row["kvs_group"])].append(row)
+    assert len(by_kvs[21]) > 50
+    assert len(by_kvs[31]) > 20
+
+    def short_share(group: list[dict]) -> float:
+        shorts = [r for r in group if not r["bump_ge30"]]
+        return len(shorts) / len(group)
+
+    share21 = short_share(by_kvs[21])
+    share31 = short_share(by_kvs[31])
+    assert share21 < 0.15
+    assert share31 > 0.20
+    assert share31 > share21 + 0.10
