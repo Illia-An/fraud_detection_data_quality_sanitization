@@ -2,11 +2,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import {
   fetchHealth,
+  fetchOrderBumpSample,
   fetchSample,
   fetchSampleDb,
   fetchTtsSample,
   postPlan,
   postProcess,
+  postProcessOrderBump,
   postProcessTts,
 } from './client';
 import {
@@ -17,6 +19,10 @@ import {
 } from '../schemas/api';
 import type { PlanRequest } from '../schemas/plan';
 import type { TtsProcessRequest, TtsSamplePreset } from '../schemas/tts';
+import type {
+  OrderBumpPreset,
+  OrderBumpProcessRequest,
+} from '../schemas/ttsOrderBump';
 
 export const queryKeys = {
   health: ['health'] as const,
@@ -32,6 +38,8 @@ export const queryKeys = {
     ] as const;
   },
   ttsSample: (preset: TtsSamplePreset) => ['tts-sample', preset] as const,
+  orderBumpSample: (preset: OrderBumpPreset) =>
+    ['tts-order-bump-sample', preset] as const,
 };
 
 export function useHealth() {
@@ -87,5 +95,20 @@ export function useTtsSample(preset: TtsSamplePreset, enabled = true) {
 export function useProcessTts() {
   return useMutation({
     mutationFn: (request: TtsProcessRequest) => postProcessTts(request),
+  });
+}
+
+export function useOrderBumpSample(preset: OrderBumpPreset, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.orderBumpSample(preset),
+    queryFn: () => fetchOrderBumpSample(preset),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useProcessOrderBump() {
+  return useMutation({
+    mutationFn: (request: OrderBumpProcessRequest) => postProcessOrderBump(request),
   });
 }
