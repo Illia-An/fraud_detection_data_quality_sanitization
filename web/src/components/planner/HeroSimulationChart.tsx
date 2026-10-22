@@ -18,8 +18,7 @@ import {
 } from '@mui/material';
 
 import { useT } from '../../i18n';
-import type { FivePercentPlan } from '../../schemas/plan';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
 import {
   EvaluationLegend,
@@ -56,12 +55,18 @@ export const HERO_PLOT_HEIGHT_PX = 340;
 export const HERO_PX_PER_PERIOD = 44;
 
 interface HeroSimulationChartProps {
-  draftPlan: FivePercentPlan;
-  panel: SanitizedPanel;
+  draftPlan: DirectedPlan;
+  panel: MetricScorePanel;
   asOfYear: number;
   asOfMonth: number;
-  /** Soft envelope half-width (pp); not a statistical CI. */
+  /** Soft envelope half-width; not a statistical CI. Percent points for 5%, minutes for TTS. */
   slackBandPp?: number;
+  /** Y-axis title. Default keeps the 5% planner label. */
+  yAxisTitle?: string;
+  /** Appended to tick labels. Default `%`. */
+  tickSuffix?: string;
+  scoreFloor?: number;
+  scoreCeiling?: number;
 }
 
 /** Dual-trace Evaluation View: cleansed fact | as-of | forecast cone + target. */
@@ -71,6 +76,10 @@ export function HeroSimulationChart({
   asOfYear,
   asOfMonth,
   slackBandPp = 1.5,
+  yAxisTitle = '5% Score',
+  tickSuffix = '%',
+  scoreFloor = 0,
+  scoreCeiling = 100,
 }: HeroSimulationChartProps) {
   const t = useT();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -143,8 +152,9 @@ export function HeroSimulationChart({
         panel,
         { year: asOfYear, month: asOfMonth },
         slackBandPp,
+        { floor: scoreFloor, ceiling: scoreCeiling },
       ),
-    [draftPlan, panel, asOfYear, asOfMonth, slackBandPp],
+    [draftPlan, panel, asOfYear, asOfMonth, slackBandPp, scoreFloor, scoreCeiling],
   );
 
   const pressurePair = useMemo(() => {
@@ -219,7 +229,8 @@ export function HeroSimulationChart({
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
 
-  const hoverPct = HERO_HOVER_TEMPLATE;
+  const hoverPct =
+    tickSuffix === '%' ? HERO_HOVER_TEMPLATE : `%{y:.2f}${tickSuffix}<extra></extra>`;
 
   const requiredMonthlyName = isPressure
     ? t('planner.hero.pressureMonthly')
@@ -591,9 +602,9 @@ export function HeroSimulationChart({
                   ...HERO_X_SPIKES,
                 },
                 yaxis: {
-                  title: { text: '5% Score' },
+                  title: { text: yAxisTitle },
                   range: [yMin, yMax],
-                  ticksuffix: '%',
+                  ticksuffix: tickSuffix,
                   fixedrange: false,
                   showgrid: true,
                   gridcolor: 'rgba(0, 0, 0, 0.08)',
@@ -618,13 +629,19 @@ export function HeroSimulationChart({
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
         {isPressure
-          ? t('planner.hero.captionPressure', {
-              yearStart: yearStartLabel,
-              lastFact: lastFactLabel ?? '—',
-              horizonEnd: horizonEndLabel ?? '—',
-              target: String(target),
-            })
-          : t('planner.hero.caption', {
+          ? t(
+              tickSuffix === '%'
+                ? 'planner.hero.captionPressure'
+                : 'planner.hero.captionPressureMin',
+              {
+                yearStart: yearStartLabel,
+                lastFact: lastFactLabel ?? '—',
+                horizonEnd: horizonEndLabel ?? '—',
+                target:
+                  tickSuffix === '%' ? String(target) : `${target.toFixed(2)} min`,
+              },
+            )
+          : t(tickSuffix === '%' ? 'planner.hero.caption' : 'planner.hero.captionMin', {
               asOf: asOfLabel,
               slack: slackBandPp.toFixed(1),
             })}

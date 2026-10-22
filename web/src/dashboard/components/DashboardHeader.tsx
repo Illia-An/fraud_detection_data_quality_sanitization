@@ -24,6 +24,10 @@ const PAGE_HEADER_KEYS: Record<string, { title: MessageKey; subtitle: MessageKey
     title: 'header.planner.title',
     subtitle: 'header.planner.subtitle',
   },
+  '/planner-tts': {
+    title: 'header.ttsPlanner.title',
+    subtitle: 'header.ttsPlanner.subtitle',
+  },
   '/documentation': {
     title: 'header.documentation.title',
     subtitle: 'header.documentation.subtitle',

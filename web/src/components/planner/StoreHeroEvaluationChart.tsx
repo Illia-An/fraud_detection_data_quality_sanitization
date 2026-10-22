@@ -18,9 +18,8 @@ import {
 } from '@mui/material';
 
 import { useT } from '../../i18n';
-import type { FivePercentPlan } from '../../schemas/plan';
+import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
 import {
   EvaluationLegend,
@@ -57,9 +56,9 @@ export const STORE_HERO_PLOT_HEIGHT_PX = 260;
 export const STORE_HERO_PX_PER_PERIOD = 40;
 
 interface StoreHeroEvaluationChartProps {
-  plan: FivePercentPlan;
+  plan: DirectedPlan;
   storeId: number;
-  panel: SanitizedPanel;
+  panel: MetricScorePanel;
   insights: PlanMonitoringInsights;
   /** Ephemeral sandbox last-month estimate; null = plan as-is. */
   draftLast?: number | null;
@@ -67,6 +66,10 @@ interface StoreHeroEvaluationChartProps {
   plotHeightPx?: number;
   /** Fill parent height (Inspect overlay layout). */
   fillParent?: boolean;
+  /** Y-axis title. Default keeps the 5% planner label. */
+  yAxisTitle?: string;
+  /** Appended to tick labels. Default `%`. */
+  tickSuffix?: string;
 }
 
 /**
@@ -81,6 +84,8 @@ export function StoreHeroEvaluationChart({
   draftLast = null,
   plotHeightPx = STORE_HERO_PLOT_HEIGHT_PX,
   fillParent = false,
+  yAxisTitle = '5%',
+  tickSuffix = '%',
 }: StoreHeroEvaluationChartProps) {
   const t = useT();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -205,6 +210,9 @@ export function StoreHeroEvaluationChart({
   const contentMinWidth = Math.max(labels.length, 1) * STORE_HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
 
+  const hoverTemplate =
+    tickSuffix === '%' ? HERO_HOVER_TEMPLATE : `%{y:.2f}${tickSuffix}<extra></extra>`;
+
   const requiredMonthlyName = isPressure
     ? t('planner.hero.pressureMonthly')
     : t('planner.hero.requiredMonthly');
@@ -222,7 +230,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#212121', width: 2.5 },
       marker: { size: 7, color: '#212121' },
       connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
+      hovertemplate: hoverTemplate,
     },
     {
       x: labels,
@@ -233,7 +241,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#424242', width: 2, dash: 'dash' as const },
       marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
       connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
+      hovertemplate: hoverTemplate,
     },
     {
       x: labels,
@@ -244,7 +252,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#616161', width: 2.5 },
       marker: { size: 6, color: '#616161', symbol: 'diamond' as const },
       connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
+      hovertemplate: hoverTemplate,
     },
     {
       x: labels,
@@ -255,7 +263,7 @@ export function StoreHeroEvaluationChart({
       line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
       marker: { size: 6, color: '#6a1b9a' },
       connectgaps: false,
-      hovertemplate: HERO_HOVER_TEMPLATE,
+      hovertemplate: hoverTemplate,
     },
     ...(!isPressure
       ? [
@@ -268,7 +276,7 @@ export function StoreHeroEvaluationChart({
             line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
             marker: { size: 6, color: '#2e7d32' },
             connectgaps: false,
-            hovertemplate: HERO_HOVER_TEMPLATE,
+            hovertemplate: hoverTemplate,
           },
           {
             x: labels,
@@ -279,7 +287,7 @@ export function StoreHeroEvaluationChart({
             line: { color: '#1565c0', width: 3 },
             marker: { size: 7, color: '#1565c0' },
             connectgaps: false,
-            hovertemplate: HERO_HOVER_TEMPLATE,
+            hovertemplate: hoverTemplate,
           },
         ]
       : []),
@@ -290,7 +298,7 @@ export function StoreHeroEvaluationChart({
       mode: 'lines' as const,
       name: t('planner.storeHero.target'),
       line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
-      hovertemplate: HERO_HOVER_TEMPLATE,
+      hovertemplate: hoverTemplate,
     },
   ];
 
@@ -479,9 +487,9 @@ export function StoreHeroEvaluationChart({
                   ...HERO_X_SPIKES,
                 },
                 yaxis: {
-                  title: { text: '5%' },
+                  title: { text: yAxisTitle },
                   range: [yMin, yMax],
-                  ticksuffix: '%',
+                  ticksuffix: tickSuffix,
                   fixedrange: false,
                   showgrid: true,
                   gridcolor: 'rgba(0, 0, 0, 0.08)',
@@ -510,7 +518,7 @@ export function StoreHeroEvaluationChart({
           color="text.secondary"
           sx={{ flexShrink: 0 }}
         >
-          {t('planner.hero.captionPressure', {
+          {t(tickSuffix === '%' ? 'planner.hero.captionPressure' : 'planner.hero.captionPressureMin', {
             yearStart: yearStartLabel ?? '—',
             lastFact: lastFactLabel ?? '—',
             horizonEnd: horizonEndLabel ?? '—',

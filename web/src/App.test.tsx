@@ -28,5 +28,6 @@ describe('App', () => {
   it('exposes Planner in the side menu', () => {
     render(<App />);
     expect(screen.getByRole('link', { name: /^Planner$/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /TTS Planner/i })).toBeInTheDocument();
   });
 });

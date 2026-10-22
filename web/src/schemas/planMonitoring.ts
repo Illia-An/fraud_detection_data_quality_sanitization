@@ -1,8 +1,13 @@
 /** Client-side plan monitoring from cleansed panel actuals (TASK-15 Phase B). */
 
-import type { SanitizedPanel } from './sanitizedPanel';
-import type { FivePercentPlan, MonthScore } from './plan';
+import type { MonthScore } from './plan';
 import { periodLabel } from './plan';
+import {
+  directionAwareDeviation,
+  metricScore,
+  type DirectedPlan,
+  type MetricScorePanel,
+} from './metricScore';
 
 export type MonitorSignal =
   | 'ahead_of_plan'
@@ -59,16 +64,20 @@ export interface PlanMonitoringInsights {
   };
 }
 
-function panelScoreMap(panel: SanitizedPanel): Map<string, number> {
+function panelScoreMap(panel: MetricScorePanel): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of panel.rows) {
-    map.set(`${row.store_id}|${periodLabel(row.year, row.month)}`, row.five_percent);
+    const score = metricScore(row);
+    if (score == null) {
+      continue;
+    }
+    map.set(`${row.store_id}|${periodLabel(row.year, row.month)}`, score);
   }
   return map;
 }
 
 function chainActualForPeriod(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   year: number,
   month: number,
   storeIds: number[],
@@ -78,8 +87,9 @@ function chainActualForPeriod(
     const row = panel.rows.find(
       (r) => r.store_id === storeId && r.year === year && r.month === month,
     );
-    if (row) {
-      scores.push(row.five_percent);
+    const score = metricScore(row);
+    if (score != null) {
+      scores.push(score);
     }
   }
   if (scores.length === 0) {
@@ -99,8 +109,8 @@ function classifyDeviation(deviation: number, bandPp: number): MonitorSignal {
 }
 
 export function buildChainMonthCompares(
-  plan: FivePercentPlan,
-  panel: SanitizedPanel,
+  plan: DirectedPlan,
+  panel: MetricScorePanel,
 ): ChainMonthCompare[] {
   const storeIds = plan.projections.map((p) => p.store_id);
   return plan.chain_trajectory.map((point) => {
@@ -110,13 +120,16 @@ export function buildChainMonthCompares(
       month: point.month,
       estimate: point.score,
       actual,
-      delta: actual == null ? null : actual - point.score,
+      delta:
+        actual == null
+          ? null
+          : directionAwareDeviation(actual, point.score, plan.direction),
     };
   });
 }
 
 /** Start of forecast = first chain_trajectory month (Hero fact|forecast split). */
-export function defaultAsOf(plan: FivePercentPlan, panel: SanitizedPanel): MonthScore {
+export function defaultAsOf(plan: DirectedPlan, panel: MetricScorePanel): MonthScore {
   void panel;
   const first = plan.chain_trajectory[0];
   if (!first) {
@@ -126,8 +139,8 @@ export function defaultAsOf(plan: FivePercentPlan, panel: SanitizedPanel): Month
 }
 
 export function buildPlanMonitoringInsights(
-  plan: FivePercentPlan,
-  panel: SanitizedPanel,
+  plan: DirectedPlan,
+  panel: MetricScorePanel,
   asOf: { year: number; month: number },
   bandPp = 1.0,
 ): PlanMonitoringInsights {
@@ -153,7 +166,17 @@ export function buildPlanMonitoringInsights(
       });
       continue;
     }
-    const deviation = actual - planned;
+    const deviation = directionAwareDeviation(actual, planned, plan.direction);
+    if (deviation == null) {
+      stores.push({
+        store_id: projection.store_id,
+        signal: 'insufficient_history',
+        planned,
+        actual,
+        deviation: null,
+      });
+      continue;
+    }
     stores.push({
       store_id: projection.store_id,
       signal: classifyDeviation(deviation, bandPp),
@@ -177,7 +200,12 @@ export function buildPlanMonitoringInsights(
   const chainActual = chainMonth?.actual ?? null;
   let onTrack: boolean | null = null;
   if (chainPlanned != null && chainActual != null) {
-    onTrack = chainActual + 1e-9 >= chainPlanned - bandPp;
+    const chainDeviation = directionAwareDeviation(
+      chainActual,
+      chainPlanned,
+      plan.direction,
+    );
+    onTrack = chainDeviation != null && chainDeviation + 1e-9 >= -bandPp;
   }
 
   return {

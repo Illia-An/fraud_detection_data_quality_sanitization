@@ -3,8 +3,8 @@
  * Does not touch DB / Export semantics beyond mutating the in-memory draft plan.
  */
 
-import type { FivePercentPlan } from './plan';
 import { periodLabel } from './plan';
+import type { DirectedPlan } from './metricScore';
 import type { PlanMonitoringInsights, StoreMonitorRow } from './planMonitoring';
 
 export interface SurplusRedistributeParams {
@@ -25,8 +25,8 @@ export interface SurplusRedistributeParams {
   ceiling?: number;
 }
 
-export interface SurplusRedistributeResult {
-  plan: FivePercentPlan;
+export interface SurplusRedistributeResult<T extends DirectedPlan = DirectedPlan> {
+  plan: T;
   poolPp: number;
   harvestedPp: number;
   distributedPp: number;
@@ -65,7 +65,7 @@ function isOnOrAfterAsOf(
 }
 
 function applyDeltaFromAsOf(
-  plan: FivePercentPlan,
+  plan: DirectedPlan,
   storeId: number,
   deltaPp: number,
   asOfYear: number,
@@ -98,7 +98,7 @@ function applyDeltaFromAsOf(
 }
 
 /** Equal-mean chain from store projections (product lock for Current/network). */
-export function recomputeChainFromProjections(plan: FivePercentPlan): FivePercentPlan {
+export function recomputeChainFromProjections<T extends DirectedPlan>(plan: T): T {
   const storeCount = plan.projections.length;
   if (storeCount === 0 || plan.chain_trajectory.length === 0) {
     return plan;
@@ -124,8 +124,11 @@ export function recomputeChainFromProjections(plan: FivePercentPlan): FivePercen
   });
 
   const final_chain = chain_trajectory[chain_trajectory.length - 1]?.score ?? plan.final_chain;
-  const required_change = round2(plan.target - plan.current_chain);
-  const feasible = final_chain + 1e-9 >= plan.target;
+  const lower = plan.direction === 'lower_is_better';
+  const required_change = round2(
+    lower ? plan.current_chain - plan.target : plan.target - plan.current_chain,
+  );
+  const feasible = lower ? final_chain <= plan.target + 1e-9 : final_chain + 1e-9 >= plan.target;
 
   return {
     ...plan,
@@ -153,11 +156,11 @@ function pickReceivers(stores: StoreMonitorRow[], topN: number): StoreMonitorRow
 /**
  * Deep-clone plan projections, harvest ahead surplus, lift behind from as-of → end.
  */
-export function redistributeSurplusToBehind(
-  plan: FivePercentPlan,
+export function redistributeSurplusToBehind<T extends DirectedPlan>(
+  plan: T,
   insights: PlanMonitoringInsights,
   params: Partial<SurplusRedistributeParams> = {},
-): SurplusRedistributeResult {
+): SurplusRedistributeResult<T> {
   const topDonors = params.topDonors ?? DEFAULTS.topDonors;
   const topReceivers = params.topReceivers ?? DEFAULTS.topReceivers;
   const harvestFraction = Math.min(1, Math.max(0, params.harvestFraction ?? DEFAULTS.harvestFraction));
@@ -167,7 +170,8 @@ export function redistributeSurplusToBehind(
   const asOfYear = params.asOfYear ?? insights.as_of_year;
   const asOfMonth = params.asOfMonth ?? insights.as_of_month;
 
-  const working: FivePercentPlan = structuredClone(plan);
+  const improveSign = plan.direction === 'lower_is_better' ? -1 : 1;
+  const working = structuredClone(plan);
   const donors = pickDonors(insights.stores, topDonors);
   const receivers = pickReceivers(insights.stores, topReceivers);
 
@@ -187,7 +191,7 @@ export function redistributeSurplusToBehind(
       const applied = applyDeltaFromAsOf(
         working,
         donor.storeId,
-        -donor.harvest,
+        -donor.harvest * improveSign,
         asOfYear,
         asOfMonth,
         floor,
@@ -214,7 +218,13 @@ export function redistributeSurplusToBehind(
         const asOfPoint = projection?.months.find(
           (m) => m.year === asOfYear && m.month === asOfMonth,
         );
-        return asOfPoint != null && asOfPoint.score < ceiling - 1e-9;
+        if (asOfPoint == null) {
+          return false;
+        }
+        if (improveSign > 0) {
+          return asOfPoint.score < ceiling - 1e-9;
+        }
+        return asOfPoint.score > floor + 1e-9;
       });
       if (eligible.length === 0) {
         break;
@@ -225,17 +235,18 @@ export function redistributeSurplusToBehind(
         const applied = applyDeltaFromAsOf(
           working,
           row.store_id,
-          share,
+          share * improveSign,
           asOfYear,
           asOfMonth,
           floor,
           ceiling,
         );
+        const moved = applied * improveSign;
         remainingByStore.set(
           row.store_id,
-          (remainingByStore.get(row.store_id) ?? 0) + applied,
+          (remainingByStore.get(row.store_id) ?? 0) + moved,
         );
-        placed += applied;
+        placed += moved;
       }
       remaining -= placed;
       if (placed < 1e-12) {
