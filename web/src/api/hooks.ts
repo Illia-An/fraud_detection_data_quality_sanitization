@@ -8,6 +8,7 @@ import {
   fetchTtsKpiFromAp,
   fetchTtsKpiPanel,
   fetchTtsSample,
+  fetchKitchenBeforeAfter,
   postPlan,
   postProcess,
   postProcessOrderBump,
@@ -24,6 +25,7 @@ import type { PlanRequest } from '../schemas/plan';
 import type { TtsPlanRequest } from '../schemas/ttsPlan';
 import type { TtsProcessRequest, TtsSamplePreset } from '../schemas/tts';
 import type { TtsKpiPreset } from '../schemas/ttsKpiPanel';
+import type { KitchenBeforeAfter } from '../schemas/ttsKitchen';
 import type {
   OrderBumpPreset,
   OrderBumpProcessRequest,
@@ -133,5 +135,11 @@ export function useOrderBumpSample(preset: OrderBumpPreset, enabled = true) {
 export function useProcessOrderBump() {
   return useMutation({
     mutationFn: (request: OrderBumpProcessRequest) => postProcessOrderBump(request),
+  });
+}
+
+export function useKitchenBeforeAfter() {
+  return useMutation({
+    mutationFn: (minSec: number): Promise<KitchenBeforeAfter> => fetchKitchenBeforeAfter(minSec),
   });
 }

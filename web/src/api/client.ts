@@ -41,6 +41,10 @@ import {
   type TtsSanitizationResponse,
 } from '../schemas/tts';
 import {
+  kitchenBeforeAfterSchema,
+  type KitchenBeforeAfter,
+} from '../schemas/ttsKitchen';
+import {
   orderBumpPresetSchema,
   orderBumpProcessRequestSchema,
   orderBumpProcessResponseSchema,
@@ -187,6 +191,14 @@ export function postProcessTts(request: TtsProcessRequest): Promise<TtsSanitizat
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function fetchKitchenBeforeAfter(minSec: number): Promise<KitchenBeforeAfter> {
+  const params = new URLSearchParams({ min_sec: String(minSec) });
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/tts-kitchen/before-after?${params}`,
+    kitchenBeforeAfterSchema,
+  );
 }
 
 export function fetchOrderBumpSample(

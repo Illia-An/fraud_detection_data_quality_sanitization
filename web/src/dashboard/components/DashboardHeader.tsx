@@ -16,6 +16,10 @@ const PAGE_HEADER_KEYS: Record<string, { title: MessageKey; subtitle: MessageKey
     title: 'header.tts.title',
     subtitle: 'header.tts.subtitle',
   },
+  '/tts-kitchen': {
+    title: 'header.ttsKitchen.title',
+    subtitle: 'header.ttsKitchen.subtitle',
+  },
   '/tts-order': {
     title: 'header.ttsOrder.title',
     subtitle: 'header.ttsOrder.subtitle',
