@@ -5,11 +5,14 @@ import {
   fetchOrderBumpSample,
   fetchSample,
   fetchSampleDb,
+  fetchTtsKpiFromAp,
+  fetchTtsKpiPanel,
   fetchTtsSample,
   postPlan,
   postProcess,
   postProcessOrderBump,
   postProcessTts,
+  postTtsPlan,
 } from './client';
 import {
   sampleDbParamsSchema,
@@ -18,7 +21,9 @@ import {
   type SamplePreset,
 } from '../schemas/api';
 import type { PlanRequest } from '../schemas/plan';
+import type { TtsPlanRequest } from '../schemas/ttsPlan';
 import type { TtsProcessRequest, TtsSamplePreset } from '../schemas/tts';
+import type { TtsKpiPreset } from '../schemas/ttsKpiPanel';
 import type {
   OrderBumpPreset,
   OrderBumpProcessRequest,
@@ -80,6 +85,24 @@ export function useProcess() {
 export function usePlan() {
   return useMutation({
     mutationFn: (request: PlanRequest) => postPlan(request),
+  });
+}
+
+export function useTtsPlan() {
+  return useMutation({
+    mutationFn: (request: TtsPlanRequest) => postTtsPlan(request),
+  });
+}
+
+export function useLoadTtsKpiPanel() {
+  return useMutation({
+    mutationFn: (preset: TtsKpiPreset) => fetchTtsKpiPanel(preset),
+  });
+}
+
+export function useLoadTtsKpiFromAp() {
+  return useMutation({
+    mutationFn: () => fetchTtsKpiFromAp(),
   });
 }
 

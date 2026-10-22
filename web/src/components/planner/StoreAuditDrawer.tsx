@@ -32,7 +32,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useT } from '../../i18n';
 import type { ProcessResponse } from '../../schemas/api';
 import { PIPELINE_STEP_LABELS, sortPipelineSteps } from '../../schemas/api';
-import type { FivePercentPlan } from '../../schemas/plan';
+import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
 import { periodLabel } from '../../schemas/plan';
 import {
   applyDraftLastMonthToTable,
@@ -63,11 +63,15 @@ const SANDBOX_OVERLAY_MAX_HEIGHT = '42vh';
 /** Min plot height when chart fills remaining Inspect pane. */
 const STORE_HERO_IN_DIALOG_MIN_PX = 280;
 
-interface StoreAuditDrawerProps {
+type InspectPanel = MetricScorePanel & {
+  echo_config?: SanitizedPanel['echo_config'];
+};
+
+interface StoreAuditDrawerProps<T extends DirectedPlan = DirectedPlan> {
   open: boolean;
   storeId: number;
-  plan: FivePercentPlan;
-  panel: SanitizedPanel;
+  plan: T;
+  panel: InspectPanel;
   insights: PlanMonitoringInsights;
   processResult: ProcessResponse | null;
   maxMonthlyImprove: number;
@@ -77,7 +81,11 @@ interface StoreAuditDrawerProps {
   /** Switch Inspected store without closing the dialog. */
   onStoreChange: (storeId: number) => void;
   /** Commit even-split into session draftPlan (Hero updates; Inspect stays open). */
-  onApplyPlan: (plan: FivePercentPlan) => void;
+  onApplyPlan: (plan: T) => void;
+  /** Store evaluation Y-axis title. Default keeps the 5% planner label. */
+  yAxisTitle?: string;
+  /** Appended to store evaluation tick labels. Default `%`. */
+  tickSuffix?: string;
 }
 
 function formatSigned(value: number, digits = 2): string {
@@ -89,7 +97,7 @@ function formatSigned(value: number, digits = 2): string {
  * V4.2 Component F — store audit + ephemeral sandbox.
  * EXP layout: full-width Store Hero · accordion panels below (At-risk style).
  */
-export function StoreAuditDrawer({
+export function StoreAuditDrawer<T extends DirectedPlan>({
   open,
   storeId,
   plan,
@@ -101,7 +109,9 @@ export function StoreAuditDrawer({
   onClose,
   onStoreChange,
   onApplyPlan,
-}: StoreAuditDrawerProps) {
+  yAxisTitle,
+  tickSuffix,
+}: StoreAuditDrawerProps<T>) {
   const t = useT();
   const storeIds = useMemo(
     () =>
@@ -126,16 +136,26 @@ export function StoreAuditDrawer({
         )?.score ?? null
       : null;
 
+  const scoreDigits = plan.unit === 'min' ? 2 : 1;
+  const scoreFloor = 0;
+  const scoreCeiling = plan.unit === 'min' ? 30 : 100;
+  const formatScore = (value: number) => value.toFixed(scoreDigits);
   const bounds =
     originalLast == null
-      ? { min: 0, max: 100 }
-      : sandboxScoreBounds(previous, originalLast, maxMonthlyImprove);
+      ? { min: scoreFloor, max: scoreCeiling }
+      : sandboxScoreBounds(
+          previous,
+          originalLast,
+          maxMonthlyImprove,
+          scoreFloor,
+          scoreCeiling,
+        );
 
   const steps = processResult ? sortPipelineSteps(processResult.steps) : [];
   const echo = panel.echo_config;
 
   const [inputValue, setInputValue] = useState(
-    originalLast == null ? '' : originalLast.toFixed(1),
+    originalLast == null ? '' : formatScore(originalLast),
   );
   const [appliedDraft, setAppliedDraft] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -147,14 +167,14 @@ export function StoreAuditDrawer({
 
   useEffect(() => {
     if (open && originalLast != null) {
-      setInputValue(originalLast.toFixed(1));
+      setInputValue(formatScore(originalLast));
       setAppliedDraft(null);
       setPreview(null);
       setError(null);
       setSandboxExpanded(false);
       setPoolDialogOpen(false);
     }
-  }, [open, storeId, originalLast]);
+  }, [open, storeId, originalLast, scoreDigits]);
 
   const baseTable = useMemo(
     () => buildStorePlanActualDifferenceTable(plan, storeId, panel, insights, monitorRow),
@@ -179,7 +199,7 @@ export function StoreAuditDrawer({
     }
     if (parsed < bounds.min - 1e-9 || parsed > bounds.max + 1e-9) {
       setError(
-        `Value out of range. Enter a value between ${bounds.min.toFixed(1)} and ${bounds.max.toFixed(1)}.`,
+        `Value out of range. Enter a value between ${formatScore(bounds.min)} and ${formatScore(bounds.max)}.`,
       );
       return;
     }
@@ -205,13 +225,15 @@ export function StoreAuditDrawer({
         previousScore: previous,
         others,
         maxMonthlyImprove,
+        floor: scoreFloor,
+        ceiling: scoreCeiling,
       }),
     );
   };
 
   const clearLocalSandbox = () => {
     if (originalLast != null) {
-      setInputValue(originalLast.toFixed(1));
+      setInputValue(formatScore(originalLast));
     }
     setAppliedDraft(null);
     setPreview(null);
@@ -380,19 +402,25 @@ export function StoreAuditDrawer({
                 {t('planner.inspect.auditHint')}
               </Typography>
               <Stack spacing={0.35}>
-                <Typography variant="caption">
-                  Tier2 freq ≥ {echo.tier2_freq_threshold}
-                  {echo.tier2_freq_enabled ? '' : ' (off)'}
-                </Typography>
-                <Typography variant="caption">
-                  Tier3 always-5{' '}
-                  {echo.tier3_always_five_enabled
-                    ? `min n ${echo.tier3_always_five_min_n}`
-                    : 'off'}
-                </Typography>
-                <Typography variant="caption">
-                  Tier4 store×month {echo.tier4_enabled ? 'on' : 'off'}
-                </Typography>
+                {echo ? (
+                  <>
+                    <Typography variant="caption">
+                      Tier2 freq ≥ {echo.tier2_freq_threshold}
+                      {echo.tier2_freq_enabled ? '' : ' (off)'}
+                    </Typography>
+                    <Typography variant="caption">
+                      Tier3 always-5{' '}
+                      {echo.tier3_always_five_enabled
+                        ? `min n ${echo.tier3_always_five_min_n}`
+                        : 'off'}
+                    </Typography>
+                    <Typography variant="caption">
+                      Tier4 store×month {echo.tier4_enabled ? 'on' : 'off'}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="caption">{t('planner.baseline.noSteps')}</Typography>
+                )}
                 {steps.map((step) => (
                   <Typography key={step.step_name} variant="caption" color="text.secondary">
                     {PIPELINE_STEP_LABELS[step.step_name]} · drop {step.rows_dropped} ·{' '}
@@ -459,6 +487,8 @@ export function StoreAuditDrawer({
             draftLast={appliedDraft}
             plotHeightPx={STORE_HERO_IN_DIALOG_MIN_PX}
             fillParent
+            yAxisTitle={yAxisTitle}
+            tickSuffix={tickSuffix}
           />
         </Box>
 
@@ -521,7 +551,7 @@ export function StoreAuditDrawer({
                 <Chip
                   size="small"
                   variant="outlined"
-                  label={`Dist ${preview ? preview.distributed.toFixed(1) : '—'}`}
+                  label={`Dist ${preview ? formatScore(preview.distributed) : '—'}`}
                 />
               </Stack>
             </AccordionSummary>
@@ -590,7 +620,7 @@ export function StoreAuditDrawer({
                                 ) : score == null ? (
                                   '—'
                                 ) : (
-                                  score.toFixed(1)
+                                  formatScore(score)
                                 )}
                               </TableCell>
                             );
@@ -604,7 +634,7 @@ export function StoreAuditDrawer({
                             const actual = displayTable.actual[index];
                             return (
                               <TableCell key={`a-${col.label}`} align="center">
-                                {actual == null ? '—' : actual.toFixed(1)}
+                                {actual == null ? '—' : formatScore(actual)}
                               </TableCell>
                             );
                           })}
@@ -629,7 +659,7 @@ export function StoreAuditDrawer({
                     </Typography>
                   )}
                   <Typography variant="caption" color="text.secondary">
-                    Allowed {bounds.min.toFixed(1)}–{bounds.max.toFixed(1)}
+                    Allowed {formatScore(bounds.min)}–{formatScore(bounds.max)}
                     {lastPeriod
                       ? ` · last ${periodLabel(lastPeriod.year, lastPeriod.month)}`
                       : ''}
@@ -768,8 +798,8 @@ export function StoreAuditDrawer({
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700 }}>{storeId}</TableCell>
                     <TableCell>selected</TableCell>
-                    <TableCell align="right">{preview.original.toFixed(1)}</TableCell>
-                    <TableCell align="right">{preview.draft.toFixed(1)}</TableCell>
+                    <TableCell align="right">{formatScore(preview.original)}</TableCell>
+                    <TableCell align="right">{formatScore(preview.draft)}</TableCell>
                     <TableCell align="right">{formatSigned(preview.taken)}</TableCell>
                   </TableRow>
                   {preview.pool.map((row) => (
@@ -780,8 +810,8 @@ export function StoreAuditDrawer({
                           ? 'selected'
                           : SIGNAL_LABELS[row.signal as keyof typeof SIGNAL_LABELS]}
                       </TableCell>
-                      <TableCell align="right">{row.original.toFixed(1)}</TableCell>
-                      <TableCell align="right">{row.draft.toFixed(1)}</TableCell>
+                      <TableCell align="right">{formatScore(row.original)}</TableCell>
+                      <TableCell align="right">{formatScore(row.draft)}</TableCell>
                       <TableCell align="right">{formatSigned(row.applied_delta)}</TableCell>
                     </TableRow>
                   ))}

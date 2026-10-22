@@ -19,6 +19,18 @@ import {
 } from '../schemas/api';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 import {
+  ttsPlanRequestSchema,
+  ttsPlanResponseSchema,
+  type TtsPlanRequest,
+  type TtsPlanResponse,
+} from '../schemas/ttsPlan';
+import {
+  ttsKpiPanelSchema,
+  ttsKpiPresetSchema,
+  type TtsKpiPanel,
+  type TtsKpiPreset,
+} from '../schemas/ttsKpiPanel';
+import {
   ttsProcessRequestSchema,
   ttsSamplePresetSchema,
   ttsSampleResponseSchema,
@@ -133,12 +145,32 @@ export function postPlan(request: PlanRequest): Promise<PlanResponse> {
   });
 }
 
+export function postTtsPlan(request: TtsPlanRequest): Promise<TtsPlanResponse> {
+  const body = ttsPlanRequestSchema.parse(request);
+  return fetchJson(`${API_BASE_URL}${API_PREFIX}/plans-tts`, ttsPlanResponseSchema, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export function parseProcessRequest(input: unknown): ProcessRequest {
   return processRequestSchema.parse(input);
 }
 
 export function parsePipelineConfig(input: unknown): PipelineConfig {
   return pipelineConfigSchema.parse(input);
+}
+
+export function fetchTtsKpiPanel(preset: TtsKpiPreset): Promise<TtsKpiPanel> {
+  const validPreset = ttsKpiPresetSchema.parse(preset);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/sample/tts-kpi/${validPreset}`,
+    ttsKpiPanelSchema,
+  );
+}
+
+export function fetchTtsKpiFromAp(): Promise<TtsKpiPanel> {
+  return fetchJson(`${API_BASE_URL}${API_PREFIX}/tts-kpi/ap`, ttsKpiPanelSchema);
 }
 
 export function fetchTtsSample(preset: TtsSamplePreset): Promise<TtsSampleResponse> {

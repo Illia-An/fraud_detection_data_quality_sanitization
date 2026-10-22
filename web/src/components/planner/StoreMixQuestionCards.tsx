@@ -12,6 +12,7 @@ interface StoreMixQuestionCardsProps {
   disabledTip: string;
   pendingId: StoreMixQuestionId | null;
   onApply: (id: StoreMixQuestionId) => void;
+  blurbOverrides?: Partial<Record<StoreMixQuestionId, MessageKey>>;
 }
 
 const MIX_COPY: Record<StoreMixQuestionId, { title: MessageKey; blurb: MessageKey }> = {
@@ -31,6 +32,7 @@ export function StoreMixQuestionCards({
   disabledTip,
   pendingId,
   onApply,
+  blurbOverrides,
 }: StoreMixQuestionCardsProps) {
   const t = useT();
 
@@ -51,7 +53,10 @@ export function StoreMixQuestionCards({
         {t('planner.mix.recipeSummary')}
       </Typography>
       {STORE_MIX_QUESTIONS.map((q) => {
-        const copy = MIX_COPY[q.id];
+        const copy = {
+          ...MIX_COPY[q.id],
+          blurb: blurbOverrides?.[q.id] ?? MIX_COPY[q.id].blurb,
+        };
         const busy = pendingId === q.id;
         const otherBusy = pendingId != null && pendingId !== q.id;
         return (

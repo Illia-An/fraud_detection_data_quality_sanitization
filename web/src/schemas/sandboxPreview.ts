@@ -3,7 +3,7 @@
  * (TASK-15 Phase C) — no DB / Export semantics.
  */
 
-import type { FivePercentPlan } from './plan';
+import type { DirectedPlan } from './metricScore';
 import type { MonitorSignal } from './planMonitoring';
 import { recomputeChainFromProjections } from './surplusRedistribute';
 
@@ -130,7 +130,7 @@ function round2(value: number): number {
 }
 
 function setStoreMonthScore(
-  plan: FivePercentPlan,
+  plan: DirectedPlan,
   storeId: number,
   year: number,
   month: number,
@@ -147,12 +147,12 @@ function setStoreMonthScore(
  * Commit even-split preview into a cloned plan (last-month scores) and
  * recompute equal-mean chain / final_chain for Hero.
  */
-export function applySandboxEvenSplitToPlan(
-  plan: FivePercentPlan,
+export function applySandboxEvenSplitToPlan<T extends DirectedPlan>(
+  plan: T,
   preview: SandboxEvenSplitPreview,
   year: number,
   month: number,
-): FivePercentPlan {
+): T {
   const working = structuredClone(plan);
   setStoreMonthScore(
     working,
