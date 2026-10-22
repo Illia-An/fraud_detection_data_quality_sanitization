@@ -3,6 +3,7 @@ import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
 import TimerRoundedIcon from '@mui/icons-material/TimerRounded';
+import KitchenRoundedIcon from '@mui/icons-material/KitchenRounded';
 import RestaurantRoundedIcon from '@mui/icons-material/RestaurantRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import TourRoundedIcon from '@mui/icons-material/TourRounded';
@@ -29,6 +30,7 @@ const mainListItems: {
 }[] = [
   { textKey: 'nav.sanitization', icon: <ScienceRoundedIcon />, path: '/' },
   { textKey: 'nav.tts', icon: <TimerRoundedIcon />, path: '/tts' },
+  { textKey: 'nav.ttsKitchen', icon: <KitchenRoundedIcon />, path: '/tts-kitchen' },
   {
     textKey: 'nav.ttsOrder',
     icon: <RestaurantRoundedIcon />,
