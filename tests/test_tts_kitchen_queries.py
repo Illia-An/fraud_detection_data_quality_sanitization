@@ -9,6 +9,8 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
+from db.config import Settings
+
 from backend.tts_kitchen_queries import (
     KITCHEN_PERIOD_END,
     KITCHEN_PERIOD_START,
@@ -155,6 +157,15 @@ def test_settings_loader_opens_one_engine(
         engine.connect.return_value = conn
         return engine
 
+    monkeypatch.setattr(
+        "db.config.get_settings",
+        lambda: Settings(
+            database_url="sqlite:///:memory:",
+            cors_origins="",
+            tts_database_url="",
+            tts_view=DEFAULT_TTS_VIEW,
+        ),
+    )
     monkeypatch.setattr("db.connection.get_tts_engine", engine_factory)
     with pytest.raises(KitchenReadError):
         load_tts_kitchen_month_cells_from_settings()
