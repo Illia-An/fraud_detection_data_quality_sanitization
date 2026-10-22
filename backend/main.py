@@ -57,6 +57,9 @@ from backend.tts_schemas import (
     TtsSampleResponse,
     TtsSanitizationResponse,
 )
+from backend.tts_kitchen_queries import KitchenReadError
+from backend.tts_kitchen_schemas import KitchenBeforeAfterResponse
+from backend.tts_kitchen_service import run_tts_kitchen_before_after
 from backend.tts_service import run_tts_process
 from backend.tts_order_bump_schemas import (
     OrderBumpProcessRequest,
@@ -561,6 +564,36 @@ def create_app() -> FastAPI:
             return TtsPlanResponse(metrics={"tts": metric})
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.get(
+        f"{API_PREFIX}/tts-kitchen/before-after",
+        response_model=KitchenBeforeAfterResponse,
+        response_model_exclude_none=False,
+        tags=["tts-kitchen"],
+        responses={
+            503: {"description": "Kitchen view read failed"},
+            500: {"description": "Kitchen before/after fold failed"},
+        },
+    )
+    def tts_kitchen_before_after(
+        min_sec: int = Query(default=30, ge=0),
+    ) -> KitchenBeforeAfterResponse:
+        """Before/after for the fixed kitchen window. Read-only.
+
+        ``min_sec`` drops shorter positions. A position of exactly ``min_sec`` stays.
+        """
+        try:
+            return run_tts_kitchen_before_after(min_sec=min_sec)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except KitchenReadError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Kitchen before/after read failed")
+            raise HTTPException(
+                status_code=500,
+                detail="Kitchen before/after read failed",
+            ) from exc
 
     # API routes first; SPA catch-all only when FRONTEND_DIST_DIR / web/dist exists.
     if mount_frontend(app):
