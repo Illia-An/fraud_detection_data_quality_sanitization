@@ -5,6 +5,7 @@ export const en = {
   'nav.tts': 'TTS',
   'nav.ttsOrder': 'Order × Bump',
   'nav.planner': 'Planner',
+  'nav.ttsPlanner': 'TTS Planner',
   'nav.documentation': 'Documentation',
   'nav.about': 'About PoC',
   'nav.collapse': 'Collapse navigation',
@@ -24,6 +25,9 @@ export const en = {
   'header.planner.title': 'Planner',
   'header.planner.subtitle':
     'Build a store improvement plan on the cleansed Q10012 baseline',
+  'header.ttsPlanner.title': 'TTS Planner',
+  'header.ttsPlanner.subtitle':
+    'Build a store plan on monthly TTS minutes. Lower is better.',
   'header.documentation.title': 'Documentation',
   'header.documentation.subtitle':
     'Pipeline tiers, research reports, and API references',
@@ -702,6 +706,10 @@ export const en = {
     'Last cleansed fact month: pressure required curves start here. Moves right as new actual months appear.',
   'planner.hero.captionPressure':
     'Pressure view · YTD from {yearStart} · cutover at last cleansed fact ({lastFact}) · H through plan target month ({horizonEnd}) · required pair recalculates as new months appear · target {target}%. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
+  'planner.hero.captionMin':
+    'Evaluation view · as-of ({asOf}) is plan cutover · realized fact may continue after as-of · forecast cone is allocation slack (±{slack} min), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
+  'planner.hero.captionPressureMin':
+    'Pressure view · YTD from {yearStart} · cutover at last fact ({lastFact}) · H through plan target month ({horizonEnd}) · required pair recalculates as new months appear · target {target}. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
 
   // —— Onboarding tour ——
   'nav.tour': 'Product tour',
@@ -745,6 +753,89 @@ export const en = {
   'onboarding.plannerInspect.title': 'Inspect a store from the plan',
   'onboarding.plannerInspect.body':
     'Click Inspect on a row to open the store drawer: evaluation hero, estimate vs actual, and optional sandbox what-if. Advancing the tour never applies a draft — Inspect is for reading and deliberate experiments only.',
+  'ttsPlanner.needBaseline':
+    'Reading TTS minutes from AP. This planner does not use kitchen sanitization.',
+  'ttsPlanner.loadSample': 'Load sample',
+  'ttsPlanner.loadingSample': 'Loading sample…',
+  'ttsPlanner.sampleFailed': 'Could not load the TTS sample.',
+  'ttsPlanner.loadAp': 'Load from AP',
+  'ttsPlanner.loadingAp': 'Loading from AP…',
+  'ttsPlanner.apFailed': 'Could not read TTS minutes from AP.',
+  'ttsPlanner.leversTitle': 'Plan controls',
+  'ttsPlanner.leversSub':
+    'TTS minutes · equal-mean stores at the reference month · lower is better',
+  'ttsPlanner.section.goalTime': 'Goal & time',
+  'ttsPlanner.section.allocator': 'Manual levers',
+  'ttsPlanner.current': 'Current:',
+  'ttsPlanner.direction': 'Lower is better',
+  'ttsPlanner.dir.improve': 'Improve ↓',
+  'ttsPlanner.dir.hold': 'Hold',
+  'ttsPlanner.dir.invalid': 'Invalid ↑',
+  'ttsPlanner.target': 'Target (min)',
+  'ttsPlanner.horizon': 'Horizon (months)',
+  'ttsPlanner.targetHint': '0–30',
+  'ttsPlanner.horizonHint': '1–12 months',
+  'ttsPlanner.referenceMonth': 'Reference month',
+  'ttsPlanner.referenceMonthHint':
+    'Plan baseline month · each store weighted equally',
+  'ttsPlanner.advanced': 'Advanced allocator options',
+  'ttsPlanner.trajectory': 'Trajectory',
+  'ttsPlanner.traj.uniform': 'Uniform',
+  'ttsPlanner.traj.front': 'Front-loaded',
+  'ttsPlanner.traj.accel': 'Accelerated',
+  'ttsPlanner.priorityPower': 'Lift priority power',
+  'ttsPlanner.maxMonthly': 'Max monthly improve (min)',
+  'ttsPlanner.storesAtRef': 'Stores at reference ({count})',
+  'ttsPlanner.preset': 'Sample',
+  'ttsPlanner.preset.small': 'Small',
+  'ttsPlanner.preset.medium': 'Medium',
+  'ttsPlanner.preset.stress': 'Stress',
+  'ttsPlanner.packsTitle': 'Scenario packs',
+  'ttsPlanner.packsLater': 'Packs apply after a simulation run.',
+  'ttsPlanner.packs.closeGap.blurb':
+    'You’ll get a network plan that puts more improvement on stores furthest above Target (more minutes).',
+  'ttsPlanner.mixTitle': 'Store mix',
+  'ttsPlanner.mixLater': 'Store-mix questions apply after a simulation run.',
+  'ttsPlanner.mix.liftBehind.blurb':
+    'You’ll get slower stores (more minutes) pulled down using surplus from stores already ahead of plan.',
+  'ttsPlanner.mix.rebalance.blurb':
+    'You’ll get a near zero-sum shift — ahead plans ease up in minutes, behind plans come down.',
+  'ttsPlanner.mix.result':
+    'Adjustment ready · pool {pool} min · distributed {distributed} · leftover {leftover} · network Δ {delta} min · {donors} → {receivers} ({mode})',
+  'ttsPlanner.atRisk.col.gap': 'Gap (min)',
+  'ttsPlanner.atRisk.col.mom': 'MoM (min)',
+  'ttsPlanner.atRisk.footer':
+    'Management by exception · Gap = plan − fact at as-of ({asOf}). Positive means fewer minutes than planned. A rise in minutes month to month is worse.',
+  'ttsPlanner.run': 'Run simulation',
+  'ttsPlanner.runLater': 'Simulation Run is connected in the next step.',
+  'ttsPlanner.block.noBaseline': 'TTS minutes from AP are not loaded yet.',
+  'ttsPlanner.exportCsv': 'Export CSV',
+  'ttsPlanner.revertDraft': 'Revert draft',
+  'ttsPlanner.emptyWaiting': 'Waiting for TTS minutes from AP.',
+  'ttsPlanner.kpi.current': 'Current',
+  'ttsPlanner.kpi.target': 'Target',
+  'ttsPlanner.kpi.required': 'Required',
+  'ttsPlanner.heroTitle': 'Hero evaluation',
+  'ttsPlanner.baseline.ready': 'Baseline · TTS minutes · {rows}',
+  'ttsPlanner.heroEmpty': 'The evaluation chart appears after Run simulation.',
+  'ttsPlanner.atRiskTitle': 'At risk',
+  'ttsPlanner.atRiskEmpty': 'The store table appears after Run simulation.',
+  'ttsPlanner.drawerTitle': 'Store',
+  'ttsPlanner.drawerEmpty': 'The store drawer opens from a table row after a simulation.',
+  'ttsPlanner.block.noStores': 'No stores at the selected reference month.',
+  'ttsPlanner.block.targetAbove':
+    'Target must be at or below the current chain (lower is better).',
+  'ttsPlanner.block.targetRange': 'Target must be between 0 and 30 minutes.',
+  'ttsPlanner.block.capTight':
+    'Required reduction exceeds Months × Max monthly improve — raise the cap or horizon, or raise Target.',
+  'ttsPlanner.block.horizon': 'Months must be between 1 and 12.',
+  'ttsPlanner.block.running': 'Simulation is running…',
+  'ttsPlanner.planFailed': 'TTS plan request failed',
+  'ttsPlanner.legend.history': 'History',
+  'ttsPlanner.legend.plan': 'Plan · down is better',
+  'ttsPlanner.legend.target': 'Target',
+  'ttsPlanner.kpi.final': 'Final',
+
   'onboarding.complete.title': "You're ready to get started",
   'onboarding.complete.body':
     'You know how to tune Sanitization controls and Plan levers, review results, use Inspect, and navigate At-risk. Restart this tour anytime from the navigation menu.',

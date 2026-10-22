@@ -1,9 +1,9 @@
-import { Box, Typography } from '@mui/material';
+import { Box, Chip, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import { useT } from '../../i18n';
 import type { ProcessResponse } from '../../schemas/api';
-import type { FivePercentPlan } from '../../schemas/plan';
+import type { DirectedPlan } from '../../schemas/metricScore';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { PlannerBaselineBadge } from './PlannerBaselineBadge';
 
@@ -11,8 +11,10 @@ export interface PlannerContextStripProps {
   panel: SanitizedPanel | null;
   processResult: ProcessResponse | null;
   baselineReady: boolean;
-  draftPlan: FivePercentPlan;
+  draftPlan: DirectedPlan;
   horizonMonths: number;
+  /** When set, replaces the Q10012 sanitization badge. */
+  baselineLabel?: string;
 }
 
 const labelSx = {
@@ -65,6 +67,7 @@ export function PlannerContextStrip({
   baselineReady,
   draftPlan,
   horizonMonths,
+  baselineLabel,
 }: PlannerContextStripProps) {
   const t = useT();
 
@@ -90,11 +93,15 @@ export function PlannerContextStrip({
             '& .MuiIconButton-root': { p: 0.25 },
           }}
         >
-          <PlannerBaselineBadge
-            panel={panel}
-            processResult={processResult}
-            baselineReady={baselineReady}
-          />
+          {baselineLabel ? (
+            <Chip size="small" color="success" label={baselineLabel} />
+          ) : (
+            <PlannerBaselineBadge
+              panel={panel}
+              processResult={processResult}
+              baselineReady={baselineReady}
+            />
+          )}
         </Box>
       </MiniCard>
 
@@ -107,7 +114,11 @@ export function PlannerContextStrip({
 
       <MiniCard>
         <Typography sx={labelSx}>{t('planner.strip.targetLabel')}</Typography>
-        <Typography sx={valueSx}>{draftPlan.target.toFixed(1)}%</Typography>
+        <Typography sx={valueSx}>
+          {draftPlan.unit === 'min'
+            ? `${draftPlan.target.toFixed(2)} min`
+            : `${draftPlan.target.toFixed(1)}%`}
+        </Typography>
       </MiniCard>
     </Box>
   );

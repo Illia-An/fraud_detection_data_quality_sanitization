@@ -1,12 +1,17 @@
 /** Pure helpers for At-risk exception row enrichment (priority / context columns). */
 
-import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import {
+  directionAwareDeviation,
+  metricScore,
+  type DirectedPlan,
+  type MetricScorePanel,
+} from '../../schemas/metricScore';
 
 export interface StoreBaselineRow {
   store_id: number;
-  five_percent: number;
+  five_percent?: number;
+  tts?: number;
 }
 
 export function previousCalendarMonth(
@@ -20,7 +25,7 @@ export function previousCalendarMonth(
 }
 
 export function panelFact(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   storeId: number,
   year: number,
   month: number,
@@ -28,11 +33,11 @@ export function panelFact(
   const row = panel.rows.find(
     (r) => r.store_id === storeId && r.year === year && r.month === month,
   );
-  return row?.five_percent ?? null;
+  return metricScore(row);
 }
 
 export function panelVolume(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   storeId: number,
   year: number,
   month: number,
@@ -45,7 +50,7 @@ export function panelVolume(
 
 /** Fact(as-of) − Fact(prev month); null if either missing. */
 export function momTrendPp(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   storeId: number,
   asOfYear: number,
   asOfMonth: number,
@@ -64,8 +69,8 @@ export function momTrendPp(
  * Uses store projection months that have panel actuals.
  */
 export function behindStreakMonths(
-  plan: FivePercentPlan,
-  panel: SanitizedPanel,
+  plan: DirectedPlan,
+  panel: MetricScorePanel,
   storeId: number,
   asOfYear: number,
   asOfMonth: number,
@@ -86,8 +91,8 @@ export function behindStreakMonths(
     if (actual == null) {
       break;
     }
-    const deviation = actual - point.score;
-    if (deviation < -bandPp) {
+    const deviation = directionAwareDeviation(actual, point.score, plan.direction);
+    if (deviation != null && deviation < -bandPp) {
       streak += 1;
     } else {
       break;
@@ -96,7 +101,7 @@ export function behindStreakMonths(
   return streak;
 }
 
-export function planEndScore(plan: FivePercentPlan, storeId: number): number | null {
+export function planEndScore(plan: DirectedPlan, storeId: number): number | null {
   const projection = plan.projections.find((p) => p.store_id === storeId);
   if (!projection || projection.months.length === 0) {
     return null;
@@ -110,7 +115,7 @@ export function baselineScore(
   storeId: number,
 ): number | null {
   const hit = baselineRows.find((r) => r.store_id === storeId);
-  return hit?.five_percent ?? null;
+  return hit?.tts ?? hit?.five_percent ?? null;
 }
 
 /** Share of absolute behind-plan gap for this store (0–1); null if not behind. */

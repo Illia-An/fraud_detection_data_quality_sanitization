@@ -1,8 +1,7 @@
 /** Build Evaluation-View series for the Planner hero (fact | as-of | forecast). */
 
-import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import { metricScore, type DirectedPlan, type MetricScorePanel } from '../../schemas/metricScore';
 
 /** Months before as-of where the short-window cumulative may start (inclusive). */
 export const CUMULATIVE_WINDOW_LAG_MONTHS = 3;
@@ -78,7 +77,7 @@ export function shiftCalendarMonths(
 }
 
 function networkActual(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   year: number,
   month: number,
   storeIds: number[],
@@ -89,8 +88,9 @@ function networkActual(
     const row = panel.rows.find(
       (r) => r.store_id === storeId && r.year === year && r.month === month,
     );
-    if (row) {
-      scores.push(row.five_percent);
+    const score = metricScore(row);
+    if (score != null) {
+      scores.push(score);
     }
   }
   if (scores.length === 0) {
@@ -170,11 +170,14 @@ export function monthlyFromCumulativePath(
  * Session approved/baseline is kept for Revert only — not drawn on Hero.
  */
 export function buildHeroEvaluationSeries(
-  draftPlan: FivePercentPlan,
-  panel: SanitizedPanel,
+  draftPlan: DirectedPlan,
+  panel: MetricScorePanel,
   asOf: { year: number; month: number },
   slackBandPp: number,
+  bounds: { floor?: number; ceiling?: number } = {},
 ): HeroEvaluationSeries {
+  const floor = bounds.floor ?? 0;
+  const ceiling = bounds.ceiling ?? 100;
   const storeIds = draftPlan.projections.map((p) => p.store_id);
   const asOfLabel = periodLabel(asOf.year, asOf.month);
   const periodMap = new Map<string, PeriodPoint>();
@@ -339,8 +342,8 @@ export function buildHeroEvaluationSeries(
     return value;
   });
 
-  const upperYs = draftYs.map((v) => (v == null ? null : Math.min(100, v + slackBandPp)));
-  const lowerYs = draftYs.map((v) => (v == null ? null : Math.max(0, v - slackBandPp)));
+  const upperYs = draftYs.map((v) => (v == null ? null : Math.min(ceiling, v + slackBandPp)));
+  const lowerYs = draftYs.map((v) => (v == null ? null : Math.max(floor, v - slackBandPp)));
 
   return {
     labels,

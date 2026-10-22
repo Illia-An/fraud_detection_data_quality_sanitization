@@ -1,4 +1,5 @@
 import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
 import TimerRoundedIcon from '@mui/icons-material/TimerRounded';
@@ -38,6 +39,11 @@ const mainListItems: {
     icon: <CalendarMonthRoundedIcon />,
     path: '/planner',
     onboarding: 'nav-planner',
+  },
+  {
+    textKey: 'nav.ttsPlanner',
+    icon: <SpeedRoundedIcon />,
+    path: '/planner-tts',
   },
   { textKey: 'nav.documentation', icon: <MenuBookRoundedIcon />, path: '/documentation' },
 ];

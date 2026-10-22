@@ -109,6 +109,9 @@ describe('StoreHeroEvaluationChart', () => {
     expect(payload).toContain('"size":10');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
+    expect(payload).toContain('"text":"5%"');
+    expect(payload).toContain('"ticksuffix":"%"');
+    expect(payload).toContain('%{y:.1f}%');
     expect(screen.getByTestId('store-evaluation-legend')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-requiredMonthly')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
@@ -157,5 +160,30 @@ describe('StoreHeroEvaluationChart', () => {
         /Pressure view · YTD from 2025-01 · cutover at last cleansed fact \(2025-04\) · H through plan target month \(2025-05\)/i,
       ),
     ).toBeInTheDocument();
+  });
+
+  it('labels the store axis in minutes when TTS passes a minute suffix', async () => {
+    render(
+      <ThemeProvider theme={appTheme}>
+        <StoreHeroEvaluationChart
+          plan={plan}
+          storeId={10}
+          panel={panel}
+          insights={insights}
+          yAxisTitle="min"
+          tickSuffix=" min"
+        />
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('store-hero-plotly')).toBeInTheDocument();
+    });
+    const payload = screen.getByTestId('store-hero-plotly').textContent ?? '';
+    expect(payload).toContain('"text":"min"');
+    expect(payload).toContain('"ticksuffix":" min"');
+    expect(payload).toContain('%{y:.2f} min');
+    expect(payload).not.toContain('"ticksuffix":"%"');
+    expect(payload).not.toContain('"text":"5%"');
   });
 });

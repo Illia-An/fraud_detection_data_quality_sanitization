@@ -18,14 +18,14 @@ import {
 import { useMemo, useState } from 'react';
 
 import { useT } from '../../i18n';
-import type { FivePercentPlan } from '../../schemas/plan';
+import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
+import { momIsDeterioration } from '../../schemas/metricScore';
 import { periodLabel } from '../../schemas/plan';
 import {
   SIGNAL_COLORS,
   type MonitorSignal,
   type PlanMonitoringInsights,
 } from '../../schemas/planMonitoring';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import {
   baselineScore,
   behindStreakMonths,
@@ -45,28 +45,34 @@ export type AtRiskFilter = 'behind' | 'ahead' | 'top_gainers' | 'top_laggards' |
 export const TOP_SLICE_LIMIT = 15;
 
 interface AtRiskDeltaTableProps {
-  plan: FivePercentPlan;
-  approvedPlan: FivePercentPlan | null;
+  plan: DirectedPlan;
+  approvedPlan: DirectedPlan | null;
   baselineRows: StoreBaselineRow[];
-  panel: SanitizedPanel;
+  panel: MetricScorePanel;
   insights: PlanMonitoringInsights;
   asOfOptions: { year: number; month: number }[];
   onAsOfChange: (year: number, month: number) => void;
   onInspect: (storeId: number) => void;
 }
 
-function formatPct(value: number | null): string {
+function formatScore(value: number | null, unit: string): string {
   if (value == null || Number.isNaN(value)) {
     return '—';
+  }
+  if (unit === 'min') {
+    return `${value.toFixed(2)} min`;
   }
   return `${value.toFixed(1)}%`;
 }
 
-function formatGapPp(value: number | null): string {
+function formatGap(value: number | null, unit: string): string {
   if (value == null || Number.isNaN(value)) {
     return '—';
   }
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  if (unit === 'min') {
+    return `${sign}${Math.abs(value).toFixed(2)} min`;
+  }
   return `${sign}${Math.abs(value).toFixed(1)} pp`;
 }
 
@@ -97,12 +103,13 @@ function statusLabel(signal: MonitorSignal): string {
   return 'On plan';
 }
 
-/** Deficit strip scale — |gap| capped at 10 pp → 100%. */
-function deficitProgress01(gapPp: number | null): number {
+/** Deficit strip scale — |gap| capped at 10 pp, or 1 min, → 100%. */
+function deficitProgress01(gapPp: number | null, unit: string): number {
   if (gapPp == null || gapPp >= 0) {
     return 0;
   }
-  return Math.min(1, Math.abs(gapPp) / 10);
+  const cap = unit === 'min' ? 1 : 10;
+  return Math.min(1, Math.abs(gapPp) / cap);
 }
 
 const COL_COUNT = 12;
@@ -121,6 +128,7 @@ export function AtRiskDeltaTable({
   onInspect,
 }: AtRiskDeltaTableProps) {
   const t = useT();
+  const unit = plan.unit;
   const [filter, setFilter] = useState<AtRiskFilter>('behind');
   const asOfValue = periodLabel(insights.as_of_year, insights.as_of_month);
 
@@ -365,9 +373,11 @@ export function AtRiskDeltaTable({
               <TableCell align="right" sx={headSx}>
                 {t('planner.atRisk.col.target')}
               </TableCell>
-              <TableCell sx={headSx}>{t('planner.atRisk.col.gap')}</TableCell>
+              <TableCell sx={headSx}>
+                {unit === 'min' ? t('ttsPlanner.atRisk.col.gap') : t('planner.atRisk.col.gap')}
+              </TableCell>
               <TableCell align="right" sx={headSx}>
-                {t('planner.atRisk.col.mom')}
+                {unit === 'min' ? t('ttsPlanner.atRisk.col.mom') : t('planner.atRisk.col.mom')}
               </TableCell>
               <TableCell align="right" sx={headSx}>
                 {t('planner.atRisk.col.baselineEnd')}
@@ -404,9 +414,9 @@ export function AtRiskDeltaTable({
               </TableRow>
             ) : (
               rows.map((row, rowIndex) => {
-                const deficit = deficitProgress01(row.gapPp);
+                const deficit = deficitProgress01(row.gapPp, unit);
                 const negativeGap = row.gapPp != null && row.gapPp < 0;
-                const momNeg = row.momPp != null && row.momPp < 0;
+                const momWorse = momIsDeterioration(row.momPp, plan.direction);
                 return (
                   <TableRow
                     key={row.storeId}
@@ -443,15 +453,15 @@ export function AtRiskDeltaTable({
                       {formatVolume(row.volume)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {formatPct(row.actual)}
+                      {formatScore(row.actual, unit)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {formatPct(row.targetAtAsOf)}
+                      {formatScore(row.targetAtAsOf, unit)}
                     </TableCell>
                     <TableCell>
                       <Chip
                         size="small"
-                        label={formatGapPp(row.gapPp)}
+                        label={formatGap(row.gapPp, unit)}
                         sx={{
                           height: 18,
                           fontSize: '0.7rem',
@@ -469,16 +479,16 @@ export function AtRiskDeltaTable({
                       align="right"
                       sx={{
                         fontVariantNumeric: 'tabular-nums',
-                        color: momNeg ? 'warning.main' : undefined,
-                        fontWeight: momNeg ? 600 : undefined,
+                        color: momWorse ? 'warning.main' : undefined,
+                        fontWeight: momWorse ? 600 : undefined,
                       }}
                     >
-                      {formatGapPp(row.momPp)}
+                      {formatGap(row.momPp, unit)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                       {row.baseline == null && row.endScore == null
                         ? '—'
-                        : `${formatPct(row.baseline)} → ${formatPct(row.endScore)}`}
+                        : `${formatScore(row.baseline, unit)} → ${formatScore(row.endScore, unit)}`}
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                       {row.streak > 0 ? row.streak : '—'}
@@ -487,7 +497,7 @@ export function AtRiskDeltaTable({
                       {formatShare(row.gapShare)}
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {row.liftToEnd == null ? '—' : formatGapPp(row.liftToEnd)}
+                      {row.liftToEnd == null ? '—' : formatGap(row.liftToEnd, unit)}
                     </TableCell>
                     <TableCell sx={{ minWidth: 72 }}>
                       <LinearProgress
@@ -496,7 +506,7 @@ export function AtRiskDeltaTable({
                         color="error"
                         aria-label={
                           deficit > 0
-                            ? `Deficit ${Math.abs(row.gapPp ?? 0).toFixed(1)} pp`
+                            ? `Deficit ${Math.abs(row.gapPp ?? 0).toFixed(unit === 'min' ? 2 : 1)} ${unit === 'min' ? 'min' : 'pp'}`
                             : 'No deficit'
                         }
                         sx={{
@@ -539,7 +549,9 @@ export function AtRiskDeltaTable({
         color="text.secondary"
         sx={{ flexShrink: 0, pointerEvents: 'none', fontSize: '0.65rem', lineHeight: 1.2 }}
       >
-        {t('planner.atRisk.footer', { asOf: asOfValue })}
+        {unit === 'min'
+          ? t('ttsPlanner.atRisk.footer', { asOf: asOfValue })
+          : t('planner.atRisk.footer', { asOf: asOfValue })}
       </Typography>
     </Stack>
   );

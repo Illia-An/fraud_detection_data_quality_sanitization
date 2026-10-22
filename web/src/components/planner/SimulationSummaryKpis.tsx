@@ -2,22 +2,23 @@ import { Box, Chip, Stack, Typography } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import { useT } from '../../i18n';
-import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
+import type { DirectedPlan } from '../../schemas/metricScore';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 
 interface SimulationSummaryKpisProps {
-  draftPlan: FivePercentPlan;
+  draftPlan: DirectedPlan;
   monitoring: PlanMonitoringInsights | null;
+  projectedTestId?: string;
 }
 
-function formatPct(value: number): string {
-  return `${value.toFixed(2)}%`;
+function formatScore(value: number, unit: string): string {
+  return unit === 'min' ? `${value.toFixed(2)} min` : `${value.toFixed(2)}%`;
 }
 
-function formatDeltaPp(value: number): string {
+function formatDelta(value: number, unit: string): string {
   const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(2)} pp`;
+  return unit === 'min' ? `${sign}${value.toFixed(2)} min` : `${sign}${value.toFixed(2)} pp`;
 }
 
 const labelSx = {
@@ -72,12 +73,15 @@ function MiniCard({ children }: { children: ReactNode }) {
 export function SimulationSummaryKpis({
   draftPlan,
   monitoring,
+  projectedTestId,
 }: SimulationSummaryKpisProps) {
   const t = useT();
   /** Current (equal-mean @ reference) → draft Final — not approved Final→Final. */
   const current = draftPlan.current_chain;
   const projected = draftPlan.final_chain;
   const networkDelta = projected - current;
+  const improved =
+    draftPlan.direction === 'lower_is_better' ? networkDelta <= 1e-9 : networkDelta >= -1e-9;
   const behindDraft = monitoring?.summary.behind ?? null;
   const asOfLabel = monitoring
     ? periodLabel(monitoring.as_of_year, monitoring.as_of_month)
@@ -92,13 +96,13 @@ export function SimulationSummaryKpis({
       <MiniCard>
         <Typography sx={labelSx}>{t('planner.kpi.projected')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Typography sx={valueSx}>
-            {formatPct(current)} → {formatPct(projected)}
+          <Typography sx={valueSx} data-testid={projectedTestId}>
+            {formatScore(current, draftPlan.unit)} → {formatScore(projected, draftPlan.unit)}
           </Typography>
           <Chip
             size="small"
-            label={formatDeltaPp(networkDelta)}
-            color={networkDelta >= 0 ? 'success' : 'warning'}
+            label={formatDelta(networkDelta, draftPlan.unit)}
+            color={improved ? 'success' : 'warning'}
             sx={chipSx}
           />
         </Stack>
@@ -129,7 +133,9 @@ export function SimulationSummaryKpis({
             sx={chipSx}
           />
           <Typography sx={{ ...labelSx, fontWeight: 400 }}>
-            {t('planner.kpi.liftQuota', { lift: formatDeltaPp(draftPlan.required_change) })}
+            {t('planner.kpi.liftQuota', {
+              lift: formatDelta(draftPlan.required_change, draftPlan.unit),
+            })}
           </Typography>
         </Stack>
       </MiniCard>

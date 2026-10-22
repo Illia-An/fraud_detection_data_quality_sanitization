@@ -3,19 +3,19 @@
 import type { FivePercentPlan, PlanParams } from '../../schemas/plan';
 import type { ActiveAnswer } from './activeAnswer';
 
-export interface AnswerUndoSnapshot {
-  plan: FivePercentPlan | null;
+export interface AnswerUndoSnapshot<TPlan = FivePercentPlan, TParams = PlanParams> {
+  plan: TPlan | null;
   activeAnswer: ActiveAnswer | null;
-  params: PlanParams;
+  params: TParams;
   mixNote: string | null;
 }
 
-export function createAnswerUndoSnapshot(input: {
-  plan: FivePercentPlan | null;
+export function createAnswerUndoSnapshot<TPlan, TParams extends PlanParams>(input: {
+  plan: TPlan | null;
   activeAnswer: ActiveAnswer | null;
-  params: PlanParams;
+  params: TParams;
   mixNote: string | null;
-}): AnswerUndoSnapshot {
+}): AnswerUndoSnapshot<TPlan, TParams> {
   return {
     plan: input.plan,
     activeAnswer: input.activeAnswer,

@@ -1,13 +1,12 @@
 /** Store-level evaluation series — same grammar as network Hero (per-store zoom). */
 
-import type { FivePercentPlan } from '../../schemas/plan';
 import { periodLabel } from '../../schemas/plan';
 import {
   applyDraftLastMonthToGapModel,
   buildMonitoringPlanActualGapModel,
 } from '../../schemas/planActualGap';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
-import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
+import { metricScore, type DirectedPlan, type MetricScorePanel } from '../../schemas/metricScore';
 import {
   CUMULATIVE_WINDOW_LAG_MONTHS,
   cumulativeMeanSeries,
@@ -61,7 +60,7 @@ function atOrAfter(a: PeriodPoint, b: PeriodPoint): boolean {
 }
 
 function storeActual(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   storeId: number,
   year: number,
   month: number,
@@ -69,7 +68,7 @@ function storeActual(
   const row = panel.rows.find(
     (r) => r.store_id === storeId && r.year === year && r.month === month,
   );
-  return row?.five_percent ?? null;
+  return metricScore(row);
 }
 
 /**
@@ -81,9 +80,9 @@ function storeActual(
  * Gap model stays plan-horizon only (Inspect table / deviation caption).
  */
 export function buildStoreHeroEvaluationSeries(
-  plan: FivePercentPlan,
+  plan: DirectedPlan,
   storeId: number,
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   insights: PlanMonitoringInsights,
   draftLast: number | null = null,
 ): StoreHeroEvaluationSeries | null {
