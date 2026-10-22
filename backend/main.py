@@ -38,6 +38,15 @@ from backend.schemas import (
     SurveyAnswerRow,
 )
 from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
+from backend.tts_kpi_ap import load_ap_tts_kpi_panel
+from backend.tts_plan_schemas import (
+    TtsKpiApPanelResponse,
+    TtsKpiPanelResponse,
+    TtsKpiPanelRowOut,
+    TtsPlanOut,
+    TtsPlanRequest,
+    TtsPlanResponse,
+)
 from backend.service import run_pipeline, run_pipeline_pushdown
 from backend.static_ui import mount_frontend
 from backend.tts_queries import TtsQueryError
@@ -59,6 +68,9 @@ from backend.tts_order_bump_schemas import (
 from backend.tts_order_bump_service import run_tts_order_bump_process
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
 from planner.five_percent import plan_five_percent
+from planner.tts import plan_tts
+from planner.tts_baseline import TtsKpiPresetName, generate_tts_kpi_panel
+from planner.tts_kpi_ap import TtsKpiSourceError
 from tts_guard.synthetic import TtsPresetName, generate_tts_preset, tts_preset_meta
 from tts_order_bump import (
     OrderBumpPresetName,
@@ -200,6 +212,66 @@ def create_app() -> FastAPI:
             preset=preset,
             rows=rows,
             meta=OrderBumpSamplePresetMeta.model_validate(meta_raw),
+        )
+
+    @app.get(
+        f"{API_PREFIX}/sample/tts-kpi/{{preset}}",
+        response_model=TtsKpiPanelResponse,
+        tags=["sample-tts-kpi"],
+        responses={404: {"description": "Unknown TTS KPI preset"}},
+    )
+    def sample_tts_kpi(preset: TtsKpiPresetName) -> TtsKpiPanelResponse:
+        """Synthetic monthly TTS minutes for the planner. No database read or write."""
+        panel = generate_tts_kpi_panel(preset)
+        return TtsKpiPanelResponse(
+            preset=panel.preset,
+            period_start=panel.period_start,
+            period_end=panel.period_end,
+            reference_year=panel.reference_year,
+            reference_month=panel.reference_month,
+            row_count=panel.row_count,
+            rows=[
+                TtsKpiPanelRowOut(
+                    store_id=row.store_id,
+                    year=row.year,
+                    month=row.month,
+                    tts=row.tts,
+                )
+                for row in panel.rows
+            ],
+        )
+
+    @app.get(
+        f"{API_PREFIX}/tts-kpi/ap",
+        response_model=TtsKpiApPanelResponse,
+        tags=["tts-kpi"],
+        responses={
+            404: {"description": "AP returned no avg_serve_time_minutes rows"},
+            422: {"description": "AP rows are not a usable TTS panel"},
+            503: {"description": "TTS_KPI_SOURCE is synthetic or AP is unreachable"},
+        },
+    )
+    def tts_kpi_from_ap() -> TtsKpiApPanelResponse:
+        """Read-only AP minutes. Synthetic presets stay on ``/sample/tts-kpi``."""
+        try:
+            panel = load_ap_tts_kpi_panel()
+        except TtsKpiSourceError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        return TtsKpiApPanelResponse(
+            period_start=panel.period_start,
+            period_end=panel.period_end,
+            reference_year=panel.reference_year,
+            reference_month=panel.reference_month,
+            row_count=panel.row_count,
+            rows=[
+                TtsKpiPanelRowOut(
+                    store_id=row.store_id,
+                    year=row.year,
+                    month=row.month,
+                    tts=row.tts,
+                )
+                for row in panel.rows
+            ],
         )
 
     @app.get(
@@ -438,6 +510,55 @@ def create_app() -> FastAPI:
                 ],
             )
             return PlanResponse(metrics={"five_percent": metric})
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post(
+        f"{API_PREFIX}/plans-tts",
+        response_model=TtsPlanResponse,
+        tags=["plans-tts"],
+        responses={
+            422: {"description": "Validation error"},
+        },
+    )
+    def create_tts_plan(body: TtsPlanRequest) -> TtsPlanResponse:
+        """Allocate TTS store×month minute reductions from a KPI baseline snapshot."""
+        try:
+            baseline = {row.store_id: row.tts for row in body.baseline_rows}
+            result = plan_tts(
+                baseline=baseline,
+                target=body.target,
+                n_months=body.horizon,
+                max_monthly_improve=body.params.max_monthly_improve,
+                priority_power=body.params.priority_power,
+                trajectory=body.params.trajectory,
+                trajectory_power=body.params.trajectory_power,
+                growth_factor=body.params.growth_factor,
+                reference_year=body.reference_year,
+                reference_month=body.reference_month,
+            )
+            metric = TtsPlanOut(
+                target=result.target,
+                current_chain=result.current_chain,
+                required_change=result.required_change,
+                final_chain=result.final_chain,
+                feasible=result.feasible,
+                chain_trajectory=[
+                    MonthScoreOut(year=m.year, month=m.month, score=m.score)
+                    for m in result.chain_trajectory
+                ],
+                projections=[
+                    StoreProjectionOut(
+                        store_id=p.store_id,
+                        months=[
+                            MonthScoreOut(year=m.year, month=m.month, score=m.score)
+                            for m in p.months
+                        ],
+                    )
+                    for p in result.projections
+                ],
+            )
+            return TtsPlanResponse(metrics={"tts": metric})
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

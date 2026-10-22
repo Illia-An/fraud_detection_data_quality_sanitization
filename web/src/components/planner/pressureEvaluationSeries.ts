@@ -7,7 +7,7 @@
  * Horizon H ends at the plan target month (last chain_trajectory), not past it.
  */
 
-import { periodLabel, type FivePercentPlan } from '../../schemas/plan';
+import { periodLabel } from '../../schemas/plan';
 import {
   cumulativeMeanSeries,
   linearCumulativePathToTarget,
@@ -43,7 +43,9 @@ function emptyPair(
 }
 
 /** Last month of the draft trajectory — plan target month for Pressure H. */
-export function planTargetMonthLabel(draftPlan: FivePercentPlan): string | null {
+export function planTargetMonthLabel(draftPlan: {
+  chain_trajectory: { year: number; month: number }[];
+}): string | null {
   const traj = draftPlan.chain_trajectory;
   if (traj.length === 0) {
     return null;

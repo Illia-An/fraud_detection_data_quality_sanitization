@@ -2,7 +2,7 @@ import { Box, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 
 import { useT } from '../../i18n';
-import type { FivePercentPlan } from '../../schemas/plan';
+import type { DirectedPlan } from '../../schemas/metricScore';
 import { periodLabel } from '../../schemas/plan';
 import {
   SIGNAL_COLORS,
@@ -15,7 +15,7 @@ import {
 } from './atRiskRowMetrics';
 
 interface InspectStoreGlanceProps {
-  plan: FivePercentPlan;
+  plan: DirectedPlan;
   insights: PlanMonitoringInsights;
   storeId: number;
   baselineRows: StoreBaselineRow[];
@@ -23,18 +23,24 @@ interface InspectStoreGlanceProps {
   draftLast: number | null;
 }
 
-function formatPct(value: number | null): string {
+function formatScore(value: number | null, unit: string): string {
   if (value == null || Number.isNaN(value)) {
     return '—';
+  }
+  if (unit === 'min') {
+    return `${value.toFixed(2)} min`;
   }
   return `${value.toFixed(1)}%`;
 }
 
-function formatGapPp(value: number | null): string {
+function formatGap(value: number | null, unit: string): string {
   if (value == null || Number.isNaN(value)) {
     return '—';
   }
   const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  if (unit === 'min') {
+    return `${sign}${Math.abs(value).toFixed(2)} min`;
+  }
   return `${sign}${Math.abs(value).toFixed(1)} pp`;
 }
 
@@ -81,6 +87,7 @@ export function InspectStoreGlance({
   draftLast,
 }: InspectStoreGlanceProps) {
   const t = useT();
+  const unit = plan.unit;
   const monitor = insights.stores.find((s) => s.store_id === storeId);
   const asOfLabel = periodLabel(insights.as_of_year, insights.as_of_month);
 
@@ -127,23 +134,23 @@ export function InspectStoreGlance({
         useFlexGap
         sx={{ rowGap: 0.75 }}
       >
-        <GlanceCell label={t('planner.atRisk.col.actual')} value={formatPct(metrics.fact)} />
+        <GlanceCell label={t('planner.atRisk.col.actual')} value={formatScore(metrics.fact, unit)} />
         <GlanceCell
           label={t('planner.atRisk.col.target')}
-          value={formatPct(metrics.planAtAsOf)}
+          value={formatScore(metrics.planAtAsOf, unit)}
         />
         <GlanceCell
-          label={t('planner.atRisk.col.gap')}
-          value={formatGapPp(metrics.gapPp)}
+          label={unit === 'min' ? t('ttsPlanner.atRisk.col.gap') : t('planner.atRisk.col.gap')}
+          value={formatGap(metrics.gapPp, unit)}
           valueColor={gapColor}
         />
         <GlanceCell
           label={t('planner.atRisk.col.baselineEnd')}
-          value={`${formatPct(metrics.baseline)} → ${formatPct(metrics.end)}`}
+          value={`${formatScore(metrics.baseline, unit)} → ${formatScore(metrics.end, unit)}`}
         />
         <GlanceCell
           label={t('planner.atRisk.col.lift')}
-          value={formatGapPp(metrics.liftToEnd)}
+          value={formatGap(metrics.liftToEnd, unit)}
         />
       </Stack>
     </Stack>

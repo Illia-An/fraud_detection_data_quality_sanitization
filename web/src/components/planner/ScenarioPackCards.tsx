@@ -12,6 +12,9 @@ interface ScenarioPackCardsProps {
   pendingId: ScenarioPackId | null;
   pathParams: PlanParams;
   onApply: (id: ScenarioPackId) => void;
+  /** Replaces the default path summary. 5% keeps the pp wording. */
+  summaryText?: string;
+  blurbOverrides?: Partial<Record<ScenarioPackId, MessageKey>>;
 }
 
 const PACK_COPY: Record<ScenarioPackId, { title: MessageKey; blurb: MessageKey }> = {
@@ -36,6 +39,8 @@ export function ScenarioPackCards({
   pendingId,
   pathParams,
   onApply,
+  summaryText,
+  blurbOverrides,
 }: ScenarioPackCardsProps) {
   const t = useT();
 
@@ -55,10 +60,13 @@ export function ScenarioPackCards({
         data-testid="planner-path-levers-summary"
         sx={{ fontSize: '0.68rem', lineHeight: 1.35, fontVariantNumeric: 'tabular-nums' }}
       >
-        {formatPathLeversSummary(pathParams, t)}
+        {summaryText ?? formatPathLeversSummary(pathParams, t)}
       </Typography>
       {SCENARIO_PACKS.map((pack) => {
-        const copy = PACK_COPY[pack.id];
+        const copy = {
+          ...PACK_COPY[pack.id],
+          blurb: blurbOverrides?.[pack.id] ?? PACK_COPY[pack.id].blurb,
+        };
         const busy = pendingId === pack.id;
         const otherBusy = pendingId != null && pendingId !== pack.id;
         return (

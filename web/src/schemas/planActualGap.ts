@@ -1,12 +1,18 @@
 /** Plan vs actual gap model — port of Angular monitoring.models (five_percent only). */
 
-import type { FivePercentPlan } from './plan';
 import { periodLabel } from './plan';
 import type { PlanMonitoringInsights, StoreMonitorRow } from './planMonitoring';
 import { SIGNAL_COLORS } from './planMonitoring';
-import type { SanitizedPanel } from './sanitizedPanel';
+import {
+  directionAwareDeviation,
+  metricScore,
+  type DirectedPlan,
+  type MetricDirection,
+  type MetricScorePanel,
+} from './metricScore';
 
-export type MetricDirection = 'higher_is_better';
+export type { MetricDirection };
+export { directionAwareDeviation };
 
 export interface PlanActualGapPoint {
   index: number;
@@ -44,21 +50,6 @@ export interface StorePlanActualTable {
   difference: Array<number | null>;
 }
 
-/** Signed deviation from plan (positive = better than planned). */
-export function directionAwareDeviation(
-  actual: number | null | undefined,
-  planned: number | null | undefined,
-  direction: MetricDirection = 'higher_is_better',
-): number | null {
-  if (actual == null || planned == null || !Number.isFinite(actual) || !Number.isFinite(planned)) {
-    return null;
-  }
-  if (direction === 'higher_is_better') {
-    return actual - planned;
-  }
-  return planned - actual;
-}
-
 /** Fill color for signed deviation (matches Plan monitoring signal palette). */
 export function monitoringDeviationFill(deviation: number | null | undefined): string {
   if (deviation == null || !Number.isFinite(deviation)) {
@@ -74,7 +65,7 @@ export function monitoringDeviationFill(deviation: number | null | undefined): s
 }
 
 function panelActual(
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   storeId: number,
   year: number,
   month: number,
@@ -82,7 +73,7 @@ function panelActual(
   const row = panel.rows.find(
     (r) => r.store_id === storeId && r.year === year && r.month === month,
   );
-  return row?.five_percent ?? null;
+  return metricScore(row);
 }
 
 /**
@@ -90,9 +81,9 @@ function panelActual(
  * As-of gap uses the monitoring store row so the labeled deviation matches Plan monitoring.
  */
 export function buildMonitoringPlanActualGapModel(
-  plan: FivePercentPlan,
+  plan: DirectedPlan,
   storeId: number,
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   insights: PlanMonitoringInsights,
   monitorRow?: StoreMonitorRow | null,
 ): PlanActualGapModel | null {
@@ -176,9 +167,9 @@ export function applyDraftLastMonthToGapModel(
 
 /** Read-only table under Plan vs actual. Months match the gap chart. */
 export function buildStorePlanActualDifferenceTable(
-  plan: FivePercentPlan,
+  plan: DirectedPlan,
   storeId: number,
-  panel: SanitizedPanel,
+  panel: MetricScorePanel,
   insights: PlanMonitoringInsights,
   monitorRow?: StoreMonitorRow | null,
 ): StorePlanActualTable | null {
