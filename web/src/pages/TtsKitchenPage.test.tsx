@@ -141,7 +141,31 @@ describe('TtsKitchenPage', () => {
     expect(screen.getByTestId('kitchen-impact-chart')).toHaveTextContent(
       '2026-09-01 – 2026-10-20',
     );
+    expect(screen.getByTestId('kitchen-fit')).toHaveTextContent('Fit');
+    expect(screen.getByTestId('kitchen-chart-legend')).toHaveTextContent(
+      'Hover legend labels for short tips.',
+    );
+    expect(screen.getByTestId('kitchen-legend-actual')).toHaveTextContent('Actual');
+    expect(screen.getByTestId('kitchen-legend-after')).toHaveTextContent('After ≥ 30s');
     expect(screen.queryByTestId('tts-panel-export-csv')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('kitchen-open-inspect'));
+    const inspect = await screen.findByTestId('kitchen-store-inspect');
+    expect(inspect).toHaveTextContent('Store 105');
+    expect(screen.getByTestId('kitchen-inspect-glance')).toHaveTextContent('100.0 s');
+    expect(screen.getByTestId('kitchen-inspect-glance')).toHaveTextContent('120.0 s');
+    expect(screen.getByTestId('kitchen-inspect-glance')).toHaveTextContent('+20.0 s');
+    expect(screen.getByTestId('kitchen-inspect-glance')).toHaveTextContent('1 · 25.00%');
+    expect(screen.getByTestId('kitchen-inspect-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('kitchen-inspect-fit')).toHaveTextContent('Fit');
+    expect(screen.queryByTestId('kitchen-inspect-months')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Months'));
+    expect(await screen.findByTestId('kitchen-inspect-months')).toHaveTextContent('2026-09');
+    expect(screen.getByTestId('kitchen-inspect-months')).toHaveTextContent('90.0 s');
+    fireEvent.click(screen.getByTestId('kitchen-inspect-close'));
+    await waitFor(() => {
+      expect(screen.queryByTestId('kitchen-store-inspect')).not.toBeInTheDocument();
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Code' }));
     const table = await screen.findByTestId('kitchen-code-table');
