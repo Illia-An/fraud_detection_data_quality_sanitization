@@ -1,16 +1,9 @@
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from 'react';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import {
   Box,
+  Button,
   Card,
-  CircularProgress,
   FormControl,
   InputLabel,
   MenuItem,
@@ -22,50 +15,14 @@ import {
   Typography,
 } from '@mui/material';
 
-import { buildTtsImpactTraces } from '../tts/ttsChartData';
 import { useT } from '../../i18n';
 import type { KitchenBeforeAfter } from '../../schemas/ttsKitchen';
 import { KitchenCodeTable } from './KitchenCodeTable';
+import { KitchenMeanChart } from './KitchenMeanChart';
+import { KitchenStoreInspectDialog } from './KitchenStoreInspectDialog';
 import { kitchenPlotPoints } from './kitchenChartData';
 
-const Plot = lazy(async () => {
-  const module = await import('react-plotly.js');
-  return { default: module.default };
-});
-
-const PLOT_MIN_HEIGHT_PX = 280;
-
 type KitchenScope = 'network' | 'store' | 'code';
-
-function usePlotBox(enabled: boolean) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState(PLOT_MIN_HEIGHT_PX);
-
-  useEffect(() => {
-    const node = containerRef.current;
-    if (!enabled || !node || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-    let frame = 0;
-    const observer = new ResizeObserver((entries) => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const next = Math.floor(entries[0]?.contentRect.height ?? 0);
-        if (next > 80) {
-          setHeight((current) => (current === next ? current : next));
-        }
-        window.dispatchEvent(new Event('resize'));
-      });
-    });
-    observer.observe(node);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-    };
-  }, [enabled]);
-
-  return { containerRef, height };
-}
 
 interface KitchenImpactChartProps {
   result: KitchenBeforeAfter;
@@ -74,6 +31,7 @@ interface KitchenImpactChartProps {
 export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
   const t = useT();
   const [scope, setScope] = useState<KitchenScope>('network');
+  const [inspectOpen, setInspectOpen] = useState(false);
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(
     result.by_store[0]?.store_id ?? null,
   );
@@ -97,17 +55,7 @@ export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
     return kitchenPlotPoints(result.network_months);
   }, [result, scope, selectedStoreId]);
 
-  const traces = useMemo(
-    () =>
-      buildTtsImpactTraces(points, {
-        actual: t('tts.chart.actual'),
-        ge30: t('kitchen.chart.after', { sec: result.tts_min_sec }),
-      }),
-    [points, t],
-  );
-  const plotting = scope !== 'code' && points.length > 0;
-  const { containerRef, height: plotHeight } = usePlotBox(plotting);
-  const monthLabels = traces[0]?.x ?? [];
+  const canInspect = storeIds.length > 0;
 
   const handleScope = (_: MouseEvent<HTMLElement>, value: KitchenScope | null) => {
     if (value) {
@@ -150,6 +98,16 @@ export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
           </Select>
         </FormControl>
       ) : null}
+      <ToggleButtonGroup
+        size="small"
+        exclusive
+        value="fit"
+        aria-label={t('chart.yScaleAria')}
+      >
+        <ToggleButton value="fit" aria-label={t('chart.fitAria')} data-testid="kitchen-fit">
+          {t('chart.fit')}
+        </ToggleButton>
+      </ToggleButtonGroup>
     </Stack>
   );
 
@@ -168,11 +126,34 @@ export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
       }}
     >
       <Stack
+        direction="row"
+        spacing={0.75}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+        data-testid="kitchen-inspect-toolbar"
+        sx={{ flexShrink: 0, px: 2, pt: 1.5, pb: 0.5 }}
+      >
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<OpenInNewRoundedIcon fontSize="small" />}
+          onClick={() => setInspectOpen(true)}
+          disabled={!canInspect}
+          data-testid="kitchen-open-inspect"
+        >
+          {t('kitchen.inspect.open')}
+        </Button>
+        <Typography variant="caption" color="text.secondary">
+          {t('kitchen.inspect.entryHint')}
+        </Typography>
+      </Stack>
+      <Stack
         direction={{ xs: 'column', md: 'row' }}
         spacing={1}
         alignItems={{ xs: 'stretch', md: 'flex-start' }}
         justifyContent="space-between"
-        sx={{ flexShrink: 0, px: 2, pt: 1.5, pb: 0.5 }}
+        sx={{ flexShrink: 0, px: 2, pt: 0.5, pb: 0.5 }}
       >
         <Box sx={{ minWidth: 0 }}>
           <Box
@@ -195,44 +176,18 @@ export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
           <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <KitchenCodeTable result={result} />
           </Box>
-        ) : points.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            {t('kitchen.chart.empty')}
-          </Typography>
         ) : (
-          <Box ref={containerRef} sx={{ flex: 1, minHeight: PLOT_MIN_HEIGHT_PX, width: '100%' }}>
-            <Suspense
-              fallback={
-                <Stack alignItems="center" justifyContent="center" sx={{ height: '100%' }}>
-                  <CircularProgress size={28} />
-                </Stack>
-              }
-            >
-              <Plot
-                data={traces}
-                layout={{
-                  autosize: true,
-                  height: plotHeight,
-                  margin: { l: 48, r: 16, t: 28, b: 48 },
-                  yaxis: { title: { text: t('tts.chart.yAxis') }, ticksuffix: ' s' },
-                  xaxis: {
-                    title: { text: t('kitchen.chart.xAxis') },
-                    type: 'category',
-                    categoryorder: 'array',
-                    categoryarray: monthLabels,
-                  },
-                  legend: { orientation: 'h', y: 1.08 },
-                  paper_bgcolor: 'transparent',
-                  plot_bgcolor: 'transparent',
-                }}
-                config={{ displayModeBar: false, responsive: true }}
-                style={{ width: '100%', height: '100%' }}
-                useResizeHandler
-              />
-            </Suspense>
-          </Box>
+          <KitchenMeanChart points={points} minSec={result.tts_min_sec} />
         )}
       </Box>
+      <KitchenStoreInspectDialog
+        open={inspectOpen}
+        storeId={selectedStoreId}
+        stores={result.by_store}
+        minSec={result.tts_min_sec}
+        onClose={() => setInspectOpen(false)}
+        onStoreChange={setSelectedStoreId}
+      />
     </Card>
   );
 }
