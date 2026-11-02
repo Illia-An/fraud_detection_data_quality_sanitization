@@ -54,6 +54,34 @@ export const HERO_PLOT_HEIGHT_PX = 340;
  */
 export const HERO_PX_PER_PERIOD = 44;
 
+/** Plan-mode series off until the user clicks the legend (keeps the default view quieter). */
+export const HERO_DEFAULT_HIDDEN_IDS = ['planCumulative', 'windowCumulative'] as const;
+
+function createHeroDefaultHiddenIds(): Set<string> {
+  return new Set(HERO_DEFAULT_HIDDEN_IDS);
+}
+
+/** Initial horizontal scroll: left edge (default) or center the cutover (as-of / last fact). */
+export type HeroScrollAnchor = 'start' | 'asOf';
+
+/** Scroll offset so period `index` sits near the viewport center. */
+export function heroScrollLeftToCenterIndex(
+  index: number,
+  periodCount: number,
+  contentWidth: number,
+  viewportWidth: number,
+  pxPerPeriod: number = HERO_PX_PER_PERIOD,
+): number {
+  if (periodCount <= 0 || viewportWidth <= 0 || contentWidth <= 0 || index < 0) {
+    return 0;
+  }
+  const naturalWidth = periodCount * pxPerPeriod;
+  const scale = naturalWidth > 0 && contentWidth > naturalWidth ? contentWidth / naturalWidth : 1;
+  const anchorX = (index + 0.5) * pxPerPeriod * scale;
+  const maxScroll = Math.max(0, contentWidth - viewportWidth);
+  return Math.min(maxScroll, Math.max(0, anchorX - viewportWidth / 2));
+}
+
 interface HeroSimulationChartProps {
   draftPlan: DirectedPlan;
   panel: MetricScorePanel;
@@ -67,6 +95,8 @@ interface HeroSimulationChartProps {
   tickSuffix?: string;
   scoreFloor?: number;
   scoreCeiling?: number;
+  /** Where to park the horizontal scroller on load / as-of change. */
+  scrollAnchor?: HeroScrollAnchor;
 }
 
 /** Dual-trace Evaluation View: cleansed fact | as-of | forecast cone + target. */
@@ -80,12 +110,13 @@ export function HeroSimulationChart({
   tickSuffix = '%',
   scoreFloor = 0,
   scoreCeiling = 100,
+  scrollAnchor = 'start',
 }: HeroSimulationChartProps) {
   const t = useT();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [plotHeight, setPlotHeight] = useState(HERO_PLOT_HEIGHT_PX);
   const [plotWidth, setPlotWidth] = useState(0);
-  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(createHeroDefaultHiddenIds);
   const [requiredMode, setRequiredMode] = useState<HeroRequiredMode>('plan');
   const isPressure = requiredMode === 'pressure';
 
@@ -107,7 +138,7 @@ export function HeroSimulationChart({
         return;
       }
       setRequiredMode(next);
-      setHiddenIds(new Set());
+      setHiddenIds(createHeroDefaultHiddenIds());
     },
     [],
   );
@@ -192,6 +223,40 @@ export function HeroSimulationChart({
   const lastFactLabel = pressurePair.lastFactLabel;
   const horizonEndLabel = pressurePair.horizonEndLabel;
   const legendItems = isPressure ? HERO_PRESSURE_LEGEND : HERO_EVALUATION_LEGEND;
+
+  // TTS (and any caller with scrollAnchor="asOf"): keep cutover in view when the strip overflows.
+  useEffect(() => {
+    if (scrollAnchor !== 'asOf') {
+      return;
+    }
+    const node = containerRef.current;
+    if (!node || plotWidth <= 0 || labels.length === 0) {
+      return;
+    }
+    const anchorLabel = isPressure ? (lastFactLabel ?? asOfLabel) : asOfLabel;
+    const index = labels.indexOf(anchorLabel);
+    if (index < 0) {
+      return;
+    }
+    const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
+    const contentWidth = Math.max(contentMinWidth, plotWidth);
+    const frame = requestAnimationFrame(() => {
+      node.scrollLeft = heroScrollLeftToCenterIndex(
+        index,
+        labels.length,
+        contentWidth,
+        node.clientWidth,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [
+    scrollAnchor,
+    asOfLabel,
+    lastFactLabel,
+    isPressure,
+    labels,
+    plotWidth,
+  ]);
 
   const yValues = [
     ...(isVisible('fact') ? factYs.filter((v): v is number => v != null) : []),
@@ -585,19 +650,22 @@ export function HeroSimulationChart({
                 height: plotHeight,
                 width: plotMinWidth > 0 ? plotMinWidth : undefined,
                 margin: { l: 48, r: 16, t: 20, b: 40 },
-                paper_bgcolor: 'transparent',
-                plot_bgcolor: 'transparent',
+                // Match Sanitization Network impact: white plot + monthly category grid.
+                paper_bgcolor: '#ffffff',
+                plot_bgcolor: '#ffffff',
                 dragmode: 'zoom',
                 hovermode: HERO_HOVERMODE,
                 hoverlabel: HERO_HOVERLABEL,
                 showlegend: false,
                 xaxis: {
-                  title: { text: '' },
-                  tickangle: -30,
+                  title: { text: 'Month' },
+                  type: 'category',
+                  categoryorder: 'array',
+                  categoryarray: labels,
                   automargin: true,
                   fixedrange: false,
                   showgrid: true,
-                  gridcolor: 'rgba(0, 0, 0, 0.06)',
+                  gridcolor: 'rgba(0, 0, 0, 0.12)',
                   zeroline: false,
                   ...HERO_X_SPIKES,
                 },
@@ -607,7 +675,7 @@ export function HeroSimulationChart({
                   ticksuffix: tickSuffix,
                   fixedrange: false,
                   showgrid: true,
-                  gridcolor: 'rgba(0, 0, 0, 0.08)',
+                  gridcolor: 'rgba(0, 0, 0, 0.12)',
                   zeroline: false,
                   ...HERO_Y_SPIKES,
                 },

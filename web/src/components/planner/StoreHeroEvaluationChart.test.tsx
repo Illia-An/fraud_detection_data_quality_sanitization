@@ -103,6 +103,8 @@ describe('StoreHeroEvaluationChart', () => {
     expect(payload).toContain('"showlegend":false');
     expect(payload).toContain('"scrollZoom":true');
     expect(payload).toContain('"hovermode":"x unified"');
+    expect(payload).toContain('"type":"category"');
+    expect(payload).toContain('"plot_bgcolor":"#ffffff"');
     expect(payload).toContain('"showspikes":true');
     expect(payload).toContain('"xref":"paper"');
     expect(payload).toContain('"bgcolor":"rgba(33, 33, 33, 0.9)"');
