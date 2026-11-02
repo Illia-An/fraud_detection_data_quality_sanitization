@@ -203,7 +203,7 @@ Snapshot fast-path for TTS is **backlog**, not v1 blocker.
 - UI toggle for `order_agg` (`avg` / `max`)
 - KVSGroup inclusion filter
 - Long-tail cap
-- TTS sqlite snapshot / Docker data path
+- TTS sqlite snapshot / Docker data path — `exp/tts-kpi-snapshot` (`TTS_KPI_SOURCE=snapshot`, `scripts/refresh_tts_kpi_snapshot.py`)
 - Reconcile vs official TTS report
 - Onboarding / analytics for TTS
 - UX compose (`exp/tts-ux-compose`) after sanitize+panel exist
