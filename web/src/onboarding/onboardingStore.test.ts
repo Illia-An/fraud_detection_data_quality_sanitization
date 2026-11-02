@@ -10,11 +10,13 @@ const product = {
   hasProcessResult: false,
   hasPlannerPanel: false,
   hasDraftPlan: false,
+  hasTtsDraftPlan: false,
 };
 const productWithResults = {
   hasProcessResult: true,
   hasPlannerPanel: true,
   hasDraftPlan: false,
+  hasTtsDraftPlan: false,
 };
 
 describe('onboardingStore', () => {

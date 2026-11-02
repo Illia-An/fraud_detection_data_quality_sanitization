@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { directionForLocale, useLocaleStore, useT } from '../i18n';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
+import { useTtsPlannerScenarioStore } from '../store/ttsPlannerScenarioStore';
 import { useUiStore } from '../store/uiStore';
 import { progressForStep, type OnboardingProductState } from './eligibility';
 import { useOnboardingStore } from './onboardingStore';
@@ -39,13 +40,15 @@ interface DisplayFrame {
 function useProductState(): OnboardingProductState {
   const processResult = useUiStore((s) => s.processResult);
   const draftPlan = usePlannerScenarioStore((s) => s.draftPlan);
+  const ttsDraftPlan = useTtsPlannerScenarioStore((s) => s.draftPlan);
   return useMemo(
     () => ({
       hasProcessResult: processResult != null,
       hasPlannerPanel: processResult != null || draftPlan != null,
       hasDraftPlan: draftPlan != null,
+      hasTtsDraftPlan: ttsDraftPlan != null,
     }),
-    [processResult, draftPlan],
+    [processResult, draftPlan, ttsDraftPlan],
   );
 }
 

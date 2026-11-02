@@ -73,7 +73,7 @@ import {
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import { useOnboardingStore } from '../onboarding';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
-import { useUiStore } from '../store/uiStore';
+import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
 
 const RAIL_WIDTH_PX = 320;
 const RAIL_COLLAPSED_PX = 40;
@@ -171,7 +171,7 @@ export function PlannerPage() {
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
   const selectStore = usePlannerScenarioStore((s) => s.selectStore);
 
-  const [controlsOpen, setControlsOpen] = useState(true);
+  const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
 

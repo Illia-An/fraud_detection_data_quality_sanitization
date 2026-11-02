@@ -19,7 +19,7 @@ export const DRAWER_WIDTH_COLLAPSED = 64;
 export default function SideMenu() {
   const t = useT();
   const theme = useTheme();
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const width = open ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED;
 
   return (

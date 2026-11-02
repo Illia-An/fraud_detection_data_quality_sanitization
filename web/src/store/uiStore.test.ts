@@ -42,6 +42,7 @@ describe('useUiStore survey data', () => {
       customToDate: '',
       chartScope: 'store',
       chartTimeMode: 'timeline',
+      controlsRailOpenByRoute: {},
       surveyRows: [],
       sampleMeta: null,
       sampleGeneration: 0,
@@ -56,12 +57,24 @@ describe('useUiStore survey data', () => {
     expect(state.periodPreset).toBe('from_2025');
     expect(state.chartScope).toBe('store');
     expect(state.chartTimeMode).toBe('timeline');
+    expect(state.controlsRailOpenByRoute).toEqual({});
     expect(state.selectedStoreId).toBeNull();
     expect(state.highlightedPeriodLabel).toBeNull();
     expect(state.surveyRows).toEqual([]);
     expect(state.sampleMeta).toBeNull();
     expect(state.sampleGeneration).toBe(0);
     expect(state.sampleDataKey).toBeNull();
+  });
+
+  it('remembers controls rail open/closed per route', () => {
+    useUiStore.getState().setControlsRailOpen('/planner', false);
+    useUiStore.getState().setControlsRailOpen('/planner-tts', true);
+    expect(useUiStore.getState().controlsRailOpenByRoute).toEqual({
+      '/planner': false,
+      '/planner-tts': true,
+    });
+    const raw = sessionStorage.getItem(UI_SESSION_STORAGE_KEY);
+    expect(raw).toContain('"/planner":false');
   });
 
   it('updates period preset and custom range', () => {

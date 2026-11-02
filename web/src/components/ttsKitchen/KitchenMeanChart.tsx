@@ -2,10 +2,11 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
-import { buildTtsImpactTraces, TTS_CHART_COLORS } from '../tts/ttsChartData';
 import {
   buildKitchenFitRange,
+  buildKitchenImpactTraces,
   collectKitchenMeanSeconds,
+  KITCHEN_CHART_COLORS,
   type KitchenPlotPoint,
 } from './kitchenChartData';
 
@@ -112,11 +113,11 @@ export function KitchenMeanChart({
   fitTestId = 'kitchen-fit',
 }: KitchenMeanChartProps) {
   const t = useT();
-  const actualLabel = t('tts.chart.actual');
+  const actualLabel = t('kitchen.chart.actual');
   const afterLabel = t('kitchen.chart.after', { sec: minSec });
   const traces = useMemo(
     () =>
-      buildTtsImpactTraces(points, {
+      buildKitchenImpactTraces(points, {
         actual: actualLabel,
         ge30: afterLabel,
       }),
@@ -150,13 +151,13 @@ export function KitchenMeanChart({
         <Stack spacing={0.35} sx={{ flexShrink: 0 }} data-testid={legendTestId}>
           <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap>
             <LegendItem
-              color={TTS_CHART_COLORS.actual}
+              color={KITCHEN_CHART_COLORS.actual}
               label={actualLabel}
               tip={t('kitchen.chart.legend.actualTip')}
               testId={actualTestId}
             />
             <LegendItem
-              color={TTS_CHART_COLORS.ge30}
+              color={KITCHEN_CHART_COLORS.ge30}
               label={afterLabel}
               tip={t('kitchen.chart.legend.afterTip')}
               testId={afterTestId}
@@ -190,7 +191,7 @@ export function KitchenMeanChart({
               margin: { l: 48, r: 16, t: 12, b: 48 },
               showlegend: false,
               yaxis: {
-                title: { text: t('tts.chart.yAxis') },
+                title: { text: t('kitchen.chart.yAxis') },
                 ticksuffix: ' s',
                 range: yRange ?? undefined,
               },

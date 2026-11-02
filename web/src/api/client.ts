@@ -31,29 +31,9 @@ import {
   type TtsKpiPreset,
 } from '../schemas/ttsKpiPanel';
 import {
-  ttsProcessRequestSchema,
-  ttsSamplePresetSchema,
-  ttsSampleResponseSchema,
-  ttsSanitizationResponseSchema,
-  type TtsProcessRequest,
-  type TtsSamplePreset,
-  type TtsSampleResponse,
-  type TtsSanitizationResponse,
-} from '../schemas/tts';
-import {
   kitchenBeforeAfterSchema,
   type KitchenBeforeAfter,
 } from '../schemas/ttsKitchen';
-import {
-  orderBumpPresetSchema,
-  orderBumpProcessRequestSchema,
-  orderBumpProcessResponseSchema,
-  orderBumpSampleResponseSchema,
-  type OrderBumpPreset,
-  type OrderBumpProcessRequest,
-  type OrderBumpProcessResponse,
-  type OrderBumpSampleResponse,
-} from '../schemas/ttsOrderBump';
 
 export class ApiError extends Error {
   constructor(
@@ -177,50 +157,10 @@ export function fetchTtsKpiFromAp(): Promise<TtsKpiPanel> {
   return fetchJson(`${API_BASE_URL}${API_PREFIX}/tts-kpi/ap`, ttsKpiPanelSchema);
 }
 
-export function fetchTtsSample(preset: TtsSamplePreset): Promise<TtsSampleResponse> {
-  const validPreset = ttsSamplePresetSchema.parse(preset);
-  return fetchJson(
-    `${API_BASE_URL}${API_PREFIX}/sample/tts/${validPreset}`,
-    ttsSampleResponseSchema,
-  );
-}
-
-export function postProcessTts(request: TtsProcessRequest): Promise<TtsSanitizationResponse> {
-  const body = ttsProcessRequestSchema.parse(request);
-  return fetchJson(`${API_BASE_URL}${API_PREFIX}/process-tts`, ttsSanitizationResponseSchema, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
 export function fetchKitchenBeforeAfter(minSec: number): Promise<KitchenBeforeAfter> {
   const params = new URLSearchParams({ min_sec: String(minSec) });
   return fetchJson(
     `${API_BASE_URL}${API_PREFIX}/tts-kitchen/before-after?${params}`,
     kitchenBeforeAfterSchema,
-  );
-}
-
-export function fetchOrderBumpSample(
-  preset: OrderBumpPreset,
-): Promise<OrderBumpSampleResponse> {
-  const validPreset = orderBumpPresetSchema.parse(preset);
-  return fetchJson(
-    `${API_BASE_URL}${API_PREFIX}/sample/tts-order-bump/${validPreset}`,
-    orderBumpSampleResponseSchema,
-  );
-}
-
-export function postProcessOrderBump(
-  request: OrderBumpProcessRequest,
-): Promise<OrderBumpProcessResponse> {
-  const body = orderBumpProcessRequestSchema.parse(request);
-  return fetchJson(
-    `${API_BASE_URL}${API_PREFIX}/process-tts-order-bump`,
-    orderBumpProcessResponseSchema,
-    {
-      method: 'POST',
-      body: JSON.stringify(body),
-    },
   );
 }

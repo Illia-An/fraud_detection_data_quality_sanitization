@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { create } from 'zustand';
 
 import {
@@ -21,6 +22,17 @@ import { z } from 'zod';
 
 export const UI_SESSION_STORAGE_KEY = 'fraud-guard-ui-session';
 
+/** Stable keys for per-route controls-rail open/closed (survives nav + F5). */
+export const CONTROLS_RAIL_ROUTE = {
+  sanitization: '/',
+  planner: '/planner',
+  ttsPlanner: '/planner-tts',
+  ttsKitchen: '/tts-kitchen',
+} as const;
+
+export type ControlsRailRouteKey =
+  (typeof CONTROLS_RAIL_ROUTE)[keyof typeof CONTROLS_RAIL_ROUTE];
+
 interface UiState {
   selectedStoreId: number | null;
   /** Period label ``YYYY-MM`` highlighted from FlaggedMonthsTable → chart. */
@@ -34,6 +46,11 @@ interface UiState {
   chartScope: ChartScopeMode;
   /** Timeline | YoY overlay for the impact chart. */
   chartTimeMode: ChartTimeMode;
+  /**
+   * Controls rail open/closed by route path. Missing key → default open.
+   * Example: { '/planner': false, '/planner-tts': true }.
+   */
+  controlsRailOpenByRoute: Record<string, boolean>;
   surveyRows: SurveyAnswerRow[];
   sampleMeta: SamplePresetMeta | null;
   sampleGeneration: number;
@@ -52,6 +69,7 @@ interface UiState {
   setCustomPeriod: (fromDate: string, toDate: string) => void;
   setChartScope: (scope: ChartScopeMode) => void;
   setChartTimeMode: (mode: ChartTimeMode) => void;
+  setControlsRailOpen: (routeKey: string, open: boolean) => void;
   /**
    * Apply sample payload. Pass ``loadToken`` (react-query ``dataUpdatedAt``) so identical
    * cached loads are no-ops. Returns true when state changed (bump + clear process).
@@ -104,6 +122,7 @@ const uiSessionSchema = z.object({
   customToDate: z.string(),
   chartScope: chartScopeSchema,
   chartTimeMode: chartTimeModeSchema,
+  controlsRailOpenByRoute: z.record(z.string(), z.boolean()).default({}),
   surveyRows: z.array(surveyAnswerRowSchema),
   sampleMeta: samplePresetMetaSchema.nullable(),
   sampleGeneration: z.number().int().nonnegative(),
@@ -123,6 +142,7 @@ function defaultSessionSlice(): UiSessionSlice {
     customToDate: '',
     chartScope: 'store',
     chartTimeMode: 'timeline',
+    controlsRailOpenByRoute: {},
     surveyRows: [],
     sampleMeta: null,
     sampleGeneration: 0,
@@ -154,6 +174,7 @@ function persistUiSession(state: UiState): void {
     customToDate: state.customToDate,
     chartScope: state.chartScope,
     chartTimeMode: state.chartTimeMode,
+    controlsRailOpenByRoute: state.controlsRailOpenByRoute,
     surveyRows: state.surveyRows,
     sampleMeta: state.sampleMeta,
     sampleGeneration: state.sampleGeneration,
@@ -183,6 +204,13 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ customFromDate: fromDate, customToDate: toDate }),
   setChartScope: (scope) => set({ chartScope: scope }),
   setChartTimeMode: (mode) => set({ chartTimeMode: mode }),
+  setControlsRailOpen: (routeKey, open) =>
+    set((state) => ({
+      controlsRailOpenByRoute: {
+        ...state.controlsRailOpenByRoute,
+        [routeKey]: open,
+      },
+    })),
   setSurveyData: (rows, meta, preset, loadToken) => {
     const state = get();
     const nextKey =
@@ -241,3 +269,27 @@ export const useUiStore = create<UiState>((set, get) => ({
 useUiStore.subscribe((state) => {
   persistUiSession(state);
 });
+
+/**
+ * Per-route controls rail open state with the same setter shape as ``useState``
+ * (supports ``setOpen(true)`` and ``setOpen((prev) => !prev)``).
+ */
+export function useControlsRailOpen(
+  routeKey: ControlsRailRouteKey | string,
+  defaultOpen = true,
+): [boolean, (next: boolean | ((prev: boolean) => boolean)) => void] {
+  const open = useUiStore(
+    (state) => state.controlsRailOpenByRoute[routeKey] ?? defaultOpen,
+  );
+  const setControlsRailOpen = useUiStore((state) => state.setControlsRailOpen);
+  const setOpen = useCallback(
+    (next: boolean | ((prev: boolean) => boolean)) => {
+      const current =
+        useUiStore.getState().controlsRailOpenByRoute[routeKey] ?? defaultOpen;
+      const value = typeof next === 'function' ? next(current) : next;
+      setControlsRailOpen(routeKey, value);
+    },
+    [routeKey, defaultOpen, setControlsRailOpen],
+  );
+  return [open, setOpen];
+}

@@ -9,23 +9,15 @@ import { StoreImpactChart } from './StoreImpactChart';
 
 vi.mock('react-plotly.js', () => ({
   default: ({
-    onHover,
-    onUnhover,
     onLegendClick,
     data,
+    layout,
   }: {
-    onHover?: (event: { points: { curveNumber: number }[] }) => void;
-    onUnhover?: () => void;
     onLegendClick?: (event: { curveNumber: number }) => boolean | void;
     data?: { opacity?: number; visible?: boolean | 'legendonly'; name?: string }[];
+    layout?: { hovermode?: string; height?: number };
   }) => (
     <div data-testid="plotly-chart">
-      <button type="button" data-testid="plotly-hover-tier1" onClick={() => onHover?.({ points: [{ curveNumber: 1 }] })}>
-        hover-tier1
-      </button>
-      <button type="button" data-testid="plotly-unhover" onClick={() => onUnhover?.()}>
-        unhover
-      </button>
       <button
         type="button"
         data-testid="plotly-legend-tier2"
@@ -39,6 +31,8 @@ vi.mock('react-plotly.js', () => ({
       <span data-testid="plotly-visibility">
         {(data ?? []).map((trace) => String(trace.visible ?? true)).join(',')}
       </span>
+      <span data-testid="plotly-hovermode">{layout?.hovermode ?? ''}</span>
+      <span data-testid="plotly-height">{layout?.height ?? ''}</span>
     </div>
   ),
 }));
@@ -92,6 +86,7 @@ describe('StoreImpactChart', () => {
       expect.stringMatching(/Actual.*Raw top-box/i),
     );
     expect(screen.getByText('Hover legend labels for short tips.')).toBeInTheDocument();
+    expect(screen.getByTestId('plotly-hovermode')).toHaveTextContent('x unified');
   });
 
   it('toggles Y-scale between Fit and 0–100%', () => {
@@ -241,7 +236,7 @@ describe('StoreImpactChart', () => {
     expect(screen.queryByTestId('chart-flagged-toggle')).not.toBeInTheDocument();
   });
 
-  it('dims sibling series on hover and restores on unhover', async () => {
+  it('keeps all series full opacity (no hover dim)', async () => {
     useUiStore.setState({ selectedStoreId: 1 });
     render(
       <ThemeProvider theme={appTheme}>
@@ -252,19 +247,10 @@ describe('StoreImpactChart', () => {
     await waitFor(() => {
       expect(screen.getByTestId('plotly-chart')).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByTestId('plotly-hover-tier1'));
-    await waitFor(() => {
-      expect(screen.getByTestId('plotly-opacities').textContent).toBe('0.25,1,0.25,0.25,0.25');
-    });
-
-    fireEvent.click(screen.getByTestId('plotly-unhover'));
-    await waitFor(() => {
-      expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
-    });
+    expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
   });
 
-  it('keeps legend-hidden traces off after hover focus refresh', async () => {
+  it('hides a series via legend click without dimming siblings', async () => {
     useUiStore.setState({ selectedStoreId: 1, chartScope: 'store', chartTimeMode: 'timeline' });
     render(
       <ThemeProvider theme={appTheme}>
@@ -281,18 +267,11 @@ describe('StoreImpactChart', () => {
       expect(screen.getByTestId('plotly-visibility').textContent).toBe(
         'true,true,legendonly,true,true',
       );
-    });
-
-    fireEvent.click(screen.getByTestId('plotly-hover-tier1'));
-    await waitFor(() => {
-      expect(screen.getByTestId('plotly-visibility').textContent).toBe(
-        'true,true,legendonly,true,true',
-      );
-      expect(screen.getByTestId('plotly-opacities').textContent).toBe('0.25,1,1,0.25,0.25');
+      expect(screen.getByTestId('plotly-opacities').textContent).toBe('1,1,1,1,1');
     });
   });
 
-  it('dispatches window resize when the plot container size changes', async () => {
+  it('sizes the plot from the container height (no window.resize)', async () => {
     const observers: Array<{ callback: ResizeObserverCallback; el: Element }> = [];
     class MockResizeObserver {
       callback: ResizeObserverCallback;
@@ -308,9 +287,6 @@ describe('StoreImpactChart', () => {
     }
     vi.stubGlobal('ResizeObserver', MockResizeObserver);
 
-    const onResize = vi.fn();
-    window.addEventListener('resize', onResize);
-
     useUiStore.setState({ selectedStoreId: 1 });
     render(
       <ThemeProvider theme={appTheme}>
@@ -320,20 +296,20 @@ describe('StoreImpactChart', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('store-impact-plot-container')).toBeInTheDocument();
+      expect(screen.getByTestId('plotly-height')).toHaveTextContent('550');
     });
     expect(observers.length).toBeGreaterThan(0);
 
     const entry = {
       target: observers[0].el,
-      contentRect: { width: 900, height: 560 },
+      contentRect: { width: 900, height: 720 },
     } as unknown as ResizeObserverEntry;
     observers[0].callback([entry], {} as ResizeObserver);
 
     await waitFor(() => {
-      expect(onResize).toHaveBeenCalled();
+      expect(screen.getByTestId('plotly-height')).toHaveTextContent('720');
     });
 
-    window.removeEventListener('resize', onResize);
     vi.unstubAllGlobals();
   });
 });

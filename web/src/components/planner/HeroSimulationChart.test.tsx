@@ -6,7 +6,11 @@ import { defaultPipelineConfig } from '../../schemas/api';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import { appTheme } from '../../theme';
-import { HeroSimulationChart } from './HeroSimulationChart';
+import {
+  HERO_PX_PER_PERIOD,
+  HeroSimulationChart,
+  heroScrollLeftToCenterIndex,
+} from './HeroSimulationChart';
 
 vi.mock('react-plotly.js', () => ({
   default: (props: { layout?: { shapes?: unknown[]; annotations?: unknown[] }; data?: unknown[] }) => (
@@ -67,12 +71,23 @@ describe('HeroSimulationChart', () => {
     expect(payload).toContain('Required monthly (to hit target)');
     expect(payload).toContain('Required cumulative (if required monthly)');
     expect(payload).toContain('Cumulative actual');
-    expect(payload).toContain('Path to target (−3 mo)');
-    expect(payload).toContain('Cumulative plan');
     expect(payload).toContain('Draft simulation');
-    expect(screen.getByTestId('evaluation-legend-item-windowCumulative')).toBeInTheDocument();
+    // Quieter default: these two stay off until legend click.
+    expect(payload).not.toContain('Path to target (−3 mo)');
+    expect(payload).not.toContain('Cumulative plan');
+    expect(screen.getByTestId('evaluation-legend-item-windowCumulative')).toHaveAttribute(
+      'data-hidden',
+      'true',
+    );
+    expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toHaveAttribute(
+      'data-hidden',
+      'false',
+    );
+    expect(screen.getByTestId('evaluation-legend-item-planCumulative')).toHaveAttribute(
+      'data-hidden',
+      'true',
+    );
     expect(screen.getByTestId('evaluation-legend-item-requiredMonthly')).toBeInTheDocument();
-    expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-windowHandoff')).toBeInTheDocument();
     expect(payload).toContain('−3 mo window');
     expect(payload).toContain('2024-12');
@@ -87,6 +102,9 @@ describe('HeroSimulationChart', () => {
     expect(payload).toContain('"xref":"paper"');
     expect(payload).toContain('"bgcolor":"rgba(33, 33, 33, 0.9)"');
     expect(payload).toContain('"size":10');
+    // Match Network impact: categorical months + white plot panel.
+    expect(payload).toContain('"type":"category"');
+    expect(payload).toContain('"plot_bgcolor":"#ffffff"');
     // Match Sanitization Store impact: auto Y ticks (no forced 1pp grid).
     expect(payload).not.toContain('"dtick":1');
     expect(screen.getByTestId('hero-evaluation-legend')).toBeInTheDocument();
@@ -95,6 +113,15 @@ describe('HeroSimulationChart', () => {
     expect(screen.getByText(/plan cutover/i)).toBeInTheDocument();
     expect(screen.getByText(/mouse wheel zooms/i)).toBeInTheDocument();
     expect(screen.getByText(/Click legend labels to show\/hide/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('evaluation-legend-item-windowCumulative'));
+    await waitFor(() => {
+      expect(screen.getByTestId('hero-plotly').textContent ?? '').toContain('Path to target (−3 mo)');
+    });
+    expect(screen.getByTestId('evaluation-legend-item-windowCumulative')).toHaveAttribute(
+      'data-hidden',
+      'false',
+    );
 
     fireEvent.click(screen.getByTestId('evaluation-legend-item-draft'));
     await waitFor(() => {
@@ -163,6 +190,10 @@ describe('HeroSimulationChart', () => {
     expect(payload).toContain('last fact');
     expect(payload).not.toContain('Path to target (−3 mo)');
     expect(payload).not.toContain('Draft simulation');
+    expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toHaveAttribute(
+      'data-hidden',
+      'false',
+    );
     expect(screen.getByTestId('evaluation-legend-item-lastFact')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-yearStart')).toBeInTheDocument();
     expect(screen.queryByTestId('evaluation-legend-item-draft')).not.toBeInTheDocument();
@@ -172,5 +203,21 @@ describe('HeroSimulationChart', () => {
       ),
     ).toBeInTheDocument();
     expect(payload).toContain('"x0":"2025-04"');
+  });
+});
+
+describe('heroScrollLeftToCenterIndex', () => {
+  it('centers the as-of period in the viewport when content overflows', () => {
+    const periods = 40;
+    const contentWidth = periods * HERO_PX_PER_PERIOD;
+    const viewportWidth = 400;
+    const asOfIndex = 20;
+    const left = heroScrollLeftToCenterIndex(asOfIndex, periods, contentWidth, viewportWidth);
+    const anchorX = (asOfIndex + 0.5) * HERO_PX_PER_PERIOD;
+    expect(left).toBe(Math.round(anchorX - viewportWidth / 2));
+  });
+
+  it('clamps to zero when the strip fits the viewport', () => {
+    expect(heroScrollLeftToCenterIndex(5, 10, 400, 500)).toBe(0);
   });
 });
