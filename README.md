@@ -83,8 +83,12 @@ SQL Trusted Connection).
 Prerequisites:
 
 1. Docker Desktop running.
-2. Local snapshot file (gitignored): `data/q10012_snapshot.sqlite`  
-   Refresh when you have DB access: `uv run python scripts/refresh_q10012_snapshot.py`
+2. Local snapshot files (gitignored):
+   - `data/q10012_snapshot.sqlite` — survey sanitization  
+     `uv run python scripts/refresh_q10012_snapshot.py`
+   - `data/tts_kpi_snapshot.sqlite` — TTS Planner AP minutes  
+     `uv run python scripts/refresh_tts_kpi_snapshot.py`  
+     (needs `TTS_KPI_DATABASE_URL` on a host that can reach AP; same period default as Q10012)
 3. Optional: `copy .env.docker.example .env.docker`
 
 ```powershell
@@ -100,6 +104,7 @@ docker build -t fraud-dq-sanitization:local .
 docker rm -f fraud-dq 2>$null
 docker run -d --name fraud-dq -p 8000:8000 --env-file .env.docker `
   -v "${PWD}/data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro" `
+  -v "${PWD}/data/tts_kpi_snapshot.sqlite:/app/data/tts_kpi_snapshot.sqlite:ro" `
   fraud-dq-sanitization:local
 ```
 
@@ -112,7 +117,8 @@ docker run -d --name fraud-dq -p 8000:8000 --env-file .env.docker `
 In the UI use **Data source: db** (reads the mounted snapshot) or synthetic
 **small / medium / stress**. Rebuild the image after code changes (no hot-reload).
 
-Synthetic presets work even if the snapshot file is missing; **db** requires the volume.
+Synthetic sanitization presets work even if the Q10012 snapshot file is missing; **db** requires the volume.
+**TTS Planner** defaults to `TTS_KPI_SOURCE=snapshot` in Docker — refresh the TTS file first, or temporarily set `TTS_KPI_SOURCE=synthetic` / use `/sample/tts-kpi` until AP is reachable from the host.
 
 ## Stack (React v2)
 

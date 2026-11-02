@@ -3,6 +3,7 @@
 ``TTS_KPI_SOURCE`` selects the transport:
 
 - ``synthetic`` (default) — this loader stays off; the planner uses small|medium|stress
+- ``snapshot`` — local SQLite from ``scripts/refresh_tts_kpi_snapshot.py`` (Docker path)
 - ``sql`` — one SELECT through ``TTS_KPI_DATABASE_URL`` (ODBC / SQLAlchemy)
 - ``dreamfactory`` — the same filter through ``TTS_KPI_API_URL``
 
@@ -17,6 +18,10 @@ import httpx
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from backend.tts_kpi_snapshot import (
+    fetch_tts_kpi_snapshot_rows,
+    require_tts_kpi_snapshot_engine,
+)
 from planner.tts_kpi_ap import (
     DEFAULT_TABLE,
     KPI_NAME,
@@ -32,7 +37,7 @@ _API_KEY_HEADER = "X-DreamFactory-Api-Key"
 
 
 def tts_kpi_source() -> str:
-    """``synthetic``, ``sql``, or ``dreamfactory``. Anything else is rejected at load."""
+    """``synthetic``, ``snapshot``, ``sql``, or ``dreamfactory``."""
     return os.environ.get("TTS_KPI_SOURCE", "synthetic").strip().lower() or "synthetic"
 
 
@@ -41,19 +46,29 @@ def load_ap_tts_kpi_panel() -> ApTtsKpiPanel:
     source = tts_kpi_source()
     if source in ("synthetic", "sample"):
         raise TtsKpiSourceError(
-            "TTS KPI source is synthetic. Set TTS_KPI_SOURCE=sql or TTS_KPI_SOURCE=dreamfactory.",
+            "TTS KPI source is synthetic. Set TTS_KPI_SOURCE=snapshot, sql, or dreamfactory.",
             status_code=503,
         )
-    if source == "sql":
+    if source in ("snapshot", "sqlite"):
+        raw_rows = _fetch_snapshot()
+    elif source == "sql":
         raw_rows = _fetch_sql()
     elif source == "dreamfactory":
         raw_rows = _fetch_dreamfactory()
     else:
         raise TtsKpiSourceError(
-            "TTS_KPI_SOURCE must be synthetic, sql, or dreamfactory.",
+            "TTS_KPI_SOURCE must be synthetic, snapshot, sql, or dreamfactory.",
             status_code=503,
         )
     return rows_to_panel(raw_rows)
+
+
+def _fetch_snapshot() -> list[dict[str, object]]:
+    engine = require_tts_kpi_snapshot_engine()
+    try:
+        return fetch_tts_kpi_snapshot_rows(engine)
+    finally:
+        engine.dispose()
 
 
 def _fetch_sql() -> list[dict[str, object]]:
