@@ -87,6 +87,8 @@ export default function MenuContent({
               component={RouterLink}
               to={item.path}
               selected={isSelectedPath(location.pathname, item.path)}
+              // Collapsed rail hides ListItemText — keep an accessible name for a11y/e2e.
+              aria-label={label}
               {...(item.onboarding
                 ? {
                     'data-onboarding': item.onboarding,
