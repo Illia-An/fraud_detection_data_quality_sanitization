@@ -2,9 +2,7 @@ import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
 import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
 import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
-import TimerRoundedIcon from '@mui/icons-material/TimerRounded';
 import KitchenRoundedIcon from '@mui/icons-material/KitchenRounded';
-import RestaurantRoundedIcon from '@mui/icons-material/RestaurantRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import TourRoundedIcon from '@mui/icons-material/TourRounded';
 import List from '@mui/material/List';
@@ -20,6 +18,7 @@ import { Link as RouterLink, useLocation } from 'react-router-dom';
 import { useT, type MessageKey } from '../../i18n';
 import { useOnboardingStore } from '../../onboarding';
 import { usePlannerScenarioStore } from '../../store/plannerScenarioStore';
+import { useTtsPlannerScenarioStore } from '../../store/ttsPlannerScenarioStore';
 import { useUiStore } from '../../store/uiStore';
 
 const mainListItems: {
@@ -29,13 +28,7 @@ const mainListItems: {
   onboarding?: string;
 }[] = [
   { textKey: 'nav.sanitization', icon: <ScienceRoundedIcon />, path: '/' },
-  { textKey: 'nav.tts', icon: <TimerRoundedIcon />, path: '/tts' },
   { textKey: 'nav.ttsKitchen', icon: <KitchenRoundedIcon />, path: '/tts-kitchen' },
-  {
-    textKey: 'nav.ttsOrder',
-    icon: <RestaurantRoundedIcon />,
-    path: '/tts-order',
-  },
   {
     textKey: 'nav.planner',
     icon: <CalendarMonthRoundedIcon />,
@@ -46,6 +39,7 @@ const mainListItems: {
     textKey: 'nav.ttsPlanner',
     icon: <SpeedRoundedIcon />,
     path: '/planner-tts',
+    onboarding: 'nav-tts-planner',
   },
   { textKey: 'nav.documentation', icon: <MenuBookRoundedIcon />, path: '/documentation' },
 ];
@@ -72,12 +66,14 @@ export default function MenuContent({
   const restart = useOnboardingStore((s) => s.restart);
   const processResult = useUiStore((s) => s.processResult);
   const draftPlan = usePlannerScenarioStore((s) => s.draftPlan);
+  const ttsDraftPlan = useTtsPlannerScenarioStore((s) => s.draftPlan);
 
   const handleRestartTour = () => {
     restart({
       hasProcessResult: processResult != null,
       hasPlannerPanel: processResult != null || draftPlan != null,
       hasDraftPlan: draftPlan != null,
+      hasTtsDraftPlan: ttsDraftPlan != null,
     });
   };
 

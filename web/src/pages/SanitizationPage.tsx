@@ -19,6 +19,7 @@ import {
   getSanitizationScenarioPack,
   type SanitizationScenarioPackId,
 } from '../schemas/sanitizationScenarioPacks';
+import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
@@ -48,7 +49,9 @@ export function SanitizationPage() {
   const [runAfterSeed, setRunAfterSeed] = useState(false);
   const [activeScenario, setActiveScenario] = useState<ActiveScenario | null>(null);
   const [scenarioUndo, setScenarioUndo] = useState<ScenarioUndoSnapshot | null>(null);
-  const [controlsOpen, setControlsOpen] = useState(true);
+  const [controlsOpen, setControlsOpen] = useControlsRailOpen(
+    CONTROLS_RAIL_ROUTE.sanitization,
+  );
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const onboardingStatus = useOnboardingStore((s) => s.status);
   const onboardingStepId = useOnboardingStore((s) => s.stepId);

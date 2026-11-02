@@ -51,6 +51,7 @@ import {
   ttsPlannerRunBlockReason,
 } from '../components/ttsPlanner/ttsPlannerRunGuards';
 import { useT } from '../i18n';
+import { useOnboardingStore } from '../onboarding';
 import { periodLabel } from '../schemas/plan';
 import { buildPlanMonitoringInsights, defaultAsOf } from '../schemas/planMonitoring';
 import { getScenarioPack, type ScenarioPackId } from '../schemas/scenarioPacks';
@@ -62,6 +63,7 @@ import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import type { TtsKpiPanel } from '../schemas/ttsKpiPanel';
 import type { TtsPlan, TtsPlanParams } from '../schemas/ttsPlan';
 import { useTtsPlannerScenarioStore } from '../store/ttsPlannerScenarioStore';
+import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 
 const RAIL_WIDTH_PX = 320;
 const RAIL_COLLAPSED_PX = 40;
@@ -140,7 +142,9 @@ export function TtsPlannerPage() {
   const panel = useTtsPlannerScenarioStore((state) => state.panel);
   const setPanel = useTtsPlannerScenarioStore((state) => state.setPanel);
 
-  const [controlsOpen, setControlsOpen] = useState(true);
+  const [controlsOpen, setControlsOpen] = useControlsRailOpen(
+    CONTROLS_RAIL_ROUTE.ttsPlanner,
+  );
   const apLoadStarted = useRef(false);
   const [referenceYear, setReferenceYear] = useState<number | null>(null);
   const [referenceMonth, setReferenceMonth] = useState<number | null>(null);
@@ -163,6 +167,45 @@ export function TtsPlannerPage() {
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+
+  const onboardingStatus = useOnboardingStore((s) => s.status);
+  const onboardingStepId = useOnboardingStore((s) => s.stepId);
+
+  // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
+  useEffect(() => {
+    if (onboardingStatus !== 'active') {
+      return;
+    }
+    if (onboardingStepId === 'tts-planner-levers') {
+      setControlsOpen(true);
+      setAtRiskExpanded(false);
+      return;
+    }
+    if (onboardingStepId === 'tts-planner-hero') {
+      setAtRiskExpanded(false);
+      const timerId = window.setTimeout(() => {
+        document
+          .querySelector<HTMLElement>('[data-onboarding="tts-planner-hero"]')
+          ?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      }, 80);
+      return () => window.clearTimeout(timerId);
+    }
+    if (onboardingStepId === 'tts-planner-at-risk' || onboardingStepId === 'tts-planner-inspect') {
+      setAtRiskExpanded(true);
+      // After Accordion opens, bring the sheet into view for spotlight.
+      const timerId = window.setTimeout(() => {
+        document
+          .querySelector<HTMLElement>('[data-onboarding="tts-planner-at-risk"]')
+          ?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        if (onboardingStepId === 'tts-planner-inspect') {
+          document
+            .querySelector<HTMLElement>('[data-onboarding="tts-planner-inspect"]')
+            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }, 80);
+      return () => window.clearTimeout(timerId);
+    }
+  }, [onboardingStatus, onboardingStepId]);
 
   const params: TtsPlanParams = {
     trajectory,
@@ -543,6 +586,7 @@ export function TtsPlannerPage() {
           <Card
             variant="outlined"
             data-testid="tts-allocation-levers"
+            data-onboarding="tts-planner-levers"
             sx={{
               flex: { xs: 'none', md: 1 },
               minHeight: { md: 0 },
@@ -935,6 +979,7 @@ export function TtsPlannerPage() {
                 <Card
                   variant="outlined"
                   data-testid="tts-planner-hero"
+                  data-onboarding="tts-planner-hero"
                   sx={{
                     flex: 1,
                     width: '100%',
@@ -985,6 +1030,7 @@ export function TtsPlannerPage() {
                       tickSuffix=" min"
                       scoreFloor={TTS_FLOOR}
                       scoreCeiling={TTS_CEILING}
+                      scrollAnchor="asOf"
                     />
                   </CardContent>
                 </Card>
@@ -993,6 +1039,7 @@ export function TtsPlannerPage() {
               {monitoring && (
                 <Box
                   data-testid="tts-planner-at-risk"
+                  data-onboarding="tts-planner-at-risk"
                   sx={{
                     position: { xs: 'relative', md: 'absolute' },
                     left: { md: 0 },
@@ -1065,6 +1112,7 @@ export function TtsPlannerPage() {
                           setAsOfMonth(month);
                         }}
                         onInspect={(storeId) => selectStore(storeId)}
+                        inspectOnboardingId="tts-planner-inspect"
                       />
                     </AccordionDetails>
                   </Accordion>
@@ -1074,13 +1122,23 @@ export function TtsPlannerPage() {
           </Box>
         ) : (
           <>
-            <Card variant="outlined" data-testid="tts-planner-hero" sx={{ flexShrink: 0 }}>
+            <Card
+              variant="outlined"
+              data-testid="tts-planner-hero"
+              data-onboarding="tts-planner-hero"
+              sx={{ flexShrink: 0 }}
+            >
               <CardHeader title={t('planner.heroTitle')} subheader={t('planner.heroSub')} />
               <CardContent>
                 <Typography color="text.secondary">{t('ttsPlanner.heroEmpty')}</Typography>
               </CardContent>
             </Card>
-            <Card variant="outlined" data-testid="tts-planner-at-risk" sx={{ flexShrink: 0 }}>
+            <Card
+              variant="outlined"
+              data-testid="tts-planner-at-risk"
+              data-onboarding="tts-planner-at-risk"
+              sx={{ flexShrink: 0 }}
+            >
               <CardHeader title={t('planner.atRiskTitle')} />
               <CardContent>
                 <Typography variant="body2" color="text.secondary">

@@ -74,10 +74,10 @@ export function KitchenImpactChart({ result }: KitchenImpactChartProps) {
         exclusive
         value={scope}
         onChange={handleScope}
-        aria-label={t('tts.chart.scopeAria')}
+        aria-label={t('kitchen.chart.scopeAria')}
       >
-        <ToggleButton value="network">{t('tts.chart.network')}</ToggleButton>
-        <ToggleButton value="store">{t('tts.chart.store')}</ToggleButton>
+        <ToggleButton value="network">{t('kitchen.chart.network')}</ToggleButton>
+        <ToggleButton value="store">{t('kitchen.chart.store')}</ToggleButton>
         <ToggleButton value="code">{t('kitchen.chart.code')}</ToggleButton>
       </ToggleButtonGroup>
       {scope === 'store' ? (

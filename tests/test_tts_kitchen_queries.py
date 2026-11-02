@@ -19,7 +19,7 @@ from backend.tts_kitchen_queries import (
     fetch_tts_kitchen_month_cells,
     load_tts_kitchen_month_cells_from_settings,
 )
-from backend.tts_queries import DEFAULT_TTS_VIEW
+from backend.tts_kitchen_queries import DEFAULT_TTS_VIEW
 
 _WRITE_WORDS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|MERGE|TRUNCATE|DROP|ALTER|CREATE|EXEC|EXECUTE|INTO)\b",

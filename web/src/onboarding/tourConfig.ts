@@ -2,11 +2,12 @@ import type { MessageKey } from '../i18n';
 
 /** Stable tour identity — bump ONBOARDING_TOUR_VERSION when step IDs change. */
 export const ONBOARDING_TOUR_ID = 'planner-product-tour';
-export const ONBOARDING_TOUR_VERSION = 3;
+export const ONBOARDING_TOUR_VERSION = 4;
 
 export type OnboardingAnchorId =
   | 'nav-main'
   | 'nav-planner'
+  | 'nav-tts-planner'
   | 'sanitization-sample'
   | 'sanitization-controls'
   | 'sanitization-results'
@@ -14,7 +15,11 @@ export type OnboardingAnchorId =
   | 'planner-hero'
   | 'planner-levers'
   | 'planner-at-risk'
-  | 'planner-inspect';
+  | 'planner-inspect'
+  | 'tts-planner-levers'
+  | 'tts-planner-hero'
+  | 'tts-planner-at-risk'
+  | 'tts-planner-inspect';
 
 export type OnboardingStepId =
   | 'welcome'
@@ -28,6 +33,11 @@ export type OnboardingStepId =
   | 'planner-levers'
   | 'planner-at-risk'
   | 'planner-inspect'
+  | 'tts-planner-entry'
+  | 'tts-planner-levers'
+  | 'tts-planner-hero'
+  | 'tts-planner-at-risk'
+  | 'tts-planner-inspect'
   | 'complete';
 
 export type TourPlacement = 'center' | 'top' | 'bottom' | 'left' | 'right';
@@ -40,12 +50,12 @@ export interface TourStepConfig {
   anchor?: OnboardingAnchorId;
   placement: TourPlacement;
   /** Navigate here before showing the step (if not already on path). */
-  route?: '/' | '/planner';
+  route?: '/' | '/planner' | '/planner-tts';
   /**
    * Soft eligibility — when false, step is skipped unless it is welcome/complete.
    * Evaluated at runtime against product state.
    */
-  requires?: 'processResult' | 'plannerPanel' | 'draftPlan';
+  requires?: 'processResult' | 'plannerPanel' | 'draftPlan' | 'ttsDraftPlan';
 }
 
 export const TOUR_STEPS: TourStepConfig[] = [
@@ -138,6 +148,48 @@ export const TOUR_STEPS: TourStepConfig[] = [
     placement: 'top',
     route: '/planner',
     requires: 'draftPlan',
+  },
+  {
+    id: 'tts-planner-entry',
+    titleKey: 'onboarding.ttsPlannerEntry.title',
+    bodyKey: 'onboarding.ttsPlannerEntry.body',
+    anchor: 'nav-tts-planner',
+    placement: 'right',
+    route: '/',
+  },
+  {
+    id: 'tts-planner-levers',
+    titleKey: 'onboarding.ttsPlannerLevers.title',
+    bodyKey: 'onboarding.ttsPlannerLevers.body',
+    anchor: 'tts-planner-levers',
+    placement: 'right',
+    route: '/planner-tts',
+  },
+  {
+    id: 'tts-planner-hero',
+    titleKey: 'onboarding.ttsPlannerHero.title',
+    bodyKey: 'onboarding.ttsPlannerHero.body',
+    anchor: 'tts-planner-hero',
+    placement: 'bottom',
+    route: '/planner-tts',
+  },
+  {
+    id: 'tts-planner-at-risk',
+    titleKey: 'onboarding.ttsPlannerAtRisk.title',
+    bodyKey: 'onboarding.ttsPlannerAtRisk.body',
+    anchor: 'tts-planner-at-risk',
+    placement: 'top',
+    route: '/planner-tts',
+    requires: 'ttsDraftPlan',
+  },
+  {
+    id: 'tts-planner-inspect',
+    titleKey: 'onboarding.ttsPlannerInspect.title',
+    bodyKey: 'onboarding.ttsPlannerInspect.body',
+    anchor: 'tts-planner-inspect',
+    placement: 'top',
+    route: '/planner-tts',
+    requires: 'ttsDraftPlan',
   },
   {
     id: 'complete',

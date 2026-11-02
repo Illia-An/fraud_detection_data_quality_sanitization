@@ -13,16 +13,25 @@ const emptyProduct = {
   hasProcessResult: false,
   hasPlannerPanel: false,
   hasDraftPlan: false,
+  hasTtsDraftPlan: false,
 };
 const withResults = {
   hasProcessResult: true,
   hasPlannerPanel: true,
   hasDraftPlan: false,
+  hasTtsDraftPlan: false,
 };
 const withDraft = {
   hasProcessResult: true,
   hasPlannerPanel: true,
   hasDraftPlan: true,
+  hasTtsDraftPlan: false,
+};
+const withTtsDraft = {
+  hasProcessResult: true,
+  hasPlannerPanel: true,
+  hasDraftPlan: true,
+  hasTtsDraftPlan: true,
 };
 
 describe('onboarding eligibility', () => {
@@ -66,11 +75,25 @@ describe('onboarding eligibility', () => {
     expect(withDraftIds).toContain('planner-at-risk');
     expect(withDraftIds).toContain('planner-inspect');
     expect(withDraftIds).toContain('sanitization-inspect');
+    expect(withDraftIds).not.toContain('tts-planner-at-risk');
+    expect(withDraftIds).not.toContain('tts-planner-inspect');
+  });
+
+  it('includes TTS planner at-risk and inspect only when a TTS draft exists', () => {
+    const withTtsIds = eligibleSteps(TOUR_STEPS, withTtsDraft).map((s) => s.id);
+    expect(withTtsIds).toContain('tts-planner-entry');
+    expect(withTtsIds).toContain('tts-planner-levers');
+    expect(withTtsIds).toContain('tts-planner-hero');
+    expect(withTtsIds).toContain('tts-planner-at-risk');
+    expect(withTtsIds).toContain('tts-planner-inspect');
   });
 
   it('always includes controls and levers steps', () => {
     const ids = eligibleSteps(TOUR_STEPS, emptyProduct).map((s) => s.id);
     expect(ids).toContain('sanitization-controls');
     expect(ids).toContain('planner-levers');
+    expect(ids).toContain('tts-planner-entry');
+    expect(ids).toContain('tts-planner-levers');
+    expect(ids).toContain('tts-planner-hero');
   });
 });

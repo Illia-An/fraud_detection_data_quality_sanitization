@@ -25,8 +25,6 @@ import {
   Typography,
   type SelectChangeEvent,
 } from '@mui/material';
-import type { PlotMouseEvent } from 'plotly.js';
-
 import { useT } from '../i18n';
 import type { PipelineConfig, StoreImpactPoint, StoreMonthCell } from '../schemas/api';
 import { isPipelineStepEnabled } from '../schemas/api';
@@ -53,6 +51,12 @@ import {
   type StoreImpactYScaleMode,
 } from './charts/storeImpactChartData';
 import {
+  HERO_HOVERLABEL,
+  HERO_HOVERMODE,
+  HERO_X_SPIKES,
+  HERO_Y_SPIKES,
+} from './planner/heroChartCrosshair';
+import {
   EvaluationLegend,
   networkImpactLegendItems,
 } from './planner/EvaluationLegend';
@@ -62,16 +66,18 @@ const Plot = lazy(async () => {
   return { default: module.default };
 });
 
-/** Plot area height — primary visual for the results canvas. */
-const CHART_HEIGHT_PX = 550;
+/** Fallback / framed-card plot height when the parent has not sized yet. */
+const CHART_HEIGHT_FALLBACK_PX = 550;
+/** Ignore tiny ResizeObserver blips before the flex pane settles. */
+const CHART_HEIGHT_MIN_PX = 280;
 
 /**
- * Plotly's useResizeHandler listens to window resize, not flex/CSS parent
- * width changes (controls rail / side nav collapse). Observe the container and
- * nudge Plotly via a window resize event.
+ * Drive Plotly height from the flex parent (Hero pattern). Do not fake
+ * window.resize — that can feedback-loop with Plotly's useResizeHandler.
  */
-function usePlotContainerResize(enabled: boolean) {
+function usePlotContainerSize(enabled: boolean) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [plotHeight, setPlotHeight] = useState(CHART_HEIGHT_FALLBACK_PX);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -80,10 +86,13 @@ function usePlotContainerResize(enabled: boolean) {
     }
 
     let frame = 0;
-    const observer = new ResizeObserver(() => {
+    const observer = new ResizeObserver((entries) => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
+        const nextH = Math.floor(entries[0]?.contentRect.height ?? 0);
+        if (nextH >= CHART_HEIGHT_MIN_PX) {
+          setPlotHeight((prev) => (prev === nextH ? prev : nextH));
+        }
       });
     });
     observer.observe(node);
@@ -94,7 +103,7 @@ function usePlotContainerResize(enabled: boolean) {
     };
   }, [enabled]);
 
-  return containerRef;
+  return { containerRef, plotHeight };
 }
 
 export type StoreImpactChartLayout = 'default' | 'network' | 'store';
@@ -136,8 +145,7 @@ export function StoreImpactChart({
   const chartTimeMode = useUiStore((state) => state.chartTimeMode);
   const setChartTimeMode = useUiStore((state) => state.setChartTimeMode);
   const [yScaleMode, setYScaleMode] = useState<StoreImpactYScaleMode>('fit');
-  const [focusedTraceIndex, setFocusedTraceIndex] = useState<number | null>(null);
-  /** Trace names hidden via Plotly legend click — kept across hover re-renders. */
+  /** Trace names hidden via Plotly legend click. */
   const [legendHiddenNames, setLegendHiddenNames] = useState<Set<string>>(() => new Set());
   /** Store+timeline: show Tier 4 flagged month bands/markers (toggle next to Timeline/YoY). */
   const [showFlaggedOverlay, setShowFlaggedOverlay] = useState(true);
@@ -151,7 +159,9 @@ export function StoreImpactChart({
   const isYoY = chartTimeMode === 'yoy';
   /** Timeline: custom legend + tips (Hero pattern). YoY keeps Plotly legend (dynamic years). */
   const useCustomLegend = !isYoY;
-  const plotContainerRef = usePlotContainerResize(storeIds.length > 0);
+  const { containerRef: plotContainerRef, plotHeight } = usePlotContainerSize(
+    storeIds.length > 0,
+  );
   const legendItems = useMemo(
     () => networkImpactLegendItems(echoConfig),
     [echoConfig],
@@ -210,12 +220,11 @@ export function StoreImpactChart({
 
   useEffect(() => {
     setLegendHiddenNames(new Set());
-    setFocusedTraceIndex(null);
   }, [baseTraceNamesKey]);
 
   const traces = useMemo(
-    () => applyTraceHoverFocus(baseTraces, focusedTraceIndex, legendHiddenNames),
-    [baseTraces, focusedTraceIndex, legendHiddenNames],
+    () => applyTraceHoverFocus(baseTraces, null, legendHiddenNames),
+    [baseTraces, legendHiddenNames],
   );
 
   const periodLabels = useMemo(
@@ -249,7 +258,6 @@ export function StoreImpactChart({
 
   const handleStoreChange = (event: SelectChangeEvent<number>) => {
     setSelectedStoreId(Number(event.target.value));
-    setFocusedTraceIndex(null);
   };
 
   const handleScopeChange = (
@@ -258,7 +266,6 @@ export function StoreImpactChart({
   ) => {
     if (next != null) {
       setChartScope(next);
-      setFocusedTraceIndex(null);
     }
   };
 
@@ -268,7 +275,6 @@ export function StoreImpactChart({
   ) => {
     if (next != null) {
       setChartTimeMode(next);
-      setFocusedTraceIndex(null);
     }
   };
 
@@ -281,22 +287,6 @@ export function StoreImpactChart({
     }
   };
 
-  const handlePlotHover = (event: Readonly<PlotMouseEvent>) => {
-    const curveNumber = event.points?.[0]?.curveNumber;
-    if (typeof curveNumber !== 'number') {
-      return;
-    }
-    const name = baseTraces[curveNumber]?.name;
-    if (name != null && legendHiddenNames.has(name)) {
-      return;
-    }
-    setFocusedTraceIndex(curveNumber);
-  };
-
-  const handlePlotUnhover = () => {
-    setFocusedTraceIndex(null);
-  };
-
   const handleLegendClick = (event: Readonly<{ curveNumber?: number }>) => {
     const curveNumber = event.curveNumber;
     if (typeof curveNumber !== 'number') {
@@ -307,7 +297,6 @@ export function StoreImpactChart({
       return false;
     }
     setLegendHiddenNames((prev) => toggleLegendHiddenName(prev, name));
-    setFocusedTraceIndex(null);
     // Suppress Plotly's own visibility toggle — we own it in React state.
     return false;
   };
@@ -451,7 +440,11 @@ export function StoreImpactChart({
     <Box
       ref={plotContainerRef}
       data-testid="store-impact-plot-container"
-      sx={{ width: '100%', minHeight: CHART_HEIGHT_PX }}
+      sx={{
+        width: '100%',
+        height: '100%',
+        minHeight: CHART_HEIGHT_MIN_PX,
+      }}
     >
       <Suspense
         fallback={
@@ -464,20 +457,19 @@ export function StoreImpactChart({
           data={traces}
           layout={{
             autosize: true,
-            height: CHART_HEIGHT_PX,
+            height: plotHeight,
             margin: { l: 48, r: 16, t: 12, b: useCustomLegend ? 40 : 56 },
-            xaxis: xAxis,
-            yaxis: yAxis,
+            xaxis: { ...xAxis, ...HERO_X_SPIKES },
+            yaxis: { ...yAxis, ...HERO_Y_SPIKES },
             shapes,
-            hovermode: 'closest',
+            hovermode: HERO_HOVERMODE,
+            hoverlabel: HERO_HOVERLABEL,
             showlegend: !useCustomLegend,
             legend: useCustomLegend ? undefined : { orientation: 'h', y: -0.12 },
           }}
           config={{ displayModeBar: false, responsive: true }}
-          style={{ width: '100%', height: '100%' }}
+          style={{ width: '100%', height: plotHeight }}
           useResizeHandler
-          onHover={handlePlotHover}
-          onUnhover={handlePlotUnhover}
           onLegendClick={handleLegendClick}
         />
       </Suspense>

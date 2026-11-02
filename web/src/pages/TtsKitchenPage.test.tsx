@@ -85,6 +85,10 @@ describe('TtsKitchenPage', () => {
   it('shows the fixed window and locked settings', () => {
     renderPage();
     expect(screen.getByTestId('tts-kitchen-page')).toBeInTheDocument();
+    expect(screen.getByTestId('kitchen-coming-soon')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('kitchen-coming-soon')).toHaveTextContent(
+      'Kitchen sanitization is a working mock for further development.',
+    );
     expect(screen.getByRole('combobox', { name: /Data source/i })).toHaveAttribute(
       'aria-disabled',
       'true',
@@ -98,25 +102,21 @@ describe('TtsKitchenPage', () => {
     expect(screen.getByText(/Process window: 2026-09-01 → 2026-10-20/)).toBeInTheDocument();
     const minSec = screen.getByTestId('kitchen-min-sec');
     expect(minSec.tagName).toBe('INPUT');
-    expect(minSec).toBeEnabled();
+    expect(minSec).toBeDisabled();
     expect(minSec).toHaveValue(30);
     expect(screen.getByText(/Exactly 30 seconds stay/)).toBeInTheDocument();
     expect(screen.getByTestId('kitchen-order-agg')).toHaveTextContent('none (bump rows)');
-    expect(screen.getByTestId('kitchen-run')).toHaveClass('MuiButton-outlined');
+    expect(screen.getByTestId('kitchen-run')).toBeDisabled();
+    expect(screen.getByTestId('kitchen-reload')).toBeDisabled();
     expect(screen.queryByTestId('tts-panel-handoff')).not.toBeInTheDocument();
     expect(screen.queryByTestId('tts-panel-export-csv')).not.toBeInTheDocument();
   });
 
-  it('runs the kitchen read from the button', async () => {
+  it('keeps Run kitchen off while the page is a prototype mock', () => {
     renderPage();
-    fireEvent.change(screen.getByTestId('kitchen-min-sec'), { target: { value: '45' } });
     fireEvent.click(screen.getByTestId('kitchen-run'));
     fireEvent.click(screen.getByTestId('kitchen-reload'));
-    await waitFor(() => {
-      expect(mutate).toHaveBeenCalledTimes(2);
-    });
-    expect(mutate).toHaveBeenNthCalledWith(1, 45);
-    expect(mutate).toHaveBeenNthCalledWith(2, 45);
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it('shows before and after, the code table, and the network steps', async () => {

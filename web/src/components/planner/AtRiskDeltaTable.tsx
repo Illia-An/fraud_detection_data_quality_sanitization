@@ -53,6 +53,8 @@ interface AtRiskDeltaTableProps {
   asOfOptions: { year: number; month: number }[];
   onAsOfChange: (year: number, month: number) => void;
   onInspect: (storeId: number) => void;
+  /** Spotlight target for product tour Inspect tip (survey vs TTS planner). */
+  inspectOnboardingId?: string;
 }
 
 function formatScore(value: number | null, unit: string): string {
@@ -126,6 +128,7 @@ export function AtRiskDeltaTable({
   asOfOptions,
   onAsOfChange,
   onInspect,
+  inspectOnboardingId = 'planner-inspect',
 }: AtRiskDeltaTableProps) {
   const t = useT();
   const unit = plan.unit;
@@ -397,7 +400,7 @@ export function AtRiskDeltaTable({
               <TableCell
                 align="right"
                 sx={headSx}
-                {...(rows.length === 0 ? { 'data-onboarding': 'planner-inspect' } : {})}
+                {...(rows.length === 0 ? { 'data-onboarding': inspectOnboardingId } : {})}
               >
                 {t('planner.atRisk.col.action')}
               </TableCell>
@@ -524,7 +527,7 @@ export function AtRiskDeltaTable({
                         color="primary"
                         endIcon={<ArrowForwardIcon sx={{ fontSize: 14 }} />}
                         onClick={() => onInspect(row.storeId)}
-                        {...(rowIndex === 0 ? { 'data-onboarding': 'planner-inspect' } : {})}
+                        {...(rowIndex === 0 ? { 'data-onboarding': inspectOnboardingId } : {})}
                         sx={{
                           fontWeight: 600,
                           textTransform: 'none',

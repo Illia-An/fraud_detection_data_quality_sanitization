@@ -98,9 +98,8 @@ function roundPct(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-/** Plotly hover: always show top-box % to hundredths (matches KPI / Planner Current). */
-export const STORE_IMPACT_HOVER_TEMPLATE =
-  '%{x}<br>%{fullData.name}: %{y:.2f}%<extra></extra>';
+/** Value-only row under the shared month header (Plotly `x unified`, Hero-style). */
+export const STORE_IMPACT_HOVER_TEMPLATE = '%{y:.1f}%<extra></extra>';
 
 /**
  * Volume-weighted top-box % across points (e.g. one store's months).
@@ -594,8 +593,7 @@ export function buildTier4FlagMarkerTrace(
       line: { color: STORE_IMPACT_COLORS.tier4Flag, width: 2 },
     },
     customdata,
-    hovertemplate:
-      'Tier 4 flagged<br>z=%{customdata[0]:.2f}<br>volume=%{customdata[1]}<br>5%=%{customdata[2]:.2f}%<extra></extra>',
+    hovertemplate: STORE_IMPACT_HOVER_TEMPLATE,
     showlegend: true,
   };
 }
