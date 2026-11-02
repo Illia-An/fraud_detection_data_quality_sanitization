@@ -5,6 +5,8 @@ export interface OnboardingProductState {
   hasPlannerPanel: boolean;
   /** True after Planner Run produced a draft (At-risk / Inspect steps). */
   hasDraftPlan: boolean;
+  /** True after TTS Planner Run produced a draft. */
+  hasTtsDraftPlan: boolean;
 }
 
 /** Whether a step should appear given current product state. */
@@ -20,6 +22,9 @@ export function isStepEligible(
   }
   if (step.requires === 'draftPlan') {
     return state.hasDraftPlan;
+  }
+  if (step.requires === 'ttsDraftPlan') {
+    return state.hasTtsDraftPlan;
   }
   return true;
 }

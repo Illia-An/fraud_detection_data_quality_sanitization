@@ -25,6 +25,7 @@ KITCHEN_PERIOD_START = date(2026, 9, 1)
 KITCHEN_PERIOD_END = date(2026, 10, 20)
 # Shorter than this is dropped. Exactly this many seconds stays.
 KITCHEN_MIN_SEC = 30
+DEFAULT_TTS_VIEW = "dbo.TargetsByMetrics_McKitiBump"
 
 _VIEW_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 _TTS_EXPR = "DATEDIFF(SECOND, UpDatetime, BumpDateTime)"

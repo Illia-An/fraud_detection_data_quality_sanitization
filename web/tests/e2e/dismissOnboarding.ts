@@ -11,7 +11,8 @@ export async function dismissOnboarding(page: Page): Promise<void> {
       'fraud-guard-onboarding-v1',
       JSON.stringify({
         tourId: 'planner-product-tour',
-        version: 3,
+        // Keep in sync with ONBOARDING_TOUR_VERSION (tourConfig.ts).
+        version: 4,
         status: 'dismissed',
         stepId: null,
         completedStepIds: [],

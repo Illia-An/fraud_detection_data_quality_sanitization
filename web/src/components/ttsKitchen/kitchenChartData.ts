@@ -1,10 +1,65 @@
 import type { KitchenMonth } from '../../schemas/ttsKitchen';
 
+export const KITCHEN_CHART_COLORS = {
+  actual: '#4C78A8',
+  ge30: '#54A24B',
+} as const;
+
+export function periodLabel(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
 export interface KitchenPlotPoint {
   year: number;
   month: number;
   actual_mean_tts_sec: number | null;
   after_ge30_mean_tts_sec: number | null;
+}
+
+export interface KitchenPlotTrace {
+  name: string;
+  x: string[];
+  y: (number | null)[];
+  mode: 'lines+markers';
+  line: { color: string; width: number };
+  marker: { size: number };
+  hovertemplate: string;
+  connectgaps: boolean;
+}
+
+export function buildKitchenImpactTraces(
+  points: Array<{
+    period_label?: string;
+    year: number;
+    month: number;
+    actual_mean_tts_sec?: number | null;
+    after_ge30_mean_tts_sec?: number | null;
+  }>,
+  labels: { actual: string; ge30: string },
+): KitchenPlotTrace[] {
+  const x = points.map((p) => p.period_label ?? periodLabel(p.year, p.month));
+  return [
+    {
+      name: labels.actual,
+      x,
+      y: points.map((p) => p.actual_mean_tts_sec ?? null),
+      mode: 'lines+markers',
+      line: { color: KITCHEN_CHART_COLORS.actual, width: 2 },
+      marker: { size: 6 },
+      hovertemplate: '%{x}<br>%{y:.1f} s<extra>%{fullData.name}</extra>',
+      connectgaps: false,
+    },
+    {
+      name: labels.ge30,
+      x,
+      y: points.map((p) => p.after_ge30_mean_tts_sec ?? null),
+      mode: 'lines+markers',
+      line: { color: KITCHEN_CHART_COLORS.ge30, width: 2 },
+      marker: { size: 6 },
+      hovertemplate: '%{x}<br>%{y:.1f} s<extra>%{fullData.name}</extra>',
+      connectgaps: false,
+    },
+  ];
 }
 
 export function kitchenPlotPoints(months: KitchenMonth[]): KitchenPlotPoint[] {

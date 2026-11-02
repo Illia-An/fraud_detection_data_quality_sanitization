@@ -2,7 +2,7 @@ import { alpha } from '@mui/material/styles';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
 import Stack from '@mui/material/Stack';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import { LocaleDocumentEffects } from '../i18n/LocaleDocumentEffects';
 import { OnboardingHost } from '../onboarding';
@@ -11,7 +11,18 @@ import AppNavbar from './components/AppNavbar';
 import DashboardHeader from './components/DashboardHeader';
 import SideMenu from './components/SideMenu';
 
+function isPlannerRoute(pathname: string): boolean {
+  return pathname === '/planner' || pathname.startsWith('/planner/');
+}
+
+function isTtsPlannerRoute(pathname: string): boolean {
+  return pathname === '/planner-tts' || pathname.startsWith('/planner-tts/');
+}
+
 export function DashboardLayout() {
+  const { pathname } = useLocation();
+  const tightNavPad = isPlannerRoute(pathname) || isTtsPlannerRoute(pathname);
+
   return (
     <LocaleDocumentEffects>
       <AppTheme>
@@ -37,7 +48,9 @@ export function DashboardLayout() {
                 flex: 1,
                 minHeight: 0,
                 alignItems: 'center',
-                px: { xs: 2, sm: 3, md: 4 },
+                // Planner workbenches hug SideMenu; other pages keep the roomier gutter.
+                pl: tightNavPad ? { xs: 1, sm: 1, md: 1 } : { xs: 2, sm: 3, md: 4 },
+                pr: { xs: 2, sm: 3, md: 4 },
                 pt: { xs: 0, md: 0.5 },
                 pb: { xs: 2, md: 1.5 },
                 mt: { xs: 8, md: 0 },

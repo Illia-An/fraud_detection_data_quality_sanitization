@@ -25,9 +25,8 @@ import {
 import { useMemo, useState } from 'react';
 
 import { useT } from '../../i18n';
-import { periodLabel } from '../../schemas/tts';
 import type { KitchenMonth, KitchenStore } from '../../schemas/ttsKitchen';
-import { kitchenPlotPoints } from './kitchenChartData';
+import { kitchenPlotPoints, periodLabel } from './kitchenChartData';
 import { KitchenMeanChart } from './KitchenMeanChart';
 
 /** Match Sanitization Inspect paper width. */

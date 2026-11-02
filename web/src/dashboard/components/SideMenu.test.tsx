@@ -17,18 +17,18 @@ function renderSideMenu() {
 }
 
 describe('SideMenu', () => {
-  it('starts expanded and collapses to mini rail', () => {
+  it('starts collapsed as mini rail and expands on demand', () => {
     renderSideMenu();
-
-    expect(screen.getByText('Survey Sanitization')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Sanitization/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^TTS$/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^Planner$/i })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }));
 
     expect(screen.queryByText('Survey Sanitization')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Sanitization/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Planner$/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand navigation' }));
+
+    expect(screen.getByText('Survey Sanitization')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Sanitization/i })).toBeInTheDocument();
   });
 });

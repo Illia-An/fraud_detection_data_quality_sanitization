@@ -6,6 +6,7 @@ import { KitchenStepsTable } from '../components/ttsKitchen/KitchenStepsTable';
 import { useKitchenBeforeAfter } from '../api/hooks';
 import { useT } from '../i18n';
 import { KITCHEN_PERIOD_END, KITCHEN_PERIOD_START } from '../schemas/ttsKitchen';
+import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 import Accordion from '@mui/material/Accordion';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -34,6 +35,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 const CONTROLS_RAIL_WIDTH_PX = 360;
 const CONTROLS_RAIL_COLLAPSED_PX = 40;
 const COLLAPSED_PLAY_REVEAL_MS = 250;
+/** Prototype mock: keep Run kitchen off until the product cut is ready. */
+const KITCHEN_RUN_ENABLED = false;
 /** Collapsed accordion summary height reserved so the chart is not covered on md. */
 const STEPS_SUMMARY_RESERVE_PX = 80;
 const STEPS_GAP_PX = 12;
@@ -43,7 +46,9 @@ export function TtsKitchenPage() {
   const t = useT();
   const theme = useTheme();
   const run = useKitchenBeforeAfter();
-  const [controlsOpen, setControlsOpen] = useState(true);
+  const [controlsOpen, setControlsOpen] = useControlsRailOpen(
+    CONTROLS_RAIL_ROUTE.ttsKitchen,
+  );
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const [stepsExpanded, setStepsExpanded] = useState(false);
   const [minSecInput, setMinSecInput] = useState('30');
@@ -55,9 +60,10 @@ export function TtsKitchenPage() {
 
   const minSec = /^\d+$/.test(minSecInput) ? Number(minSecInput) : null;
   const minSecReady = minSec != null;
+  const canRun = KITCHEN_RUN_ENABLED && minSecReady && !run.isPending;
 
   const handleRun = () => {
-    if (minSec == null || run.isPending) {
+    if (!canRun || minSec == null) {
       return;
     }
     run.mutate(minSec);
@@ -207,13 +213,13 @@ export function TtsKitchenPage() {
                       component="button"
                       type="button"
                       onClick={handleRun}
-                      disabled={run.isPending || !minSecReady}
+                      disabled={!canRun}
                       data-testid="kitchen-reload"
                       sx={{
                         alignSelf: 'flex-start',
                         border: 0,
                         background: 'none',
-                        cursor: run.isPending || !minSecReady ? 'default' : 'pointer',
+                        cursor: canRun ? 'pointer' : 'default',
                         p: 0,
                         textDecoration: 'underline',
                         font: 'inherit',
@@ -246,8 +252,8 @@ export function TtsKitchenPage() {
                         label={t('kitchen.config.minSec')}
                         value={minSecInput}
                         onChange={(event) => setMinSecInput(event.target.value)}
-                        disabled={run.isPending}
-                        error={!minSecReady}
+                        disabled={!KITCHEN_RUN_ENABLED || run.isPending}
+                        error={KITCHEN_RUN_ENABLED && !minSecReady}
                         helperText={
                           minSecReady
                             ? t('kitchen.config.minSecHint', { sec: minSec })
@@ -293,7 +299,7 @@ export function TtsKitchenPage() {
               variant="outlined"
               fullWidth
               onClick={handleRun}
-              disabled={run.isPending || !minSecReady}
+              disabled={!canRun}
               data-testid="kitchen-run"
               startIcon={
                 run.isPending ? <CircularProgress size={18} color="inherit" /> : undefined
@@ -315,13 +321,13 @@ export function TtsKitchenPage() {
               flex: 1,
             }}
           >
-            <Tooltip title={t('kitchen.run')} placement="right">
+            <Tooltip title={t('kitchen.prototypeBadge')} placement="right">
               <span>
                 <IconButton
                   data-testid="kitchen-collapsed-run"
                   color="primary"
                   onClick={handleRun}
-                  disabled={run.isPending || !minSecReady}
+                  disabled={!canRun}
                   aria-label={t('kitchen.run')}
                   size="small"
                 >
@@ -351,6 +357,51 @@ export function TtsKitchenPage() {
         }}
       >
         <Stack spacing={1.5} sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          <Box
+            aria-hidden
+            data-testid="kitchen-coming-soon"
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 2,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              transform: 'rotate(-12deg)',
+              opacity: 0.18,
+            }}
+          >
+            <Typography
+              component="div"
+              sx={{
+                fontSize: { xs: '2.75rem', md: '4.5rem' },
+                fontWeight: 800,
+                letterSpacing: '0.06em',
+                lineHeight: 1,
+                textTransform: 'uppercase',
+                color: 'text.primary',
+              }}
+            >
+              {t('kitchen.prototypeBadge')}
+            </Typography>
+            <Typography
+              component="div"
+              sx={{
+                mt: 1,
+                maxWidth: 420,
+                px: 2,
+                textAlign: 'center',
+                fontSize: { xs: '0.85rem', md: '1rem' },
+                fontWeight: 600,
+                color: 'text.primary',
+              }}
+            >
+              {t('kitchen.prototypeHint')}
+            </Typography>
+          </Box>
           {!result && !run.isPending && !run.isError ? (
             <Alert severity="info" data-testid="kitchen-waiting">
               {t('kitchen.waiting')}
