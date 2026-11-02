@@ -32,6 +32,8 @@ ENV PYTHONUNBUFFERED=1 \
     FRONTEND_DIST_DIR=/app/web/dist \
     SANITIZATION_SOURCE=snapshot \
     SNAPSHOT_URL=sqlite:///data/q10012_snapshot.sqlite \
+    TTS_KPI_SOURCE=snapshot \
+    TTS_KPI_SNAPSHOT_URL=sqlite:///data/tts_kpi_snapshot.sqlite \
     API_CORS_ORIGINS=http://localhost:8000 \
     PORT=8000
 
