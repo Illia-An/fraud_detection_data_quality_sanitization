@@ -193,11 +193,17 @@ def create_app() -> FastAPI:
         responses={
             404: {"description": "AP returned no avg_serve_time_minutes rows"},
             422: {"description": "AP rows are not a usable TTS panel"},
-            503: {"description": "TTS_KPI_SOURCE is synthetic or AP is unreachable"},
+            503: {
+                "description": "TTS_KPI_SOURCE is synthetic, snapshot missing, or AP unreachable"
+            },
         },
     )
     def tts_kpi_from_ap() -> TtsKpiApPanelResponse:
-        """Read-only AP minutes. Synthetic presets stay on ``/sample/tts-kpi``."""
+        """Read-only TTS minutes from AP, snapshot, or reject synthetic.
+
+        Synthetic presets stay on ``/sample/tts-kpi``. Docker uses
+        ``TTS_KPI_SOURCE=snapshot`` after ``refresh_tts_kpi_snapshot.py``.
+        """
         try:
             panel = load_ap_tts_kpi_panel()
         except TtsKpiSourceError as exc:
