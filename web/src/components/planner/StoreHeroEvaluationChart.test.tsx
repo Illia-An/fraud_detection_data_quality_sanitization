@@ -94,8 +94,8 @@ describe('StoreHeroEvaluationChart', () => {
     expect(payload).toContain('Cleansed fact');
     expect(payload).toContain('Required monthly (to hit target)');
     expect(payload).toContain('Required cumulative (if required monthly)');
-    expect(payload).toContain('Cumulative actual');
-    expect(payload).toContain('Cumulative plan (if draft)');
+    expect(payload).not.toContain('Cumulative actual');
+    expect(payload).not.toContain('Cumulative plan (if draft)');
     expect(payload).toContain('Draft simulation');
     expect(payload).toContain('Target');
     expect(payload).not.toContain('Network chain');
@@ -119,6 +119,9 @@ describe('StoreHeroEvaluationChart', () => {
     expect(screen.getByTestId('evaluation-legend-item-requiredCumulative')).toBeInTheDocument();
     expect(screen.getByTestId('evaluation-legend-item-draft')).toHaveTextContent(/Draft simulation/i);
     expect(screen.getByTestId('store-hero-required-mode')).toBeInTheDocument();
+    expect(screen.getByTestId('store-hero-unreachable')).toHaveTextContent(
+      /even 100% in every remaining month/i,
+    );
     expect(screen.getByTestId('store-hero-evaluation-chart')).toHaveAttribute(
       'data-required-mode',
       'plan',
@@ -187,5 +190,6 @@ describe('StoreHeroEvaluationChart', () => {
     expect(payload).toContain('%{y:.2f} min');
     expect(payload).not.toContain('"ticksuffix":"%"');
     expect(payload).not.toContain('"text":"5%"');
+    expect(screen.queryByTestId('store-hero-unreachable')).not.toBeInTheDocument();
   });
 });

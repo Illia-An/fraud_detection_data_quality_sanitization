@@ -8,6 +8,7 @@ import {
   cumulativeMeanSeries,
   linearCumulativePathToTarget,
   monthlyFromCumulativePath,
+  requiredPairFromWindowThroughLastFact,
   shiftCalendarMonths,
 } from './heroEvaluationSeries';
 
@@ -105,13 +106,15 @@ describe('buildHeroEvaluationSeries', () => {
     expect(series.draftYs[3]).toBeCloseTo(73, 5);
     expect(series.target).toBe(75);
 
-    // Required monthly from −3 window handoff: stitch 72, then 77/81 → green hits 75
+    // Required monthly from last fact (Mar): stitch 72, then 77/81 → mean hits 75
     expect(series.requiredMonthlyYs[1]).toBeNull();
     expect(series.requiredMonthlyYs[2]).toBeCloseTo(72, 2);
     expect(series.requiredMonthlyYs[3]).toBeCloseTo(77, 2);
     expect(series.requiredMonthlyYs[4]).toBeCloseTo(81, 2);
     expect(cumulativeMeanSeries([70, 72, 77, 81])).toEqual([70, 71, 73, 75]);
-    // Required cumulative = cum(window + required monthly) → lands on target (pair with gray)
+    // Required cumulative shows the window mean before the last fact, then the path
+    expect(series.requiredCumulativeYs[0]).toBeNull();
+    expect(series.requiredCumulativeYs[1]).toBeCloseTo(70, 2);
     expect(series.requiredCumulativeYs[2]).toBeCloseTo(71, 2);
     expect(series.requiredCumulativeYs[3]).toBeCloseTo(73, 2);
     expect(series.requiredCumulativeYs[4]).toBeCloseTo(75, 2);
@@ -185,14 +188,54 @@ describe('buildHeroEvaluationSeries', () => {
       1.5,
     );
 
-    // Apr network fact = (80+84)/2 = 82 — display only after as-of
+    // Apr network fact = (80+84)/2 = 82 — realized after as-of
     expect(series.factYs[3]).toBeCloseTo(82, 2);
     expect(series.cumulativeYs[3]).toBeCloseTo(74.67, 2); // (70+72+82)/3
-    // Planning handoff still Mar: required / orange ignore Apr fact
-    expect(series.requiredMonthlyYs[2]).toBeCloseTo(72, 2);
-    expect(series.requiredMonthlyYs[3]).toBeCloseTo(77, 2);
-    expect(series.requiredCumulativeYs[3]).toBeCloseTo(73, 2);
+    // Orange and green stay on the March as-of handoff
     expect(series.windowCumulativeYs[3]).toBeCloseTo(73, 2);
     expect(series.planCumulativeYs[3]).toBeCloseTo(71.67, 2);
+    // Required pair moves to April. Window 70, 72, 82 → 74.67; May lands on 75
+    expect(series.requiredMonthlyYs[1]).toBeNull();
+    expect(series.requiredMonthlyYs[2]).toBeNull();
+    expect(series.requiredMonthlyYs[3]).toBeCloseTo(82, 2);
+    expect(series.requiredMonthlyYs[4]).toBeCloseTo(75.99, 2); // 4*75 − 3*74.67
+    expect(series.requiredCumulativeYs[1]).toBeCloseTo(70, 2);
+    expect(series.requiredCumulativeYs[2]).toBeCloseTo(71, 2);
+    expect(series.requiredCumulativeYs[3]).toBeCloseTo(74.67, 2);
+    expect(series.requiredCumulativeYs[4]).toBeCloseTo(75, 2);
+  });
+});
+
+describe('requiredPairFromWindowThroughLastFact', () => {
+  const periods = [
+    { year: 2025, month: 11 },
+    { year: 2025, month: 12 },
+    { year: 2026, month: 1 },
+    { year: 2026, month: 2 },
+    { year: 2026, month: 3 },
+    { year: 2026, month: 4 },
+  ];
+
+  it('shows window history, ignores facts before the marker, and caps at the plan month', () => {
+    const pair = requiredPairFromWindowThroughLastFact(
+      periods,
+      [40, 70, 72, null, null, null],
+      { year: 2025, month: 12 },
+      75,
+      { year: 2026, month: 3 },
+    );
+
+    expect(pair.requiredMonthlyYs[0]).toBeNull();
+    expect(pair.requiredMonthlyYs[1]).toBeNull();
+    expect(pair.requiredMonthlyYs[2]).toBeCloseTo(72, 2); // stitch last fact
+    expect(pair.requiredMonthlyYs[3]).toBeCloseTo(77, 2); // two steps left, same invert as 71 → 75
+    expect(pair.requiredMonthlyYs[4]).toBeCloseTo(81, 2);
+    expect(pair.requiredMonthlyYs[5]).toBeNull(); // past plan month
+    expect(pair.requiredCumulativeYs[0]).toBeNull();
+    expect(pair.requiredCumulativeYs[1]).toBeCloseTo(70, 2);
+    expect(pair.requiredCumulativeYs[2]).toBeCloseTo(71, 2);
+    expect(pair.requiredCumulativeYs[3]).toBeCloseTo(73, 2);
+    expect(pair.requiredCumulativeYs[4]).toBeCloseTo(75, 2);
+    expect(pair.requiredCumulativeYs[5]).toBeNull();
   });
 });

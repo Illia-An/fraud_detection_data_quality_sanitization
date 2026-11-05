@@ -124,7 +124,7 @@ describe('TtsPlannerPage shell', () => {
       expect(screen.getByTestId('tts-planner-plan-summary')).toHaveTextContent('4.00 min → 3.50 min');
     });
     expect(screen.getByTestId('hero-evaluation-chart')).toBeInTheDocument();
-    expect(screen.getByTestId('hero-required-mode')).toBeInTheDocument();
+    expect(screen.queryByTestId('hero-required-mode')).not.toBeInTheDocument();
   });
 
   it('keeps the loaded baseline and plan when the page is opened again', async () => {

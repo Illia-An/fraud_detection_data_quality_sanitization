@@ -443,6 +443,8 @@ export const en = {
   'planner.storeHero.plan': 'Draft simulation',
   'planner.storeHero.target': 'Target',
   'planner.storeHero.asOf': 'as-of',
+  'planner.storeHero.unreachable':
+    'Target unreachable: even 100% in every remaining month does not lift the average to the target.',
 
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
@@ -459,9 +461,9 @@ export const en = {
   'planner.hero.tip.fact':
     'Monthly cleansed network equal-mean (fact) wherever the panel has it — continues after as-of when realized months exist. Planning handoff stays at as-of.',
   'planner.hero.tip.requiredMonthly':
-    'Not fact: monthly scores after as-of that would make the short-window (−3 mo) cumulative follow orange and land on target. Inverted from Path to target; compare with blue draft.',
+    'Not fact: monthly scores after the last cleansed fact that carry the short-window (−3 mo) running mean to target. Recalculates when a new fact month appears. Stops at the plan target month.',
   'planner.hero.tip.requiredCumulative':
-    'Short-window cumulative built from required monthlies (gray dashed) — lands on target. Twin of Required monthly; orange is the independent linear path (may overlap).',
+    'Running mean of cleansed fact from the −3 mo marker through the last fact, then required monthlies to target. Visible across that window. Path to target stays on as-of.',
   'planner.hero.tip.cumulative':
     'Running average of monthly fact scores from the start of the series to each month.',
   'planner.hero.tip.windowCumulative':
