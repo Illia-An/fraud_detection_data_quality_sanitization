@@ -9,6 +9,7 @@ import {
   type MouseEvent,
 } from 'react';
 import {
+  Alert,
   Box,
   CircularProgress,
   Stack,
@@ -49,6 +50,9 @@ const Plot = lazy(async () => {
 /** Default store Hero height; dialog Inspect can pass a taller value. */
 export const STORE_HERO_PLOT_HEIGHT_PX = 260;
 
+/** 5% score cannot exceed this. A required month above it cannot be scored. */
+const PERCENT_SCORE_CEILING = 100;
+
 /**
  * Min px per month — closer to Sanitization Store impact cell pitch
  * (tall plot + auto Y ticks → nearer-square grid).
@@ -74,7 +78,7 @@ interface StoreHeroEvaluationChartProps {
 
 /**
  * Store-level Evaluation View — same grammar as network Hero (fact · cumulative · plan · as-of).
- * Plan (−3) and Pressure (YTD) modes mirror Network Hero; gap snapshot stays in Inspect strip.
+ * Plan (−3) and Pressure (YTD) stay on Inspect. Network Hero is Plan (−3) only.
  */
 export function StoreHeroEvaluationChart({
   plan,
@@ -172,16 +176,7 @@ export function StoreHeroEvaluationChart({
     );
   }
 
-  const {
-    labels,
-    actualYs,
-    planYs,
-    cumulativeYs,
-    planCumulativeYs,
-    target,
-    asOfLabel,
-    asOfIndex,
-  } = series;
+  const { labels, actualYs, planYs, target, asOfLabel, asOfIndex } = series;
 
   const requiredMonthlyYs = isPressure
     ? (pressurePair?.requiredMonthlyYs ?? series.requiredMonthlyYs)
@@ -193,12 +188,13 @@ export function StoreHeroEvaluationChart({
   const lastFactLabel = pressurePair?.lastFactLabel ?? null;
   const horizonEndLabel = pressurePair?.horizonEndLabel ?? null;
   const legendItems = isPressure ? STORE_PRESSURE_LEGEND : STORE_EVALUATION_LEGEND;
+  const targetUnreachable =
+    tickSuffix === '%' &&
+    requiredMonthlyYs.some((value) => value != null && value > PERCENT_SCORE_CEILING);
 
   const yValues = [
     ...actualYs.filter((v): v is number => v != null),
     ...(!isPressure ? planYs.filter((v): v is number => v != null) : []),
-    ...cumulativeYs.filter((v): v is number => v != null),
-    ...(!isPressure ? planCumulativeYs.filter((v): v is number => v != null) : []),
     ...requiredMonthlyYs.filter((v): v is number => v != null),
     ...requiredCumulativeYs.filter((v): v is number => v != null),
     target,
@@ -254,30 +250,8 @@ export function StoreHeroEvaluationChart({
       connectgaps: false,
       hovertemplate: hoverTemplate,
     },
-    {
-      x: labels,
-      y: cumulativeYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: t('planner.storeHero.cumulative'),
-      line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
-      marker: { size: 6, color: '#6a1b9a' },
-      connectgaps: false,
-      hovertemplate: hoverTemplate,
-    },
     ...(!isPressure
       ? [
-          {
-            x: labels,
-            y: planCumulativeYs,
-            type: 'scatter' as const,
-            mode: 'lines+markers' as const,
-            name: t('planner.storeHero.planCumulative'),
-            line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
-            marker: { size: 6, color: '#2e7d32' },
-            connectgaps: false,
-            hovertemplate: hoverTemplate,
-          },
           {
             x: labels,
             y: planYs,
@@ -310,11 +284,7 @@ export function StoreHeroEvaluationChart({
     : asOfIndex;
   const cutoverCrosshairY =
     cutoverIdx != null && cutoverIdx >= 0
-      ? (requiredCumulativeYs[cutoverIdx] ??
-        (!isPressure ? planCumulativeYs[cutoverIdx] : null) ??
-        cumulativeYs[cutoverIdx] ??
-        actualYs[cutoverIdx] ??
-        null)
+      ? (requiredCumulativeYs[cutoverIdx] ?? actualYs[cutoverIdx] ?? null)
       : null;
 
   const yearStartOnAxis =
@@ -432,6 +402,15 @@ export function StoreHeroEvaluationChart({
         </ToggleButtonGroup>
       </Stack>
       <EvaluationLegend items={legendItems} testId="store-evaluation-legend" />
+      {targetUnreachable ? (
+        <Alert
+          severity="warning"
+          data-testid="store-hero-unreachable"
+          sx={{ py: 0, flexShrink: 0, '& .MuiAlert-message': { py: 0.5 } }}
+        >
+          {t('planner.storeHero.unreachable')}
+        </Alert>
+      ) : null}
       <Box
         ref={containerRef}
         sx={{

@@ -10,8 +10,7 @@ import { metricScore, type DirectedPlan, type MetricScorePanel } from '../../sch
 import {
   CUMULATIVE_WINDOW_LAG_MONTHS,
   cumulativeMeanSeries,
-  linearCumulativePathToTarget,
-  monthlyFromCumulativePath,
+  requiredPairFromWindowThroughLastFact,
   shiftCalendarMonths,
 } from './heroEvaluationSeries';
 
@@ -28,11 +27,9 @@ export interface StoreHeroEvaluationSeries {
    * (YTD if this store's draft lands). Drawn from purple handoff onward (Hero green).
    */
   planCumulativeYs: (number | null)[];
-  /**
-   * Monthlies after as-of that make short-window (−3) cum hit target (Network gray dash).
-   */
+  /** Monthlies after the last store fact that carry the −3 window mean to target. */
   requiredMonthlyYs: (number | null)[];
-  /** Cum of short-window facts + required monthlies → target (Network gray solid). */
+  /** Window mean through the last fact, then required monthlies (Network gray solid). */
   requiredCumulativeYs: (number | null)[];
   /** Network/store target line (Hero red). */
   target: number;
@@ -74,8 +71,8 @@ function storeActual(
 /**
  * Same Evaluation grammar as network Hero, scoped to one store.
  * Timeline = store panel months (incl. after as-of) ∪ plan trajectory.
- * Post-as-of fact is display-only; plan handoff / green stay locked at as-of.
- * Required pair uses short-window (−3 … as-of) like Network Hero.
+ * Post-as-of fact is display-only for plan handoff / green, which stay locked at as-of.
+ * Required pair uses the −3 window through the last fact, same drawing as Network Hero.
  * Optional sandbox draftLast patches the last estimate month (ephemeral).
  * Gap model stays plan-horizon only (Inspect table / deviation caption).
  */
@@ -172,80 +169,21 @@ export function buildStoreHeroEvaluationSeries(
     return value;
   });
 
-  // Required pair — short-window (−3 … as-of), same invert as Network Hero.
   const windowStart = shiftCalendarMonths(
     asOf.year,
     asOf.month,
     -CUMULATIVE_WINDOW_LAG_MONTHS,
   );
-  const windowFactYs = periods.map((p, i) => {
-    const fact = actualYs[i];
-    if (fact == null || periodCmp(p, windowStart) < 0 || !atOrBefore(p, asOf)) {
-      return null;
-    }
-    return fact;
-  });
-  const windowFactCumYs = cumulativeMeanSeries(windowFactYs);
-
-  let requiredHandoffIdx = -1;
-  for (let i = 0; i < periods.length; i += 1) {
-    if (atOrBefore(periods[i], asOf) && windowFactYs[i] != null) {
-      requiredHandoffIdx = i;
-    }
-  }
-
-  const horizonIdxs: number[] = [];
-  if (requiredHandoffIdx >= 0) {
-    for (let i = requiredHandoffIdx + 1; i < periods.length; i += 1) {
-      horizonIdxs.push(i);
-    }
-  }
-  const startCum =
-    requiredHandoffIdx >= 0 && windowFactCumYs[requiredHandoffIdx] != null
-      ? windowFactCumYs[requiredHandoffIdx]!
-      : null;
-
-  let handoffCount = 0;
-  if (requiredHandoffIdx >= 0) {
-    for (let i = 0; i <= requiredHandoffIdx; i += 1) {
-      if (windowFactYs[i] != null) {
-        handoffCount += 1;
-      }
-    }
-  }
-  const pathToTarget =
-    startCum == null
-      ? []
-      : linearCumulativePathToTarget(startCum, plan.target, horizonIdxs.length);
-  const requiredMonthlies =
-    startCum == null || handoffCount < 1 || pathToTarget.length === 0
-      ? []
-      : monthlyFromCumulativePath(startCum, handoffCount, pathToTarget);
-  const requiredByIdx = new Map(horizonIdxs.map((idx, k) => [idx, requiredMonthlies[k]!]));
-
-  const requiredMonthlyYs = periods.map((_p, i) => {
-    if (requiredByIdx.has(i)) {
-      return requiredByIdx.get(i)!;
-    }
-    if (requiredHandoffIdx >= 0 && i === requiredHandoffIdx) {
-      return windowFactYs[i];
-    }
-    return null;
-  });
-
-  const requiredPlanMonthlyYs = periods.map((_p, i) => {
-    if (requiredHandoffIdx >= 0 && i > requiredHandoffIdx && requiredByIdx.has(i)) {
-      return requiredByIdx.get(i)!;
-    }
-    return windowFactYs[i];
-  });
-  const requiredCumFull = cumulativeMeanSeries(requiredPlanMonthlyYs);
-  const requiredCumulativeYs = requiredCumFull.map((value, i) => {
-    if (requiredHandoffIdx < 0 || i < requiredHandoffIdx) {
-      return null;
-    }
-    return value;
-  });
+  const horizonPoint = plan.chain_trajectory[plan.chain_trajectory.length - 1];
+  const requiredPair = requiredPairFromWindowThroughLastFact(
+    periods,
+    actualYs,
+    windowStart,
+    plan.target,
+    horizonPoint == null ? null : { year: horizonPoint.year, month: horizonPoint.month },
+  );
+  const requiredMonthlyYs = requiredPair.requiredMonthlyYs;
+  const requiredCumulativeYs = requiredPair.requiredCumulativeYs;
 
   return {
     labels,
