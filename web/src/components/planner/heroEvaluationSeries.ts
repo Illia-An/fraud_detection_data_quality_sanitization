@@ -23,14 +23,13 @@ export interface HeroEvaluationSeries {
   planCumulativeYs: (number | null)[];
   draftYs: (number | null)[];
   /**
-   * Monthly scores after as-of that make the short-window cumulative (green grammar)
-   * follow orange and land on target. Not fact — inverted from Path to target (−3 mo).
-   * Stitches the last window fact at handoff for continuity with black.
+   * Monthly scores after the last cleansed fact that carry the −3 window mean to target.
+   * Stitches that last fact. Capped at the plan target month. Orange stays on as-of.
    */
   requiredMonthlyYs: (number | null)[];
   /**
-   * Cumulative of (short-window facts + required monthlies) — twin of gray dashed.
-   * Lands on target by construction; orange stays the independent linear path.
+   * Running mean of facts from the −3 marker through the last fact, then required
+   * monthlies through the plan target month. Visible across the window, not only after as-of.
    */
   requiredCumulativeYs: (number | null)[];
   upperYs: (number | null)[];
@@ -158,14 +157,130 @@ export function monthlyFromCumulativePath(
   return out;
 }
 
+export interface RequiredScorePair {
+  requiredMonthlyYs: (number | null)[];
+  requiredCumulativeYs: (number | null)[];
+}
+
+function emptyRequiredPair(length: number): RequiredScorePair {
+  const blank = (): (number | null)[] => Array.from({ length }, () => null);
+  return { requiredMonthlyYs: blank(), requiredCumulativeYs: blank() };
+}
+
+/**
+ * Plan (−3) required pair, drawn like Pressure.
+ * Knowledge is cleansed fact from `windowStart` through the last fact, including
+ * months after as-of. Cumulative shows that running mean, then required monthlies
+ * through `horizonEnd` (axis end when null). Monthly stitches the last fact and
+ * continues only after it. Facts before `windowStart` are ignored.
+ */
+export function requiredPairFromWindowThroughLastFact(
+  periods: PeriodPoint[],
+  factYs: (number | null)[],
+  windowStart: PeriodPoint,
+  target: number,
+  horizonEnd: PeriodPoint | null,
+): RequiredScorePair {
+  const length = periods.length;
+  if (factYs.length !== length) {
+    return emptyRequiredPair(length);
+  }
+
+  let lastFactIdx = -1;
+  for (let i = 0; i < length; i += 1) {
+    if (factYs[i] != null) {
+      lastFactIdx = i;
+    }
+  }
+  if (lastFactIdx < 0) {
+    return emptyRequiredPair(length);
+  }
+
+  let horizonEndIdx = length - 1;
+  if (horizonEnd != null) {
+    horizonEndIdx = -1;
+    for (let i = 0; i < length; i += 1) {
+      if (periodCmp(periods[i]!, horizonEnd) <= 0) {
+        horizonEndIdx = i;
+      }
+    }
+    if (horizonEndIdx < 0) {
+      return emptyRequiredPair(length);
+    }
+  }
+
+  const knowledgeYs = periods.map((period, i) => {
+    const fact = factYs[i];
+    if (fact == null || i > lastFactIdx || periodCmp(period, windowStart) < 0) {
+      return null;
+    }
+    return fact;
+  });
+
+  let handoffCount = 0;
+  for (let i = 0; i <= lastFactIdx; i += 1) {
+    if (knowledgeYs[i] != null) {
+      handoffCount += 1;
+    }
+  }
+  const startCum = cumulativeMeanSeries(knowledgeYs)[lastFactIdx];
+  if (startCum == null || handoffCount < 1) {
+    return emptyRequiredPair(length);
+  }
+
+  const horizonIdxs: number[] = [];
+  for (let i = lastFactIdx + 1; i <= horizonEndIdx; i += 1) {
+    horizonIdxs.push(i);
+  }
+  const pathToTarget = linearCumulativePathToTarget(startCum, target, horizonIdxs.length);
+  const requiredMonthlies = monthlyFromCumulativePath(startCum, handoffCount, pathToTarget);
+  const requiredByIdx = new Map(horizonIdxs.map((idx, k) => [idx, requiredMonthlies[k]!]));
+
+  const requiredMonthlyYs = periods.map((_period, i) => {
+    if (requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    if (i === lastFactIdx) {
+      return factYs[i];
+    }
+    return null;
+  });
+
+  const requiredPlanMonthlyYs = periods.map((_period, i) => {
+    if (i > lastFactIdx && requiredByIdx.has(i)) {
+      return requiredByIdx.get(i)!;
+    }
+    return knowledgeYs[i];
+  });
+  const requiredCumFull = cumulativeMeanSeries(requiredPlanMonthlyYs);
+  const requiredCumulativeYs = requiredCumFull.map((value, i) => {
+    if (value == null || i > horizonEndIdx) {
+      return null;
+    }
+    return value;
+  });
+
+  return { requiredMonthlyYs, requiredCumulativeYs };
+}
+
+function trajectoryHorizonEnd(
+  trajectory: { year: number; month: number }[],
+): PeriodPoint | null {
+  if (trajectory.length === 0) {
+    return null;
+  }
+  const last = trajectory[trajectory.length - 1]!;
+  return { year: last.year, month: last.month };
+}
+
 /**
  * Timeline = cleansed panel months (incl. after as-of) ∪ plan trajectory (horizon).
  * Fact / full cumulative (purple): realized panel scores wherever present.
- * Planning handoff stays at as-of: short-window / required / draft ignore post-as-of fact.
+ * Orange / green / draft handoff stays at as-of and ignores post-as-of fact.
  * Orange: short-window actual mean, then linear cumulative path that reaches target.
  * Green: short-window + pure draft cumulative (what the draft actually scores).
- * Required monthly (dashed near-black): monthlies that make green grammar hit target.
- * Required cumulative (solid near-black): cum of window facts + required monthlies → target.
+ * Required pair: Pressure grammar on the −3 window — cumulative from the marker
+ * through the last fact, monthly from that last fact through the plan target month.
  * Blue / cone: monthly draft from absolute short-window handoff.
  * Session approved/baseline is kept for Revert only — not drawn on Hero.
  */
@@ -302,45 +417,15 @@ export function buildHeroEvaluationSeries(
     return windowFactCumYs[i];
   });
 
-  // Required monthly = invert orange so short-window (−3) running mean lands on target.
-  let handoffCount = 0;
-  if (handoffIdx >= 0) {
-    for (let i = 0; i <= handoffIdx; i += 1) {
-      if (windowFactYs[i] != null) {
-        handoffCount += 1;
-      }
-    }
-  }
-  const requiredMonthlies =
-    startCum == null || handoffCount < 1 || pathToTarget.length === 0
-      ? []
-      : monthlyFromCumulativePath(startCum, handoffCount, pathToTarget);
-  const requiredByIdx = new Map(horizonIdxs.map((idx, k) => [idx, requiredMonthlies[k]!]));
-
-  const requiredMonthlyYs = periods.map((_p, i) => {
-    if (requiredByIdx.has(i)) {
-      return requiredByIdx.get(i)!;
-    }
-    if (handoffIdx >= 0 && i === handoffIdx) {
-      return windowFactYs[i];
-    }
-    return null;
-  });
-
-  // Required cumulative = green grammar fed with required monthlies (pair with gray).
-  const requiredPlanMonthlyYs = periods.map((_p, i) => {
-    if (handoffIdx >= 0 && i > handoffIdx && requiredByIdx.has(i)) {
-      return requiredByIdx.get(i)!;
-    }
-    return windowFactYs[i];
-  });
-  const requiredCumFull = cumulativeMeanSeries(requiredPlanMonthlyYs);
-  const requiredCumulativeYs = requiredCumFull.map((value, i) => {
-    if (handoffIdx < 0 || i < handoffIdx) {
-      return null;
-    }
-    return value;
-  });
+  const requiredPair = requiredPairFromWindowThroughLastFact(
+    periods,
+    factYs,
+    windowStart,
+    draftPlan.target,
+    trajectoryHorizonEnd(draftPlan.chain_trajectory),
+  );
+  const requiredMonthlyYs = requiredPair.requiredMonthlyYs;
+  const requiredCumulativeYs = requiredPair.requiredCumulativeYs;
 
   const upperYs = draftYs.map((v) => (v == null ? null : Math.min(ceiling, v + slackBandPp)));
   const lowerYs = draftYs.map((v) => (v == null ? null : Math.max(floor, v - slackBandPp)));

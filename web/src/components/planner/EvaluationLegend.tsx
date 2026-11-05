@@ -220,27 +220,6 @@ export const HERO_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     swatch: 'thick',
   },
   {
-    id: 'cumulative',
-    labelKey: 'planner.hero.cumulative',
-    tipKey: 'planner.hero.tip.cumulative',
-    color: '#6a1b9a',
-    swatch: 'dashdot',
-  },
-  {
-    id: 'windowCumulative',
-    labelKey: 'planner.hero.windowCumulative',
-    tipKey: 'planner.hero.tip.windowCumulative',
-    color: '#ef6c00',
-    swatch: 'dash',
-  },
-  {
-    id: 'planCumulative',
-    labelKey: 'planner.hero.planCumulative',
-    tipKey: 'planner.hero.tip.planCumulative',
-    color: '#2e7d32',
-    swatch: 'dot',
-  },
-  {
     id: 'draft',
     labelKey: 'planner.hero.draft',
     tipKey: 'planner.hero.tip.draft',
@@ -277,59 +256,6 @@ export const HERO_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
   },
 ] as const;
 
-/** Network Hero — YTD pressure mode (separate from plan −3 / as-of lock). */
-export const HERO_PRESSURE_LEGEND: readonly EvaluationLegendItem[] = [
-  {
-    id: 'fact',
-    labelKey: 'planner.hero.fact',
-    tipKey: 'planner.hero.tip.fact',
-    color: '#212121',
-    swatch: 'solid',
-  },
-  {
-    id: 'requiredMonthly',
-    labelKey: 'planner.hero.pressureMonthly',
-    tipKey: 'planner.hero.tip.pressureMonthly',
-    color: '#424242',
-    swatch: 'dash',
-  },
-  {
-    id: 'requiredCumulative',
-    labelKey: 'planner.hero.pressureCumulative',
-    tipKey: 'planner.hero.tip.pressureCumulative',
-    color: '#616161',
-    swatch: 'thick',
-  },
-  {
-    id: 'cumulative',
-    labelKey: 'planner.hero.cumulative',
-    tipKey: 'planner.hero.tip.cumulative',
-    color: '#6a1b9a',
-    swatch: 'dashdot',
-  },
-  {
-    id: 'target',
-    labelKey: 'planner.hero.target',
-    tipKey: 'planner.hero.tip.target',
-    color: '#c62828',
-    swatch: 'target',
-  },
-  {
-    id: 'yearStart',
-    labelKey: 'planner.hero.yearStart',
-    tipKey: 'planner.hero.tip.yearStart',
-    color: '#9e9e9e',
-    swatch: 'asOf',
-  },
-  {
-    id: 'lastFact',
-    labelKey: 'planner.hero.lastFact',
-    tipKey: 'planner.hero.tip.lastFact',
-    color: '#616161',
-    swatch: 'asOf',
-  },
-] as const;
-
 /** Store evaluation — same grammar as Hero (no network cone). */
 export const STORE_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
   {
@@ -352,20 +278,6 @@ export const STORE_EVALUATION_LEGEND: readonly EvaluationLegendItem[] = [
     tipKey: 'planner.hero.tip.requiredCumulative',
     color: '#616161',
     swatch: 'thick',
-  },
-  {
-    id: 'cumulative',
-    labelKey: 'planner.storeHero.cumulative',
-    tipKey: 'planner.hero.tip.cumulative',
-    color: '#6a1b9a',
-    swatch: 'dashdot',
-  },
-  {
-    id: 'planCumulative',
-    labelKey: 'planner.storeHero.planCumulative',
-    tipKey: 'planner.hero.tip.planCumulative',
-    color: '#2e7d32',
-    swatch: 'dot',
   },
   {
     id: 'draft',
@@ -412,13 +324,6 @@ export const STORE_PRESSURE_LEGEND: readonly EvaluationLegendItem[] = [
     tipKey: 'planner.hero.tip.pressureCumulative',
     color: '#616161',
     swatch: 'thick',
-  },
-  {
-    id: 'cumulative',
-    labelKey: 'planner.storeHero.cumulative',
-    tipKey: 'planner.hero.tip.cumulative',
-    color: '#6a1b9a',
-    swatch: 'dashdot',
   },
   {
     id: 'target',

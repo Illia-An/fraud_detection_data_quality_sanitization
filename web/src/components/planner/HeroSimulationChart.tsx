@@ -6,25 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
 } from 'react';
-import {
-  Box,
-  CircularProgress,
-  Stack,
-  ToggleButton,
-  ToggleButtonGroup,
-  Typography,
-} from '@mui/material';
+import { Box, CircularProgress, Stack, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
 import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
 import { buildStoreImpactYAxis } from '../charts/storeImpactChartData';
-import {
-  EvaluationLegend,
-  HERO_EVALUATION_LEGEND,
-  HERO_PRESSURE_LEGEND,
-} from './EvaluationLegend';
+import { EvaluationLegend, HERO_EVALUATION_LEGEND } from './EvaluationLegend';
 import {
   asOfHorizontalShape,
   HERO_HOVER_TEMPLATE,
@@ -34,11 +22,6 @@ import {
   HERO_Y_SPIKES,
 } from './heroChartCrosshair';
 import { buildHeroEvaluationSeries } from './heroEvaluationSeries';
-import {
-  buildPressureRequiredPair,
-  planTargetMonthLabel,
-  type HeroRequiredMode,
-} from './pressureEvaluationSeries';
 
 const Plot = lazy(async () => {
   const module = await import('react-plotly.js');
@@ -54,8 +37,8 @@ export const HERO_PLOT_HEIGHT_PX = 340;
  */
 export const HERO_PX_PER_PERIOD = 44;
 
-/** Plan-mode series off until the user clicks the legend (keeps the default view quieter). */
-export const HERO_DEFAULT_HIDDEN_IDS = ['planCumulative', 'windowCumulative'] as const;
+/** Plan-mode series off until the user clicks the legend. */
+export const HERO_DEFAULT_HIDDEN_IDS = [] as const;
 
 function createHeroDefaultHiddenIds(): Set<string> {
   return new Set(HERO_DEFAULT_HIDDEN_IDS);
@@ -117,8 +100,6 @@ export function HeroSimulationChart({
   const [plotHeight, setPlotHeight] = useState(HERO_PLOT_HEIGHT_PX);
   const [plotWidth, setPlotWidth] = useState(0);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(createHeroDefaultHiddenIds);
-  const [requiredMode, setRequiredMode] = useState<HeroRequiredMode>('plan');
-  const isPressure = requiredMode === 'pressure';
 
   const toggleLegendId = useCallback((id: string) => {
     setHiddenIds((prev) => {
@@ -131,17 +112,6 @@ export function HeroSimulationChart({
       return next;
     });
   }, []);
-
-  const handleRequiredMode = useCallback(
-    (_event: MouseEvent<HTMLElement>, next: HeroRequiredMode | null) => {
-      if (next == null) {
-        return;
-      }
-      setRequiredMode(next);
-      setHiddenIds(createHeroDefaultHiddenIds());
-    },
-    [],
-  );
 
   const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
 
@@ -188,41 +158,18 @@ export function HeroSimulationChart({
     [draftPlan, panel, asOfYear, asOfMonth, slackBandPp, scoreFloor, scoreCeiling],
   );
 
-  const pressurePair = useMemo(() => {
-    const horizonEnd = planTargetMonthLabel(draftPlan);
-    return buildPressureRequiredPair(
-      series.labels,
-      series.factYs,
-      series.target,
-      asOfYear,
-      horizonEnd,
-    );
-  }, [draftPlan, series.labels, series.factYs, series.target, asOfYear]);
-
   const {
     labels,
     factYs,
-    cumulativeYs,
-    windowCumulativeYs,
-    planCumulativeYs,
     draftYs,
+    requiredMonthlyYs,
+    requiredCumulativeYs,
     upperYs,
     lowerYs,
     target,
     asOfLabel,
     windowStartLabel,
   } = series;
-
-  const requiredMonthlyYs = isPressure
-    ? pressurePair.requiredMonthlyYs
-    : series.requiredMonthlyYs;
-  const requiredCumulativeYs = isPressure
-    ? pressurePair.requiredCumulativeYs
-    : series.requiredCumulativeYs;
-  const yearStartLabel = pressurePair.yearStartLabel;
-  const lastFactLabel = pressurePair.lastFactLabel;
-  const horizonEndLabel = pressurePair.horizonEndLabel;
-  const legendItems = isPressure ? HERO_PRESSURE_LEGEND : HERO_EVALUATION_LEGEND;
 
   // TTS (and any caller with scrollAnchor="asOf"): keep cutover in view when the strip overflows.
   useEffect(() => {
@@ -233,7 +180,7 @@ export function HeroSimulationChart({
     if (!node || plotWidth <= 0 || labels.length === 0) {
       return;
     }
-    const anchorLabel = isPressure ? (lastFactLabel ?? asOfLabel) : asOfLabel;
+    const anchorLabel = asOfLabel;
     const index = labels.indexOf(anchorLabel);
     if (index < 0) {
       return;
@@ -252,33 +199,20 @@ export function HeroSimulationChart({
   }, [
     scrollAnchor,
     asOfLabel,
-    lastFactLabel,
-    isPressure,
     labels,
     plotWidth,
   ]);
 
   const yValues = [
     ...(isVisible('fact') ? factYs.filter((v): v is number => v != null) : []),
-    ...(isVisible('cumulative')
-      ? cumulativeYs.filter((v): v is number => v != null)
-      : []),
-    ...(!isPressure && isVisible('windowCumulative')
-      ? windowCumulativeYs.filter((v): v is number => v != null)
-      : []),
-    ...(!isPressure && isVisible('planCumulative')
-      ? planCumulativeYs.filter((v): v is number => v != null)
-      : []),
-    ...(!isPressure && isVisible('draft')
-      ? draftYs.filter((v): v is number => v != null)
-      : []),
+    ...(isVisible('draft') ? draftYs.filter((v): v is number => v != null) : []),
     ...(isVisible('requiredMonthly')
       ? requiredMonthlyYs.filter((v): v is number => v != null)
       : []),
     ...(isVisible('requiredCumulative')
       ? requiredCumulativeYs.filter((v): v is number => v != null)
       : []),
-    ...(!isPressure && isVisible('cone')
+    ...(isVisible('cone')
       ? [
           ...upperYs.filter((v): v is number => v != null),
           ...lowerYs.filter((v): v is number => v != null),
@@ -297,15 +231,8 @@ export function HeroSimulationChart({
   const hoverPct =
     tickSuffix === '%' ? HERO_HOVER_TEMPLATE : `%{y:.2f}${tickSuffix}<extra></extra>`;
 
-  const requiredMonthlyName = isPressure
-    ? t('planner.hero.pressureMonthly')
-    : t('planner.hero.requiredMonthly');
-  const requiredCumulativeName = isPressure
-    ? t('planner.hero.pressureCumulative')
-    : t('planner.hero.requiredCumulative');
-
   const data = [
-    ...(!isPressure && isVisible('cone')
+    ...(isVisible('cone')
       ? [
           {
             x: labels,
@@ -355,7 +282,7 @@ export function HeroSimulationChart({
             y: requiredMonthlyYs,
             type: 'scatter' as const,
             mode: 'lines+markers' as const,
-            name: requiredMonthlyName,
+            name: t('planner.hero.requiredMonthly'),
             line: { color: '#424242', width: 2, dash: 'dash' as const },
             marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
             connectgaps: false,
@@ -370,7 +297,7 @@ export function HeroSimulationChart({
             y: requiredCumulativeYs,
             type: 'scatter' as const,
             mode: 'lines+markers' as const,
-            name: requiredCumulativeName,
+            name: t('planner.hero.requiredCumulative'),
             line: { color: '#616161', width: 2.5 },
             marker: { size: 6, color: '#616161', symbol: 'diamond' as const },
             connectgaps: false,
@@ -378,52 +305,7 @@ export function HeroSimulationChart({
           },
         ]
       : []),
-    ...(isVisible('cumulative')
-      ? [
-          {
-            x: labels,
-            y: cumulativeYs,
-            type: 'scatter' as const,
-            mode: 'lines+markers' as const,
-            name: t('planner.hero.cumulative'),
-            line: { color: '#6a1b9a', width: 2, dash: 'dashdot' as const },
-            marker: { size: 6, color: '#6a1b9a' },
-            connectgaps: false,
-            hovertemplate: hoverPct,
-          },
-        ]
-      : []),
-    ...(!isPressure && isVisible('windowCumulative')
-      ? [
-          {
-            x: labels,
-            y: windowCumulativeYs,
-            type: 'scatter' as const,
-            mode: 'lines+markers' as const,
-            name: t('planner.hero.windowCumulative'),
-            line: { color: '#ef6c00', width: 2, dash: 'dash' as const },
-            marker: { size: 6, color: '#ef6c00' },
-            connectgaps: false,
-            hovertemplate: hoverPct,
-          },
-        ]
-      : []),
-    ...(!isPressure && isVisible('planCumulative')
-      ? [
-          {
-            x: labels,
-            y: planCumulativeYs,
-            type: 'scatter' as const,
-            mode: 'lines+markers' as const,
-            name: t('planner.hero.planCumulative'),
-            line: { color: '#2e7d32', width: 2, dash: 'dot' as const },
-            marker: { size: 6, color: '#2e7d32' },
-            connectgaps: false,
-            hovertemplate: hoverPct,
-          },
-        ]
-      : []),
-    ...(!isPressure && isVisible('draft')
+    ...(isVisible('draft')
       ? [
           {
             x: labels,
@@ -453,20 +335,14 @@ export function HeroSimulationChart({
       : []),
   ];
 
-  const cutoverLabel = isPressure ? lastFactLabel : asOfLabel;
-  const cutoverIdx = cutoverLabel != null ? labels.indexOf(cutoverLabel) : -1;
+  const cutoverIdx = labels.indexOf(asOfLabel);
   const cutoverCrosshairY =
     cutoverIdx >= 0
-      ? (requiredCumulativeYs[cutoverIdx] ??
-        (!isPressure ? windowCumulativeYs[cutoverIdx] : null) ??
-        factYs[cutoverIdx] ??
-        null)
+      ? (requiredCumulativeYs[cutoverIdx] ?? factYs[cutoverIdx] ?? null)
       : null;
 
-  const yearStartOnAxis = labels.includes(yearStartLabel);
-
   const shapes = [
-    ...(!isPressure && isVisible('windowHandoff')
+    ...(isVisible('windowHandoff')
       ? [
           {
             type: 'line' as const,
@@ -479,26 +355,12 @@ export function HeroSimulationChart({
           },
         ]
       : []),
-    ...(isPressure && isVisible('yearStart') && yearStartOnAxis
+    ...(isVisible('asOf')
       ? [
           {
             type: 'line' as const,
-            x0: yearStartLabel,
-            x1: yearStartLabel,
-            y0: 0,
-            y1: 1,
-            yref: 'paper' as const,
-            line: { color: '#9e9e9e', width: 1.5, dash: 'dot' as const },
-          },
-        ]
-      : []),
-    ...((!isPressure && isVisible('asOf')) ||
-    (isPressure && isVisible('lastFact') && lastFactLabel != null)
-      ? [
-          {
-            type: 'line' as const,
-            x0: cutoverLabel!,
-            x1: cutoverLabel!,
+            x0: asOfLabel,
+            x1: asOfLabel,
             y0: 0,
             y1: 1,
             yref: 'paper' as const,
@@ -512,7 +374,7 @@ export function HeroSimulationChart({
   ];
 
   const annotations = [
-    ...(!isPressure && isVisible('windowHandoff')
+    ...(isVisible('windowHandoff')
       ? [
           {
             x: windowStartLabel,
@@ -527,43 +389,13 @@ export function HeroSimulationChart({
           },
         ]
       : []),
-    ...(isPressure && isVisible('yearStart') && yearStartOnAxis
-      ? [
-          {
-            x: yearStartLabel,
-            y: 1,
-            yref: 'paper' as const,
-            text: t('planner.hero.yearStart'),
-            showarrow: false,
-            xanchor: 'left' as const,
-            yanchor: 'bottom' as const,
-            font: { size: 11, color: '#9e9e9e' },
-            xshift: 4,
-          },
-        ]
-      : []),
-    ...(!isPressure && isVisible('asOf')
+    ...(isVisible('asOf')
       ? [
           {
             x: asOfLabel,
             y: 1,
             yref: 'paper' as const,
             text: t('planner.hero.asOf'),
-            showarrow: false,
-            xanchor: 'left' as const,
-            yanchor: 'bottom' as const,
-            font: { size: 11, color: '#616161' },
-            xshift: 4,
-          },
-        ]
-      : []),
-    ...(isPressure && isVisible('lastFact') && lastFactLabel != null
-      ? [
-          {
-            x: lastFactLabel,
-            y: 1,
-            yref: 'paper' as const,
-            text: t('planner.hero.lastFact'),
             showarrow: false,
             xanchor: 'left' as const,
             yanchor: 'bottom' as const,
@@ -579,42 +411,13 @@ export function HeroSimulationChart({
       spacing={0.75}
       sx={{ height: '100%', minHeight: 0 }}
       data-testid="hero-evaluation-chart"
-      data-required-mode={requiredMode}
     >
-      <Stack
-        direction="row"
-        flexWrap="wrap"
-        useFlexGap
-        spacing={1}
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ flexShrink: 0 }}
-      >
-        <EvaluationLegend
-          items={legendItems}
-          testId="hero-evaluation-legend"
-          hiddenIds={hiddenIds}
-          onToggle={toggleLegendId}
-        />
-        <ToggleButtonGroup
-          size="small"
-          exclusive
-          value={requiredMode}
-          onChange={handleRequiredMode}
-          aria-label={t('planner.hero.modeAria')}
-          data-testid="hero-required-mode"
-        >
-          <ToggleButton value="plan" aria-label={t('planner.hero.modePlanAria')}>
-            {t('planner.hero.modePlan')}
-          </ToggleButton>
-          <ToggleButton
-            value="pressure"
-            aria-label={t('planner.hero.modePressureAria')}
-          >
-            {t('planner.hero.modePressure')}
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
+      <EvaluationLegend
+        items={HERO_EVALUATION_LEGEND}
+        testId="hero-evaluation-legend"
+        hiddenIds={hiddenIds}
+        onToggle={toggleLegendId}
+      />
       <Box
         ref={containerRef}
         sx={{
@@ -696,23 +499,10 @@ export function HeroSimulationChart({
         </Box>
       </Box>
       <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-        {isPressure
-          ? t(
-              tickSuffix === '%'
-                ? 'planner.hero.captionPressure'
-                : 'planner.hero.captionPressureMin',
-              {
-                yearStart: yearStartLabel,
-                lastFact: lastFactLabel ?? '—',
-                horizonEnd: horizonEndLabel ?? '—',
-                target:
-                  tickSuffix === '%' ? String(target) : `${target.toFixed(2)} min`,
-              },
-            )
-          : t(tickSuffix === '%' ? 'planner.hero.caption' : 'planner.hero.captionMin', {
-              asOf: asOfLabel,
-              slack: slackBandPp.toFixed(1),
-            })}
+        {t(tickSuffix === '%' ? 'planner.hero.caption' : 'planner.hero.captionMin', {
+          asOf: asOfLabel,
+          slack: slackBandPp.toFixed(1),
+        })}
       </Typography>
     </Stack>
   );
