@@ -427,6 +427,8 @@ export const he: Record<MessageKey, string> = {
   'planner.storeHero.plan': 'סימולציית טיוטה',
   'planner.storeHero.target': 'יעד',
   'planner.storeHero.asOf': 'as-of',
+  'planner.storeHero.unreachable':
+    'היעד לא ניתן להשגה: גם 100% בכל חודש שנותר לא מרימים את הממוצע ליעד.',
 
   'planner.hero.cone': 'חרוט תחזית',
   'planner.hero.coneSlack': 'חרוט תחזית (±רזרבה)',
@@ -443,9 +445,9 @@ export const he: Record<MessageKey, string> = {
   'planner.hero.tip.fact':
     'ממוצע שווה חודשי מנוקה של הרשת (עובדה) בכל מקום שיש בפאנל — ממשיך אחרי as-of כשיש חודשים ממומשים. מסירת התכנון נשארת ב־as-of.',
   'planner.hero.tip.requiredMonthly':
-    'לא עובדה: ציונים חודשיים אחרי as-of שיגרמו למצטבר בחלון (−3 חוד׳) לעקוב אחרי הכתום ולהגיע ליעד. הופכי מ־Path to target; להשוות לטיוטה הכחולה.',
+    'לא עובדה: ציונים חודשיים אחרי העובדה המנוקה האחרונה שמובילים את הממוצע בחלון (−3 חוד׳) ליעד. מחושב מחדש כשמופיע חודש עובדה חדש. נעצר בחודש יעד התוכנית.',
   'planner.hero.tip.requiredCumulative':
-    'מצטבר בחלון הקצר שנבנה מהחודשיים הנדרשים (אפור מקווקו) — מגיע ליעד. תאום של Required monthly; הכתום הוא מסלול ליניארי עצמאי (יכול לחפוף).',
+    'ממוצע רץ של עובדה מנוקה מסמן −3 חוד׳ עד העובדה האחרונה, ואז חודשיים נדרשים עד ליעד. נראה לאורך החלון. Path to target נשאר על as-of.',
   'planner.hero.tip.cumulative':
     'ממוצע מצטבר של ציוני העובדה החודשיים מתחילת הסדרה עד כל חודש.',
   'planner.hero.tip.windowCumulative':

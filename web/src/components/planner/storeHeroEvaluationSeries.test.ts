@@ -117,13 +117,23 @@ describe('buildStoreHeroEvaluationSeries', () => {
     expect(series!.planYs[2]).toBeCloseTo(63.33, 2);
     expect(series!.planYs[3]).toBe(72);
     expect(series!.planCumulativeYs[3]).toBeCloseTo(65.5, 2);
+    // Required pair follows May. No month remains after the plan. Window mean ends at 70.
+    expect(series!.requiredMonthlyYs[2]).toBeNull();
+    expect(series!.requiredMonthlyYs[3]).toBe(90);
+    expect(series!.requiredCumulativeYs[0]).toBeCloseTo(60, 2);
+    expect(series!.requiredCumulativeYs[1]).toBeCloseTo(62, 2);
+    expect(series!.requiredCumulativeYs[2]).toBeCloseTo(63.33, 2);
+    expect(series!.requiredCumulativeYs[3]).toBeCloseTo(70, 2);
   });
 
   it('builds required monthly/cumulative from short-window handoff to target', () => {
     const series = buildStoreHeroEvaluationSeries(plan, 10, panel, insights);
     // Window Feb–Apr: 60,64,66 → startCum 63.33; one horizon step → target 75
-    expect(series!.requiredMonthlyYs[2]).toBeCloseTo(66, 2); // stitch as-of fact
+    expect(series!.requiredMonthlyYs[0]).toBeNull();
+    expect(series!.requiredMonthlyYs[2]).toBeCloseTo(66, 2); // stitch last fact
     expect(series!.requiredMonthlyYs[3]).toBeCloseTo(110.01, 2); // 4*75 − 3*63.33
+    expect(series!.requiredCumulativeYs[0]).toBeCloseTo(60, 2);
+    expect(series!.requiredCumulativeYs[1]).toBeCloseTo(62, 2);
     expect(series!.requiredCumulativeYs[2]).toBeCloseTo(63.33, 2);
     expect(series!.requiredCumulativeYs[3]).toBeCloseTo(75, 2);
   });
