@@ -96,7 +96,22 @@ export function StoreHeroEvaluationChart({
   const [plotHeight, setPlotHeight] = useState(plotHeightPx);
   const [plotWidth, setPlotWidth] = useState(0);
   const [requiredMode, setRequiredMode] = useState<HeroRequiredMode>('plan');
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => new Set());
   const isPressure = requiredMode === 'pressure';
+
+  const toggleLegendId = useCallback((id: string) => {
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
 
   const handleRequiredMode = useCallback(
     (_event: MouseEvent<HTMLElement>, next: HeroRequiredMode | null) => {
@@ -193,14 +208,20 @@ export function StoreHeroEvaluationChart({
     requiredMonthlyYs.some((value) => value != null && value > PERCENT_SCORE_CEILING);
 
   const yValues = [
-    ...actualYs.filter((v): v is number => v != null),
-    ...(!isPressure ? planYs.filter((v): v is number => v != null) : []),
-    ...requiredMonthlyYs.filter((v): v is number => v != null),
-    ...requiredCumulativeYs.filter((v): v is number => v != null),
-    target,
+    ...(isVisible('fact') ? actualYs.filter((v): v is number => v != null) : []),
+    ...(!isPressure && isVisible('draft')
+      ? planYs.filter((v): v is number => v != null)
+      : []),
+    ...(isVisible('requiredMonthly')
+      ? requiredMonthlyYs.filter((v): v is number => v != null)
+      : []),
+    ...(isVisible('requiredCumulative')
+      ? requiredCumulativeYs.filter((v): v is number => v != null)
+      : []),
+    ...(isVisible('target') ? [target] : []),
   ];
   /** Same fit-scale helper as Sanitization Store impact (auto Y ticks, no dtick:1). */
-  const fitY = buildStoreImpactYAxis('fit', yValues);
+  const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
   const yMin = fitY.range?.[0] ?? 0;
   const yMax = fitY.range?.[1] ?? 100;
   const contentMinWidth = Math.max(labels.length, 1) * STORE_HERO_PX_PER_PERIOD;
@@ -217,40 +238,52 @@ export function StoreHeroEvaluationChart({
     : t('planner.hero.requiredCumulative');
 
   const data = [
-    {
-      x: labels,
-      y: actualYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: t('planner.storeHero.actual'),
-      line: { color: '#212121', width: 2.5 },
-      marker: { size: 7, color: '#212121' },
-      connectgaps: false,
-      hovertemplate: hoverTemplate,
-    },
-    {
-      x: labels,
-      y: requiredMonthlyYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: requiredMonthlyName,
-      line: { color: '#424242', width: 2, dash: 'dash' as const },
-      marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
-      connectgaps: false,
-      hovertemplate: hoverTemplate,
-    },
-    {
-      x: labels,
-      y: requiredCumulativeYs,
-      type: 'scatter' as const,
-      mode: 'lines+markers' as const,
-      name: requiredCumulativeName,
-      line: { color: '#616161', width: 2.5 },
-      marker: { size: 6, color: '#616161', symbol: 'diamond' as const },
-      connectgaps: false,
-      hovertemplate: hoverTemplate,
-    },
-    ...(!isPressure
+    ...(isVisible('fact')
+      ? [
+          {
+            x: labels,
+            y: actualYs,
+            type: 'scatter' as const,
+            mode: 'lines+markers' as const,
+            name: t('planner.storeHero.actual'),
+            line: { color: '#212121', width: 2.5 },
+            marker: { size: 7, color: '#212121' },
+            connectgaps: false,
+            hovertemplate: hoverTemplate,
+          },
+        ]
+      : []),
+    ...(isVisible('requiredMonthly')
+      ? [
+          {
+            x: labels,
+            y: requiredMonthlyYs,
+            type: 'scatter' as const,
+            mode: 'lines+markers' as const,
+            name: requiredMonthlyName,
+            line: { color: '#424242', width: 2, dash: 'dash' as const },
+            marker: { size: 6, color: '#424242', symbol: 'diamond' as const },
+            connectgaps: false,
+            hovertemplate: hoverTemplate,
+          },
+        ]
+      : []),
+    ...(isVisible('requiredCumulative')
+      ? [
+          {
+            x: labels,
+            y: requiredCumulativeYs,
+            type: 'scatter' as const,
+            mode: 'lines+markers' as const,
+            name: requiredCumulativeName,
+            line: { color: '#616161', width: 2.5 },
+            marker: { size: 6, color: '#616161', symbol: 'diamond' as const },
+            connectgaps: false,
+            hovertemplate: hoverTemplate,
+          },
+        ]
+      : []),
+    ...(!isPressure && isVisible('draft')
       ? [
           {
             x: labels,
@@ -265,15 +298,19 @@ export function StoreHeroEvaluationChart({
           },
         ]
       : []),
-    {
-      x: labels,
-      y: labels.map(() => target),
-      type: 'scatter' as const,
-      mode: 'lines' as const,
-      name: t('planner.storeHero.target'),
-      line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
-      hovertemplate: hoverTemplate,
-    },
+    ...(isVisible('target')
+      ? [
+          {
+            x: labels,
+            y: labels.map(() => target),
+            type: 'scatter' as const,
+            mode: 'lines' as const,
+            name: t('planner.storeHero.target'),
+            line: { color: '#c62828', width: 1.5, dash: 'dot' as const },
+            hovertemplate: hoverTemplate,
+          },
+        ]
+      : []),
   ];
 
   const cutoverLabel = isPressure ? lastFactLabel : asOfLabel;
@@ -401,7 +438,12 @@ export function StoreHeroEvaluationChart({
           </ToggleButton>
         </ToggleButtonGroup>
       </Stack>
-      <EvaluationLegend items={legendItems} testId="store-evaluation-legend" />
+      <EvaluationLegend
+        items={legendItems}
+        testId="store-evaluation-legend"
+        hiddenIds={hiddenIds}
+        onToggle={toggleLegendId}
+      />
       {targetUnreachable ? (
         <Alert
           severity="warning"

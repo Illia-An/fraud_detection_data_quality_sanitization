@@ -21,6 +21,20 @@ import {
   excelReportRequestSchema,
   type ExcelReportRequest,
 } from '../schemas/excelReport';
+import {
+  planVersionCreateRequestSchema,
+  planVersionListResponseSchema,
+  planVersionResponseSchema,
+  simulationAdjustRequestSchema,
+  simulationRequestSchema,
+  simulationResponseSchema,
+  type PlanVersionCreateRequest,
+  type PlanVersionListResponse,
+  type PlanVersionResponse,
+  type SimulationAdjustRequest,
+  type SimulationRequest,
+  type SimulationResponse,
+} from '../schemas/cumulativePlan';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 import {
   ttsPlanRequestSchema,
@@ -151,6 +165,60 @@ export function postPlan(request: PlanRequest): Promise<PlanResponse> {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function postPlanVersion(
+  request: PlanVersionCreateRequest,
+): Promise<PlanVersionResponse> {
+  const body = planVersionCreateRequestSchema.parse(request);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/plan-versions`,
+    planVersionResponseSchema,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function fetchPlanVersions(limit = 50): Promise<PlanVersionListResponse> {
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/plan-versions?limit=${limit}`,
+    planVersionListResponseSchema,
+  );
+}
+
+export function fetchPlanVersion(id: string): Promise<PlanVersionResponse> {
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/plan-versions/${encodeURIComponent(id)}`,
+    planVersionResponseSchema,
+  );
+}
+
+export function postSimulation(request: SimulationRequest): Promise<SimulationResponse> {
+  const body = simulationRequestSchema.parse(request);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/simulation`,
+    simulationResponseSchema,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+export function postSimulationAdjust(
+  request: SimulationAdjustRequest,
+): Promise<SimulationResponse> {
+  const body = simulationAdjustRequestSchema.parse(request);
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/simulation/adjust`,
+    simulationResponseSchema,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export function postTtsPlan(request: TtsPlanRequest): Promise<TtsPlanResponse> {

@@ -8,7 +8,9 @@ import {
   fetchTtsKpiPanel,
   fetchKitchenBeforeAfter,
   postPlan,
+  postPlanVersion,
   postProcess,
+  postSimulation,
   postTtsPlan,
 } from './client';
 import {
@@ -75,6 +77,18 @@ export function useProcess() {
 export function usePlan() {
   return useMutation({
     mutationFn: (request: PlanRequest) => postPlan(request),
+  });
+}
+
+export function useSavePlanVersion() {
+  return useMutation({
+    mutationFn: postPlanVersion,
+  });
+}
+
+export function useRunSimulation() {
+  return useMutation({
+    mutationFn: postSimulation,
   });
 }
 
