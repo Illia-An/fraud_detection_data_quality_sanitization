@@ -257,9 +257,31 @@ export const he: Record<MessageKey, string> = {
   'planner.noStoresAtRef': 'אין ציוני סניף לחודש הייחוס הזה.',
   'planner.run': 'הרץ סימולציה',
   'planner.exportCsv': 'ייצוא CSV',
-  'planner.exportExcel': 'שמור דוח Excel',
+  'planner.exportExcel': 'ייצוא Excel',
   'planner.exportExcelDisabledTip': 'הרץ סניטציה וסימולציה קודם.',
-  'planner.exportExcelFailed': 'לא ניתן לשמור את דוח ה-Excel.',
+  'planner.exportExcelFailed': 'לא ניתן לייצא את דוח ה-Excel.',
+  'planner.savePlan': 'שמור תוכנית',
+  'planner.savePlanTip':
+    'הקפאת קו הבסיס כגרסה חדשה בשרת (קו כחול). הסימולציה ממשיכה להתעדכן בזמן אמת.',
+  'planner.savePlanDisabledTip': 'הרץ סימולציה ואז שמור גרסת תוכנית.',
+  'planner.savePlanFailed': 'לא ניתן לשמור את גרסת התוכנית.',
+  'planner.savePlanSaved': 'גרסת התוכנית נשמרה.',
+  'planner.unreachableChip': '{count} סניפים עלולים לפספס את היעד',
+  'planner.unreachableChipTip':
+    'קצב הצמיחה הנדרש חורג מהמציאותי. פתחו Inspect להצעות יעד לסניף.',
+  'planner.slope.actual': 'בפועל',
+  'planner.slope.plan': 'תוכנית בסיס',
+  'planner.slope.simulation': 'סימולציה',
+  'planner.slope.cumActualSim': 'מצטבר בפועל / סימ׳',
+  'planner.slope.tip.actual': 'עובדה חודשית מנוקה עד as-of (שחור).',
+  'planner.slope.tip.plan':
+    'יעדים חודשיים קפואים אחרי שמירת תוכנית; אחרת הנתיב המחושב הנוכחי (כחול).',
+  'planner.slope.tip.simulation':
+    'תחזית חיה אחרי as-of מנתונים מצטברים — מתעדכנת עם עובדות חדשות (אפור).',
+  'planner.slope.tip.cumActualSim':
+    'ממוצע רץ מתחילת הנתונים עד as-of, ואז ממשיך עם סימולציה.',
+  'planner.slope.caption':
+    'תוכנית (כחול) קופאת בשמירה · בפועל (שחור) · סימולציה (אפור) חיה · לחצו על המקרא להסתרה.',
   'planner.revertDraft': 'שחזר טיוטה',
   'planner.revertDraftTip':
     'שחזור תוכנית הבסיס של הסשן (לפני Apply / עודף). סוגר את Inspect.',

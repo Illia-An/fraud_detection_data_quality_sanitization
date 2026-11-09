@@ -268,9 +268,31 @@ export const en = {
   'planner.noStoresAtRef': 'No store scores for this reference month.',
   'planner.run': 'Run simulation',
   'planner.exportCsv': 'Export CSV',
-  'planner.exportExcel': 'Save Excel report',
+  'planner.exportExcel': 'Export Excel',
   'planner.exportExcelDisabledTip': 'Run sanitization and a simulation first.',
-  'planner.exportExcelFailed': 'Could not save the Excel report.',
+  'planner.exportExcelFailed': 'Could not export the Excel report.',
+  'planner.savePlan': 'Save Plan',
+  'planner.savePlanTip':
+    'Freeze the current baseline as a new server version (blue line). Simulation still updates live.',
+  'planner.savePlanDisabledTip': 'Run a simulation first, then save a baseline version.',
+  'planner.savePlanFailed': 'Could not save the plan version.',
+  'planner.savePlanSaved': 'Plan version saved.',
+  'planner.unreachableChip': '{count} stores may miss target',
+  'planner.unreachableChipTip':
+    'Required growth exceeds a realistic rate. Open Inspect for suggested store targets.',
+  'planner.slope.actual': 'Actual',
+  'planner.slope.plan': 'Baseline plan',
+  'planner.slope.simulation': 'Simulation',
+  'planner.slope.cumActualSim': 'Cumulative actual / sim',
+  'planner.slope.tip.actual': 'Cleansed monthly fact through as-of (black).',
+  'planner.slope.tip.plan':
+    'Frozen baseline monthly targets after Save Plan; otherwise the current computed plan path (blue).',
+  'planner.slope.tip.simulation':
+    'Live forecast after as-of from cumulative actuals — recalculates with new facts (grey).',
+  'planner.slope.tip.cumActualSim':
+    'Running mean from data start through as-of, then continued with simulation.',
+  'planner.slope.caption':
+    'Plan (blue) freezes on Save · Actual (black) · Simulation (grey) updates live · click legend to hide series.',
   'planner.revertDraft': 'Revert draft',
   'planner.revertDraftTip':
     'Restore the session baseline plan (before Apply / surplus edits). Closes Inspect.',

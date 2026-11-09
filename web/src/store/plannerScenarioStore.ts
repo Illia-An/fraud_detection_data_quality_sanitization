@@ -14,6 +14,8 @@ interface PlannerScenarioState {
   /** True when a draft exists and is not yet accepted as the session-approved snapshot. */
   isDirty: boolean;
   selectedStoreId: number | null;
+  /** Server-side Baseline Plan version id (SPEC-P001); source of truth for frozen blue. */
+  activePlanVersionId: string | null;
 
   setDraftFromRun: (plan: FivePercentPlan) => void;
   /**
@@ -25,6 +27,7 @@ interface PlannerScenarioState {
   discardDraft: () => void;
   clearAll: () => void;
   selectStore: (storeId: number | null) => void;
+  setActivePlanVersionId: (id: string | null) => void;
 }
 
 function plansEqual(a: FivePercentPlan | null, b: FivePercentPlan | null): boolean {
@@ -39,6 +42,7 @@ const plannerSessionSchema = z.object({
   draftPlan: fivePercentPlanSchema.nullable(),
   isDirty: z.boolean(),
   selectedStoreId: z.number().nullable(),
+  activePlanVersionId: z.string().nullable().default(null),
 });
 
 type PlannerSessionSlice = z.infer<typeof plannerSessionSchema>;
@@ -49,6 +53,7 @@ function defaultPlannerSession(): PlannerSessionSlice {
     draftPlan: null,
     isDirty: false,
     selectedStoreId: null,
+    activePlanVersionId: null,
   };
 }
 
@@ -71,6 +76,7 @@ function persistPlannerSession(state: PlannerScenarioState): void {
     draftPlan: state.draftPlan,
     isDirty: state.isDirty,
     selectedStoreId: state.selectedStoreId,
+    activePlanVersionId: state.activePlanVersionId,
   };
   writeSessionJson(PLANNER_SESSION_STORAGE_KEY, slice);
 }
@@ -135,9 +141,12 @@ export const usePlannerScenarioStore = create<PlannerScenarioState>((set, get) =
       draftPlan: null,
       isDirty: false,
       selectedStoreId: null,
+      activePlanVersionId: null,
     }),
 
   selectStore: (storeId) => set({ selectedStoreId: storeId }),
+
+  setActivePlanVersionId: (id) => set({ activePlanVersionId: id }),
 }));
 
 usePlannerScenarioStore.subscribe((state) => {
