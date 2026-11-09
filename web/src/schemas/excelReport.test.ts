@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { defaultPipelineConfig } from './api';
+import type { SimulationResponse } from './cumulativePlan';
 import {
   buildExcelReportRequest,
+  buildExcelReportRequestFromSimulation,
   buildTtsExcelReportRequest,
   sanitizationMethodLabel,
   ttsBaselineMethodLabel,
@@ -89,5 +91,63 @@ describe('buildTtsExcelReportRequest', () => {
     expect(request.target).toBe(3.5);
     expect(request.sanitization_rows[0]?.score).toBe(4.2);
     expect(request.store_plans[0]?.months[0]?.score).toBe(3.5);
+  });
+});
+
+describe('buildExcelReportRequestFromSimulation', () => {
+  it('adds store matrices months 1-12 and version context', () => {
+    const simulation: SimulationResponse = {
+      as_of: { year: 2025, month: 3 },
+      planning_year: 2025,
+      active_plan_version_id: 'ver-1',
+      network: {
+        network_target: 75,
+        network_mean_as_of: 64.3,
+        projected_network_mean_eoy: 72,
+        feasible: false,
+        store_count: 1,
+      },
+      stores: [
+        {
+          store_id: 270,
+          monthly_target: [
+            { year: 2025, month: 1, score: 60 },
+            { year: 2025, month: 3, score: 62 },
+          ],
+          cumulative_planned: [{ year: 2025, month: 1, score: 60 }],
+          actual: [
+            { year: 2025, month: 1, score: 60 },
+            { year: 2025, month: 2, score: 61 },
+            { year: 2025, month: 3, score: 62 },
+          ],
+          cumulative_actual: [{ year: 2025, month: 1, score: 60 }],
+          simulation: [{ year: 2025, month: 4, score: 63 }],
+          cumulative_actual_or_simulation: [
+            { year: 2025, month: 1, score: 60 },
+            { year: 2025, month: 4, score: 61.5 },
+          ],
+          implied_target: 75,
+          gap_to_mean: 5,
+          slope: 1,
+          unreachable: false,
+          suggested_implied_target: null,
+          capped: false,
+        },
+      ],
+      unreachable: [],
+    };
+
+    const request = buildExcelReportRequestFromSimulation(panel, plan, simulation);
+    expect(request.store_matrices).toHaveLength(1);
+    const matrix = request.store_matrices[0]!;
+    expect(matrix.store_id).toBe(270);
+    expect(matrix.monthly_target[0]).toBe(60);
+    expect(matrix.monthly_target[2]).toBe(62);
+    expect(matrix.monthly_target[3]).toBeNull();
+    expect(matrix.actual[2]).toBe(62);
+    expect(matrix.actual[3]).toBeNull();
+    expect(request.plan_version?.version_id).toBe('ver-1');
+    expect(request.plan_version?.as_of_year).toBe(2025);
+    expect(request.plan_version?.as_of_month).toBe(3);
   });
 });

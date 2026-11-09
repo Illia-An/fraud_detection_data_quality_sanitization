@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import type { PipelineConfig } from './api';
+import type { SimulationResponse } from './cumulativePlan';
 import type { FivePercentPlan } from './plan';
 import type { SanitizedPanel } from './sanitizedPanel';
 import type { TtsKpiPanel } from './ttsKpiPanel';
@@ -13,6 +14,8 @@ const scoreMonthSchema = z.object({
   month: z.number().int().min(1).max(12),
   score: z.number(),
 });
+
+const monthSlot12Schema = z.array(z.number().nullable()).length(12);
 
 export const excelReportRequestSchema = z.object({
   method: z.string().min(1).max(200),
@@ -41,6 +44,30 @@ export const excelReportRequestSchema = z.object({
       }),
     )
     .min(1),
+  store_matrices: z
+    .array(
+      z.object({
+        store_id: z.number().int(),
+        monthly_target: monthSlot12Schema,
+        cumulative_planned: monthSlot12Schema,
+        actual: monthSlot12Schema,
+        cumulative_actual_or_simulation: monthSlot12Schema,
+      }),
+    )
+    .default([]),
+  plan_version: z
+    .object({
+      version_id: z.string().nullable().optional(),
+      created_at: z.string().nullable().optional(),
+      label: z.string().nullable().optional(),
+      network_target: z.number().nullable().optional(),
+      as_of_year: z.number().int().nullable().optional(),
+      as_of_month: z.number().int().min(1).max(12).nullable().optional(),
+      planning_year: z.number().int().nullable().optional(),
+      network_mean_at_save: z.number().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export type ExcelReportRequest = z.output<typeof excelReportRequestSchema>;
@@ -63,6 +90,16 @@ export function sanitizationMethodLabel(config: PipelineConfig): string {
   return enabled.length > 0 ? enabled.join('+') : 'none';
 }
 
+function slots12(
+  planningYear: number,
+  rows: { year: number; month: number; score: number }[],
+): (number | null)[] {
+  const byMonth = new Map(
+    rows.filter((r) => r.year === planningYear).map((r) => [r.month, r.score]),
+  );
+  return Array.from({ length: 12 }, (_, i) => byMonth.get(i + 1) ?? null);
+}
+
 export function buildExcelReportRequest(
   panel: SanitizedPanel,
   plan: FivePercentPlan,
@@ -83,6 +120,77 @@ export function buildExcelReportRequest(
     })),
     chain_months: plan.chain_trajectory,
     store_plans: plan.projections,
+  });
+}
+
+/**
+ * SPEC-P001 D-09 export: thin Plan sheet from draft + StoreMatrix from live simulation.
+ * Optional planVersionMeta fills Summary version context after Save Plan.
+ */
+export function buildExcelReportRequestFromSimulation(
+  panel: SanitizedPanel,
+  plan: FivePercentPlan,
+  simulation: SimulationResponse,
+  planVersionMeta?: {
+    version_id: string;
+    created_at?: string | null;
+    label?: string | null;
+    network_target?: number | null;
+    as_of_year?: number | null;
+    as_of_month?: number | null;
+    planning_year?: number | null;
+    network_mean_at_save?: number | null;
+  } | null,
+): ExcelReportRequest {
+  const planningYear = simulation.planning_year;
+  const store_matrices = simulation.stores.map((store) => ({
+    store_id: store.store_id,
+    monthly_target: slots12(planningYear, store.monthly_target),
+    cumulative_planned: slots12(planningYear, store.cumulative_planned),
+    actual: slots12(planningYear, store.actual),
+    cumulative_actual_or_simulation: slots12(
+      planningYear,
+      store.cumulative_actual_or_simulation,
+    ),
+  }));
+
+  return excelReportRequestSchema.parse({
+    method: sanitizationMethodLabel(panel.echo_config),
+    period_start: panel.period_start,
+    period_end: panel.period_end,
+    target: simulation.network.network_target,
+    current_chain: simulation.network.network_mean_as_of,
+    final_chain: simulation.network.projected_network_mean_eoy,
+    feasible: simulation.network.feasible,
+    sanitization_rows: panel.rows.map((row) => ({
+      store_id: row.store_id,
+      year: row.year,
+      month: row.month,
+      score: row.five_percent,
+    })),
+    chain_months: plan.chain_trajectory,
+    store_plans: plan.projections,
+    store_matrices,
+    plan_version: planVersionMeta
+      ? {
+          version_id: planVersionMeta.version_id,
+          created_at: planVersionMeta.created_at ?? null,
+          label: planVersionMeta.label ?? null,
+          network_target: planVersionMeta.network_target ?? null,
+          as_of_year: planVersionMeta.as_of_year ?? null,
+          as_of_month: planVersionMeta.as_of_month ?? null,
+          planning_year: planVersionMeta.planning_year ?? planningYear,
+          network_mean_at_save: planVersionMeta.network_mean_at_save ?? null,
+        }
+      : simulation.active_plan_version_id
+        ? {
+            version_id: simulation.active_plan_version_id,
+            planning_year: planningYear,
+            as_of_year: simulation.as_of.year,
+            as_of_month: simulation.as_of.month,
+            network_target: simulation.network.network_target,
+          }
+        : null,
   });
 }
 
