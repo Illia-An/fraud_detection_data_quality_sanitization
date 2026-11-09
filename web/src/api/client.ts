@@ -17,6 +17,10 @@ import {
   type SamplePreset,
   type SampleResponse,
 } from '../schemas/api';
+import {
+  excelReportRequestSchema,
+  type ExcelReportRequest,
+} from '../schemas/excelReport';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 import {
   ttsPlanRequestSchema,
@@ -119,6 +123,26 @@ export function postProcess(request: ProcessRequest): Promise<ProcessResponse> {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+const EXCEL_MEDIA_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+export async function postExcelReport(request: ExcelReportRequest): Promise<Blob> {
+  const body = excelReportRequestSchema.parse(request);
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}/reports/excel`, {
+    method: 'POST',
+    headers: {
+      Accept: EXCEL_MEDIA_TYPE,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new ApiError(response.status, text || response.statusText);
+  }
+  return response.blob();
 }
 
 export function postPlan(request: PlanRequest): Promise<PlanResponse> {

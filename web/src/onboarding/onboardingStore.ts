@@ -111,7 +111,7 @@ interface OnboardingState {
   status: OnboardingStatus;
   stepId: OnboardingStepId | null;
   completedStepIds: string[];
-  /** True after host mounts and decides auto-start / resume. */
+  /** True after host mounts (resume active tour if any; never auto-starts idle). */
   bootstrapped: boolean;
   start: (product: OnboardingProductState) => void;
   restart: (product: OnboardingProductState) => void;
@@ -150,15 +150,12 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   markBootstrapped: () => set({ bootstrapped: true }),
 
   bootstrap: (product) => {
+    void product;
     const { status, stepId, bootstrapped } = get();
     if (bootstrapped) {
       return;
     }
-    if (status === 'idle') {
-      get().start(product);
-      set({ bootstrapped: true });
-      return;
-    }
+    // Idle stays idle — tour starts only from nav "Product tour" (start/restart).
     if (status === 'active' && stepId != null) {
       trackOnboarding('onboarding_step_viewed', {
         tourId: ONBOARDING_TOUR_ID,
