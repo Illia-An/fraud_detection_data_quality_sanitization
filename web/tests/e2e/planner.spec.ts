@@ -51,13 +51,17 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(page.getByTestId('planner-glance-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Projected network KPI/i)).toBeVisible();
     await expect(page.getByText(/Hero evaluation/i)).toBeVisible();
-    // After Run, cumulative-slope Hero replaces the legacy evaluation chart when sim lands.
-    await expect(
-      page
-        .getByTestId('cumulative-slope-hero-chart')
-        .or(page.getByTestId('hero-evaluation-chart')),
-    ).toBeVisible({ timeout: 60_000 });
+    // Legacy Hero stays default; Slope is available via toggle after /simulation lands.
+    await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByTestId('planner-save-plan')).toBeEnabled({ timeout: 60_000 });
+    const heroMode = page.getByTestId('planner-hero-view-mode');
+    await expect(heroMode).toBeVisible({ timeout: 60_000 });
+    await heroMode.getByRole('button', { name: /Slope/i }).click();
+    await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
+      timeout: 15_000,
+    });
+    await heroMode.getByRole('button', { name: /Legacy/i }).click();
+    await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible();
 
     // At-risk is a collapsed bottom overlay — expand before asserting the table.
     await page.getByText(/At-Risk Exception List/i).click();

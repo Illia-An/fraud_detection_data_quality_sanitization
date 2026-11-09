@@ -489,6 +489,11 @@ export const he: Record<MessageKey, string> = {
     'רזרבת הקצאה רכה סביב הטיוטה (±נק׳) — לא מרווח סמך סטטיסטי.',
   'planner.hero.tip.asOf':
     'מעבר תכנון: טיוטה / נדרש / path-to-target מתחילים כאן. עובדה מנוקה ממומשת עדיין יכולה להופיע אחרי as-of כשיש חודשים מאוחרים בפאנל.',
+  'planner.hero.viewModeAria': 'מצב גרף Hero',
+  'planner.hero.viewLegacy': 'קלאסי',
+  'planner.hero.viewSlope': 'Slope',
+  'planner.hero.viewLegacyAria': 'Hero הערכה קלאסי (עובדה, טיוטה, מסלול נדרש)',
+  'planner.hero.viewSlopeAria': 'Hero cumulative-slope (תוכנית, בפועל, סימולציה)',
   'planner.hero.caption':
     'תצוגת הערכה · as-of ({asOf}) הוא מעבר תכנון · עובדה ממומשת יכולה להמשיך אחרי as-of · חרוט התחזית הוא רזרבת הקצאה (±{slack} נק׳), לא מרווח סמך סטטיסטי. גלילה אופקית במידת הצורך · גלגלת עכבר לזום · לחיצה כפולה לאיפוס. לחצו על תוויות המקרא להצגה/הסתרה · העבירו עכבר לטיפים קצרים.',
   'planner.hero.legendHide': 'לחצו להסתרה',

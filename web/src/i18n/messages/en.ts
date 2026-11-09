@@ -505,6 +505,11 @@ export const en = {
     'Soft allocation slack around the draft (±pp) — not a statistical confidence interval.',
   'planner.hero.tip.asOf':
     'Plan cutover: draft / required / path-to-target start here. Realized cleansed fact may still appear after as-of when the panel has later months.',
+  'planner.hero.viewModeAria': 'Hero chart mode',
+  'planner.hero.viewLegacy': 'Legacy',
+  'planner.hero.viewSlope': 'Slope',
+  'planner.hero.viewLegacyAria': 'Classic evaluation Hero (fact, draft, required path)',
+  'planner.hero.viewSlopeAria': 'Cumulative-slope Hero (plan, actual, simulation)',
   'planner.hero.caption':
     'Evaluation view · as-of ({asOf}) is plan cutover · realized fact may continue after as-of · forecast cone is allocation slack (±{slack} pp), not a statistical confidence interval. Scroll chart horizontally when needed · mouse wheel zooms · double-click resets. Click legend labels to show/hide series · hover for short tips.',
   'planner.hero.legendHide': 'Click to hide',
