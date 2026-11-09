@@ -31,6 +31,7 @@ import { useTheme } from '@mui/material/styles';
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
+import { postExcelReport } from '../api/client';
 import { usePlan } from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import {
@@ -49,6 +50,7 @@ import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
+import { buildExcelReportRequest } from '../schemas/excelReport';
 import {
   buildSanitizedPanelFromProcess,
   type SanitizedPanel,
@@ -174,6 +176,8 @@ export function PlannerPage() {
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+  const [excelExporting, setExcelExporting] = useState(false);
+  const [excelExportError, setExcelExportError] = useState(false);
 
   const onboardingStatus = useOnboardingStore((s) => s.status);
   const onboardingStepId = useOnboardingStore((s) => s.stepId);
@@ -474,6 +478,32 @@ export function PlannerPage() {
     }
     downloadPlanCsv(draftPlan);
     acceptDraftAsApproved();
+  };
+
+  const canExportExcel = draftPlan != null && panel != null && panel.rows.length > 0;
+
+  const handleExportExcel = () => {
+    if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
+      return;
+    }
+    setExcelExportError(false);
+    setExcelExporting(true);
+    const request = buildExcelReportRequest(panel, draftPlan);
+    void postExcelReport(request)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'sanitization-plan-report.xlsx';
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => {
+        setExcelExportError(true);
+      })
+      .finally(() => {
+        setExcelExporting(false);
+      });
   };
 
   return (
@@ -878,6 +908,26 @@ export function PlannerPage() {
                     </Button>
                   </span>
                 </Tooltip>
+                <Tooltip title={canExportExcel ? '' : t('planner.exportExcelDisabledTip')}>
+                  <span style={{ flex: 1 }}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      size="small"
+                      startIcon={
+                        excelExporting ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <DownloadRoundedIcon />
+                        )
+                      }
+                      disabled={!canExportExcel || excelExporting}
+                      onClick={handleExportExcel}
+                    >
+                      {t('planner.exportExcel')}
+                    </Button>
+                  </span>
+                </Tooltip>
                 <Tooltip
                   title={
                     isDirty && approvedPlan
@@ -905,6 +955,11 @@ export function PlannerPage() {
                   </span>
                 </Tooltip>
               </Stack>
+              {excelExportError ? (
+                <Alert severity="error" sx={{ py: 0.5 }}>
+                  {t('planner.exportExcelFailed')}
+                </Alert>
+              ) : null}
 
               {runBlock === 'no_stores' && (
                 <Typography variant="caption" color="warning.main">
