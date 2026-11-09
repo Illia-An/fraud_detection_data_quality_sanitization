@@ -29,6 +29,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useTheme } from '@mui/material/styles';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { postExcelReport } from '../api/client';
 import { useLoadTtsKpiFromAp, useTtsPlan } from '../api/hooks';
 import {
   activeAnswerLabelKey,
@@ -59,6 +60,7 @@ import {
   getStoreMixQuestion,
   type StoreMixQuestionId,
 } from '../schemas/storeMixQuestions';
+import { buildTtsExcelReportRequest } from '../schemas/excelReport';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import type { TtsKpiPanel } from '../schemas/ttsKpiPanel';
 import type { TtsPlan, TtsPlanParams } from '../schemas/ttsPlan';
@@ -167,6 +169,8 @@ export function TtsPlannerPage() {
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+  const [excelExporting, setExcelExporting] = useState(false);
+  const [excelExportError, setExcelExportError] = useState(false);
 
   const onboardingStatus = useOnboardingStore((s) => s.status);
   const onboardingStepId = useOnboardingStore((s) => s.stepId);
@@ -492,6 +496,32 @@ export function TtsPlannerPage() {
     }
     downloadTtsPlanCsv(draftPlan);
     acceptDraftAsApproved();
+  };
+
+  const canExportExcel = draftPlan != null && panel != null && panel.rows.length > 0;
+
+  const handleExportExcel = () => {
+    if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
+      return;
+    }
+    setExcelExportError(false);
+    setExcelExporting(true);
+    const request = buildTtsExcelReportRequest(panel, draftPlan);
+    void postExcelReport(request)
+      .then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'tts-plan-report.xlsx';
+        anchor.click();
+        URL.revokeObjectURL(url);
+      })
+      .catch(() => {
+        setExcelExportError(true);
+      })
+      .finally(() => {
+        setExcelExporting(false);
+      });
   };
 
   return (
@@ -828,6 +858,27 @@ export function TtsPlannerPage() {
                   >
                     {t('ttsPlanner.exportCsv')}
                   </Button>
+                  <Tooltip title={canExportExcel ? '' : t('ttsPlanner.exportExcelDisabledTip')}>
+                    <span style={{ flex: 1 }}>
+                      <Button
+                        variant="outlined"
+                        fullWidth
+                        size="small"
+                        startIcon={
+                          excelExporting ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <DownloadRoundedIcon />
+                          )
+                        }
+                        disabled={!canExportExcel || excelExporting}
+                        onClick={handleExportExcel}
+                        data-testid="tts-planner-export-excel"
+                      >
+                        {t('ttsPlanner.exportExcel')}
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button
                     variant="text"
                     color="warning"
@@ -840,6 +891,11 @@ export function TtsPlannerPage() {
                     {t('ttsPlanner.revertDraft')}
                   </Button>
                 </Stack>
+                {excelExportError ? (
+                  <Alert severity="error" sx={{ py: 0.5 }}>
+                    {t('ttsPlanner.exportExcelFailed')}
+                  </Alert>
+                ) : null}
               </Stack>
             </CardContent>
           </Card>

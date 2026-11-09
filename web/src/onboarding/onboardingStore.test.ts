@@ -90,12 +90,26 @@ describe('onboardingStore', () => {
     expect(useOnboardingStore.getState().stepId).toBeNull();
   });
 
-  it('bootstrap auto-starts when idle', () => {
+  it('bootstrap leaves idle until the user starts the tour', () => {
     useOnboardingStore.getState().bootstrap(product);
-    expect(useOnboardingStore.getState().status).toBe('active');
+    expect(useOnboardingStore.getState().status).toBe('idle');
+    expect(useOnboardingStore.getState().stepId).toBeNull();
     expect(useOnboardingStore.getState().bootstrapped).toBe(true);
     // second bootstrap is a no-op
     useOnboardingStore.getState().bootstrap(product);
-    expect(useOnboardingStore.getState().stepId).toBe('welcome');
+    expect(useOnboardingStore.getState().status).toBe('idle');
+  });
+
+  it('bootstrap resumes an in-progress tour without restarting', () => {
+    useOnboardingStore.setState({
+      status: 'active',
+      stepId: 'workspace',
+      completedStepIds: ['welcome'],
+      bootstrapped: false,
+    });
+    useOnboardingStore.getState().bootstrap(product);
+    expect(useOnboardingStore.getState().status).toBe('active');
+    expect(useOnboardingStore.getState().stepId).toBe('workspace');
+    expect(useOnboardingStore.getState().bootstrapped).toBe(true);
   });
 });
