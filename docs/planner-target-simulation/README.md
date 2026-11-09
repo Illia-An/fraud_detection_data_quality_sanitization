@@ -23,6 +23,7 @@ unreachable recommendations, and Excel month matrix.
 | —    | [contracts/domain-model.md](./contracts/domain-model.md) | Draft |
 | —    | [contracts/api-v1.md](./contracts/api-v1.md) | Draft |
 | —    | `src/planner/cumulative_slope/` | Phase 1 engine landed |
+| —    | `src/planner/plan_store.py` + `/api/v1/plan-versions` + `/simulation` | Phase 2 landed |
 
 ## Branch
 

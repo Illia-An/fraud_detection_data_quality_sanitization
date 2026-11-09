@@ -181,6 +181,7 @@ Open ops detail (Phase 2/5): exact path env var (e.g. `PLAN_STORE_PATH`), backup
 | O-01 | History-cap statistic | **Locked in Phase 1:** default `max_mom` (max positive month-over-month delta), floor `min_history_cap=0.25`. Alternatives `p95_mom` / `best_window` implemented and selectable via `NetworkPlanParams`. |
 | O-02 | Plateau “substantially ahead” threshold | **Locked in Phase 1:** `plateau_ahead_pp=2.0` — cumulative actual ≥ linear path to `network_target` + 2pp → slope 0. Also plateau at metric ceiling. |
 | O-03 | Planning year when as-of spans into next calendar year | Open — Eng |
-| O-04 | `PLAN_STORE_PATH` default in Docker Compose | Open — Eng Phase 2 |
+| O-04 | `PLAN_STORE_PATH` | **Locked in Phase 2:** env `PLAN_STORE_PATH` or default `data/plan_store.sqlite` (gitignored under `data/*.sqlite`). Docker volume `:rw` still to wire in Compose when packaging. |
 
-Phase 1 code: `src/planner/cumulative_slope/` (`simulate`, `build_baseline_plan`). Tests: `tests/test_planner_cumulative_slope.py`.
+Phase 1 code: `src/planner/cumulative_slope/` (`simulate`, `build_baseline_plan`). Tests: `tests/test_planner_cumulative_slope.py`.  
+Phase 2: `src/planner/plan_store.py`, `backend/cumulative_plan_schemas.py`, routes `/api/v1/plan-versions`, `/api/v1/simulation`, `/api/v1/simulation/adjust`.
