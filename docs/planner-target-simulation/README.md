@@ -19,9 +19,10 @@ unreachable recommendations, and Excel month matrix.
 
 | ID   | Artifact | Status |
 |------|----------|--------|
-| P001 | [SPEC-P001-target-simulation-planning.md](./SPEC-P001-target-simulation-planning.md) | Draft (locked decisions Q1–Q10) |
+| P001 | [SPEC-P001-target-simulation-planning.md](./SPEC-P001-target-simulation-planning.md) | Draft (D-01…D-10; O-01/O-02 locked in Phase 1) |
 | —    | [contracts/domain-model.md](./contracts/domain-model.md) | Draft |
 | —    | [contracts/api-v1.md](./contracts/api-v1.md) | Draft |
+| —    | `src/planner/cumulative_slope/` | Phase 1 engine landed |
 
 ## Branch
 
