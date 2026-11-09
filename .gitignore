@@ -26,6 +26,8 @@ docs/research/*_INTERNAL_PII*
 # Local Q10012 daily snapshot (may contain PII — never commit)
 data/*.sqlite
 data/*.sqlite-*
+# Baseline Plan versions (SPEC-P001) — local / compose volume
+data/plan_store/
 
 # Jupyter
 .ipynb_checkpoints/
