@@ -141,3 +141,34 @@ def test_simulation_adjust(tmp_path: Path, monkeypatch):
     assert response.status_code == 200, response.text
     store10 = next(s for s in response.json()["stores"] if s["store_id"] == 10)
     assert store10["implied_target"] == 72.0
+
+
+def test_phase5_smoke_save_survives_reopen(tmp_path: Path, monkeypatch):
+    """Save → new client/store handle → frozen targets unchanged (ops restart simulation)."""
+    db_path = tmp_path / "plan_store" / "plans.sqlite"
+    monkeypatch.setenv("PLAN_STORE_PATH", str(db_path))
+    client = TestClient(create_app())
+    created = client.post("/api/v1/plan-versions", json=_base_body(label="phase5")).json()
+    version_id = created["meta"]["id"]
+    frozen = {
+        s["store_id"]: [m["score"] for m in s["monthly_target"]] for s in created["stores"]
+    }
+
+    # Simulate process restart: new app + same PLAN_STORE_PATH
+    client2 = TestClient(create_app())
+    listed = client2.get("/api/v1/plan-versions").json()["items"]
+    assert any(item["id"] == version_id for item in listed)
+    fetched = client2.get(f"/api/v1/plan-versions/{version_id}").json()
+    assert {
+        s["store_id"]: [m["score"] for m in s["monthly_target"]] for s in fetched["stores"]
+    } == frozen
+
+    over = client2.post(
+        "/api/v1/simulation",
+        json=_base_body(active_plan_version_id=version_id),
+    )
+    assert over.status_code == 200
+    assert {
+        s["store_id"]: [m["score"] for m in s["monthly_target"]]
+        for s in over.json()["stores"]
+    } == frozen

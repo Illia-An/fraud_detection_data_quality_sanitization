@@ -19,13 +19,16 @@ unreachable recommendations, and Excel month matrix.
 
 | ID   | Artifact | Status |
 |------|----------|--------|
-| P001 | [SPEC-P001-target-simulation-planning.md](./SPEC-P001-target-simulation-planning.md) | Draft (D-01…D-10; O-01/O-02 locked in Phase 1) |
+| P001 | [SPEC-P001-target-simulation-planning.md](./SPEC-P001-target-simulation-planning.md) | Draft (D-01…D-10; O-01/O-02/O-04 locked) |
+| P001 | [REPORT-P001-phases-0-5.md](./REPORT-P001-phases-0-5.md) | Phases 0–5 on branch |
 | —    | [contracts/domain-model.md](./contracts/domain-model.md) | Draft |
-| —    | [contracts/api-v1.md](./contracts/api-v1.md) | Draft |
+| —    | [contracts/api-v1.md](./contracts/api-v1.md) | Implemented (Phase 2) |
+| —    | [RUNBOOK-plan-store.md](./RUNBOOK-plan-store.md) | Phase 5 |
 | —    | `src/planner/cumulative_slope/` | Phase 1 engine landed |
 | —    | `src/planner/plan_store.py` + `/api/v1/plan-versions` + `/simulation` | Phase 2 landed |
 | —    | FE Plan/Actual/Sim Hero + Save Plan | Phase 3 landed |
 | —    | Excel StoreMatrix M1–12 + version context | Phase 4 landed |
+| —    | Compose volume + handoff supersession + smoke | Phase 5 landed |
 
 ## Branch
 
