@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from backend.db_sample import (
     DEFAULT_FROM_DATE,
@@ -21,6 +21,7 @@ from backend.db_sample import (
     load_db_sample_meta_from_settings,
 )
 from backend.profiler import profile_block, profiling_meta
+from backend.report_schemas import ExcelReportRequest, to_excel_report_document
 from backend.queries import (
     load_actual_baseline_from_settings,
     load_tier_candidates_from_settings,
@@ -456,6 +457,28 @@ def create_app() -> FastAPI:
             return TtsPlanResponse(metrics={"tts": metric})
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post(
+        f"{API_PREFIX}/reports/excel",
+        tags=["reports"],
+        responses={
+            200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}},
+            422: {"description": "Validation error"},
+        },
+    )
+    def create_excel_report(body: ExcelReportRequest) -> Response:
+        """Pack a finished sanitization and plan into an Excel file."""
+        from excel_report.workbook import build_excel_report
+
+        try:
+            payload = build_excel_report(to_excel_report_document(body))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return Response(
+            content=payload,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": 'attachment; filename="sanitization-plan-report.xlsx"'},
+        )
 
     @app.get(
         f"{API_PREFIX}/tts-kitchen/before-after",

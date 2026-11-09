@@ -95,6 +95,7 @@ describe('TtsPlannerPage shell', () => {
     );
     expect(screen.queryByRole('link', { name: /Sanitization/i })).not.toBeInTheDocument();
     expect(screen.getByTestId('tts-planner-run')).toBeDisabled();
+    expect(screen.getByTestId('tts-planner-export-excel')).toBeDisabled();
     expect(screen.getByTestId('tts-planner-hero')).toBeInTheDocument();
     expect(screen.getByTestId('tts-planner-at-risk')).toBeInTheDocument();
     expect(screen.getByTestId('scenario-packs')).toBeInTheDocument();

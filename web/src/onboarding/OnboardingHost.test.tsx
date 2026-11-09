@@ -61,8 +61,19 @@ describe('OnboardingHost', () => {
     resetOnboardingStoreForTests();
   });
 
-  it('shows welcome on first visit and advances on Start', async () => {
+  it('stays hidden until the user starts the tour, then advances on Start', async () => {
     renderHost();
+    await waitFor(() => {
+      expect(useOnboardingStore.getState().bootstrapped).toBe(true);
+    });
+    expect(screen.queryByTestId('onboarding-tour-card')).not.toBeInTheDocument();
+
+    useOnboardingStore.getState().start({
+      hasProcessResult: false,
+      hasPlannerPanel: false,
+      hasDraftPlan: false,
+      hasTtsDraftPlan: false,
+    });
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-tour-card')).toBeInTheDocument();
     });
