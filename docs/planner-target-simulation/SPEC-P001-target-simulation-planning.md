@@ -184,4 +184,6 @@ Open ops detail (Phase 2/5): exact path env var (e.g. `PLAN_STORE_PATH`), backup
 | O-04 | `PLAN_STORE_PATH` | **Locked in Phase 2:** env `PLAN_STORE_PATH` or default `data/plan_store.sqlite` (gitignored under `data/*.sqlite`). Docker volume `:rw` still to wire in Compose when packaging. |
 
 Phase 1 code: `src/planner/cumulative_slope/` (`simulate`, `build_baseline_plan`). Tests: `tests/test_planner_cumulative_slope.py`.  
-Phase 2: `src/planner/plan_store.py`, `backend/cumulative_plan_schemas.py`, routes `/api/v1/plan-versions`, `/api/v1/simulation`, `/api/v1/simulation/adjust`.
+Phase 2: `src/planner/plan_store.py`, `backend/cumulative_plan_schemas.py`, routes `/api/v1/plan-versions`, `/api/v1/simulation`, `/api/v1/simulation/adjust`.  
+Phase 3: FE `CumulativeSlopeHeroChart`, Save Plan, Export Excel separation.  
+Phase 4: Excel `StoreMatrix` sheet (store×metric×M1–12) + `plan_version` Summary fields; FE `buildExcelReportRequestFromSimulation`.

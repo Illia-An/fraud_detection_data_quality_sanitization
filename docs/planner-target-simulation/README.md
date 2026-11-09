@@ -25,6 +25,7 @@ unreachable recommendations, and Excel month matrix.
 | —    | `src/planner/cumulative_slope/` | Phase 1 engine landed |
 | —    | `src/planner/plan_store.py` + `/api/v1/plan-versions` + `/simulation` | Phase 2 landed |
 | —    | FE Plan/Actual/Sim Hero + Save Plan | Phase 3 landed |
+| —    | Excel StoreMatrix M1–12 + version context | Phase 4 landed |
 
 ## Branch
 

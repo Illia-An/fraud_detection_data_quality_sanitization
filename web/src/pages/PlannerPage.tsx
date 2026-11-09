@@ -55,7 +55,10 @@ import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
-import { buildExcelReportRequest } from '../schemas/excelReport';
+import {
+  buildExcelReportRequest,
+  buildExcelReportRequestFromSimulation,
+} from '../schemas/excelReport';
 import {
   buildSanitizedPanelFromProcess,
   type SanitizedPanel,
@@ -588,7 +591,10 @@ export function PlannerPage() {
     }
     setExcelExportError(false);
     setExcelExporting(true);
-    const request = buildExcelReportRequest(panel, draftPlan);
+    const request =
+      slopeSimulation != null
+        ? buildExcelReportRequestFromSimulation(panel, draftPlan, slopeSimulation)
+        : buildExcelReportRequest(panel, draftPlan);
     void postExcelReport(request)
       .then((blob) => {
         const url = URL.createObjectURL(blob);
