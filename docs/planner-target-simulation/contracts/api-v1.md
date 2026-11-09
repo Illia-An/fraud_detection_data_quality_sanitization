@@ -1,6 +1,6 @@
 # Contract: HTTP API v1 — Plan versions & Simulation
 
-**Status:** Draft (Phase 0)  
+**Status:** Implemented (Phase 2) — see routes in `backend/main.py`  
 **Spec:** [SPEC-P001](../SPEC-P001-target-simulation-planning.md)  
 **Domain:** [domain-model.md](./domain-model.md)  
 **Base path:** `/api/v1`  
