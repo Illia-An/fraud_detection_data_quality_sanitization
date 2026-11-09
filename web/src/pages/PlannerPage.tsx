@@ -25,11 +25,13 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { postExcelReport } from '../api/client';
@@ -194,6 +196,8 @@ export function PlannerPage() {
   const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
+  /** Keep legacy Hero as default; Slope is opt-in after /simulation lands. */
+  const [heroViewMode, setHeroViewMode] = useState<'legacy' | 'slope'>('legacy');
 
   const onboardingStatus = useOnboardingStore((s) => s.status);
   const onboardingStepId = useOnboardingStore((s) => s.stepId);
@@ -1301,6 +1305,39 @@ export function PlannerPage() {
                   <CardHeader
                     title={t('planner.heroTitle')}
                     subheader={t('planner.heroSub')}
+                    action={
+                      slopeLayers ? (
+                        <ToggleButtonGroup
+                          size="small"
+                          exclusive
+                          value={heroViewMode}
+                          onChange={(
+                            _event: MouseEvent<HTMLElement>,
+                            next: 'legacy' | 'slope' | null,
+                          ) => {
+                            if (next != null) {
+                              setHeroViewMode(next);
+                            }
+                          }}
+                          aria-label={t('planner.hero.viewModeAria')}
+                          data-testid="planner-hero-view-mode"
+                          sx={{ mr: 1, mt: 0.5 }}
+                        >
+                          <ToggleButton
+                            value="legacy"
+                            aria-label={t('planner.hero.viewLegacyAria')}
+                          >
+                            {t('planner.hero.viewLegacy')}
+                          </ToggleButton>
+                          <ToggleButton
+                            value="slope"
+                            aria-label={t('planner.hero.viewSlopeAria')}
+                          >
+                            {t('planner.hero.viewSlope')}
+                          </ToggleButton>
+                        </ToggleButtonGroup>
+                      ) : undefined
+                    }
                     sx={{ flexShrink: 0, pb: 0 }}
                   />
                   <CardContent
@@ -1325,7 +1362,7 @@ export function PlannerPage() {
                         />
                       </Tooltip>
                     ) : null}
-                    {panel && slopeLayers ? (
+                    {panel && slopeLayers && heroViewMode === 'slope' ? (
                       <CumulativeSlopeHeroChart layers={slopeLayers} />
                     ) : panel ? (
                       <HeroSimulationChart
