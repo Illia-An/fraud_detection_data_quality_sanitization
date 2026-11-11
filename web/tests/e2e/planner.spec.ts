@@ -93,7 +93,7 @@ test.describe('Planner alt-UI smoke', () => {
 
     // Estimate funnel is collapsed by default.
     await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
-    await expect(dialog.getByRole('button', { name: /Recalculate/i })).toBeVisible();
+    await expect(dialog.getByTestId('inspect-recalculate')).toBeVisible();
 
     await dialog.locator('.MuiDialogActions-root').getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('store-inspect-dialog')).toHaveCount(0);
