@@ -95,6 +95,8 @@ export const unreachableHintSchema = z.object({
   network_impact_pp: z.number(),
 });
 
+export type UnreachableHint = z.output<typeof unreachableHintSchema>;
+
 export const simulationResponseSchema = z.object({
   as_of: yearMonthSchema,
   planning_year: z.number().int(),

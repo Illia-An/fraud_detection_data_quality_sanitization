@@ -49,9 +49,18 @@ import {
   sandboxScoreBounds,
   type SandboxEvenSplitPreview,
 } from '../../schemas/sandboxPreview';
+import type { SimulationResponse, UnreachableHint } from '../../schemas/cumulativePlan';
+import {
+  buildInspectSlopeAlign,
+  buildStoreCumulativeSlopeLayers,
+  type StoreBoostGlance,
+} from './cumulativeSlopeLayers';
+import { CumulativeSlopeHeroChart } from './CumulativeSlopeHeroChart';
 import { StoreHeroEvaluationChart } from './StoreHeroEvaluationChart';
 import { InspectStoreGlance } from './InspectStoreGlance';
+import { UnreachableRecommendationCard } from './UnreachableRecommendationCard';
 import type { StoreBaselineRow } from './atRiskRowMetrics';
+import { SLOPE_PANEL_MIN_HEIGHT_PX } from './slopeHeroShared';
 
 /** EXP: large Inspect dialog — room for store Hero + sandbox (~+13% vs 1400). */
 const INSPECT_DIALOG_PAPER_MAX_PX = 1580;
@@ -60,8 +69,10 @@ const SANDBOX_SUMMARY_RESERVE_PX = 56;
 const SANDBOX_OVERLAY_GAP_PX = 8;
 /** Expanded Estimate overlay cap — chart underneath keeps space. */
 const SANDBOX_OVERLAY_MAX_HEIGHT = '42vh';
-/** Min plot height when chart fills remaining Inspect pane. */
+/** Min plot height when legacy chart fills remaining Inspect pane. */
 const STORE_HERO_IN_DIALOG_MIN_PX = 280;
+/** Dual Slope panels need roughly 2× panel min inside the dialog. */
+const STORE_SLOPE_IN_DIALOG_MIN_PX = SLOPE_PANEL_MIN_HEIGHT_PX * 2;
 
 type InspectPanel = MetricScorePanel & {
   echo_config?: SanitizedPanel['echo_config'];
@@ -82,6 +93,15 @@ interface StoreAuditDrawerProps<T extends DirectedPlan = DirectedPlan> {
   onStoreChange: (storeId: number) => void;
   /** Commit even-split into session draftPlan (Hero updates; Inspect stays open). */
   onApplyPlan: (plan: T) => void;
+  /** SPEC-P001 unreachable hint for this store (from live simulation). */
+  unreachableHint?: UnreachableHint | null;
+  /** Apply suggested implied target via /simulation/adjust. */
+  onApplyUnreachableSuggestion?: () => void;
+  unreachableApplyPending?: boolean;
+  /** Boost / slope glance from cumulative_slope store curves. */
+  boostGlance?: StoreBoostGlance | null;
+  /** Live Slope simulation — when present, Inspect uses dual-panel Slope chart. */
+  slopeSimulation?: SimulationResponse | null;
   /** Store evaluation Y-axis title. Default keeps the 5% planner label. */
   yAxisTitle?: string;
   /** Appended to store evaluation tick labels. Default `%`. */
@@ -109,6 +129,11 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   onClose,
   onStoreChange,
   onApplyPlan,
+  unreachableHint = null,
+  onApplyUnreachableSuggestion,
+  unreachableApplyPending = false,
+  boostGlance = null,
+  slopeSimulation = null,
   yAxisTitle,
   tickSuffix,
 }: StoreAuditDrawerProps<T>) {
@@ -117,6 +142,17 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
     () =>
       [...new Set(plan.projections.map((p) => p.store_id))].sort((a, b) => a - b),
     [plan.projections],
+  );
+  const slopeLayers = useMemo(
+    () =>
+      slopeSimulation != null
+        ? buildStoreCumulativeSlopeLayers(slopeSimulation, storeId)
+        : null,
+    [slopeSimulation, storeId],
+  );
+  const slopeAlign = useMemo(
+    () => (slopeLayers != null ? buildInspectSlopeAlign(slopeLayers) : null),
+    [slopeLayers],
   );
   const projection = plan.projections.find((p) => p.store_id === storeId);
   const monitorRow: StoreMonitorRow | undefined = insights.stores.find(
@@ -465,11 +501,46 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           storeId={storeId}
           baselineRows={baselineRows}
           draftLast={appliedDraft}
+          slopeAlign={slopeAlign}
         />
+        {boostGlance != null ? (
+          <Alert
+            severity="info"
+            variant="outlined"
+            data-testid="inspect-boost-glance"
+            sx={{ flexShrink: 0, mb: 1, py: 0.5 }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+              {t('planner.inspect.boostTitle')}
+            </Typography>
+            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.25 }}>
+              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {t('planner.inspect.boostGap', {
+                  gap: boostGlance.gapToMean.toFixed(1),
+                })}
+              </Typography>
+              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {t('planner.inspect.boostSlope', {
+                  slope: boostGlance.slope.toFixed(2),
+                })}
+              </Typography>
+            </Stack>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+              {t('planner.inspect.boostHint')}
+            </Typography>
+          </Alert>
+        ) : null}
+        {unreachableHint != null && onApplyUnreachableSuggestion != null ? (
+          <UnreachableRecommendationCard
+            hint={unreachableHint}
+            onApply={onApplyUnreachableSuggestion}
+            applyPending={unreachableApplyPending}
+          />
+        ) : null}
         <Box
           sx={{
             flex: 1,
-            minHeight: 0,
+            minHeight: slopeLayers != null ? STORE_SLOPE_IN_DIALOG_MIN_PX : 0,
             width: '100%',
             display: 'flex',
             flexDirection: 'column',
@@ -479,17 +550,31 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
             },
           }}
         >
-          <StoreHeroEvaluationChart
-            plan={plan}
-            storeId={storeId}
-            panel={panel}
-            insights={insights}
-            draftLast={appliedDraft}
-            plotHeightPx={STORE_HERO_IN_DIALOG_MIN_PX}
-            fillParent
-            yAxisTitle={yAxisTitle}
-            tickSuffix={tickSuffix}
-          />
+          {slopeLayers != null ? (
+            <Stack spacing={0.35} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+              <Typography
+                sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
+              >
+                {t('planner.storeHero.title')}
+              </Typography>
+              <CumulativeSlopeHeroChart
+                layers={slopeLayers}
+                yAxisTitle={yAxisTitle ?? '5% Score'}
+              />
+            </Stack>
+          ) : (
+            <StoreHeroEvaluationChart
+              plan={plan}
+              storeId={storeId}
+              panel={panel}
+              insights={insights}
+              draftLast={appliedDraft}
+              plotHeightPx={STORE_HERO_IN_DIALOG_MIN_PX}
+              fillParent
+              yAxisTitle={yAxisTitle}
+              tickSuffix={tickSuffix}
+            />
+          )}
         </Box>
 
         <Box

@@ -3,6 +3,7 @@ import { ThemeProvider } from '@mui/material';
 import { describe, expect, it, vi } from 'vitest';
 
 import { defaultPipelineConfig } from '../../schemas/api';
+import type { SimulationResponse } from '../../schemas/cumulativePlan';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
@@ -12,6 +13,46 @@ import { StoreAuditDrawer } from './StoreAuditDrawer';
 vi.mock('react-plotly.js', () => ({
   default: () => <div data-testid="store-hero-plotly-mock" />,
 }));
+
+const slopeSimulation: SimulationResponse = {
+  as_of: { year: 2025, month: 4 },
+  planning_year: 2025,
+  active_plan_version_id: null,
+  network: {
+    network_target: 75,
+    network_mean_as_of: 70,
+    projected_network_mean_eoy: 72,
+    feasible: true,
+    store_count: 1,
+  },
+  stores: [
+    {
+      store_id: 10,
+      monthly_target: [
+        { year: 2025, month: 4, score: 68 },
+        { year: 2025, month: 5, score: 69 },
+      ],
+      cumulative_planned: [
+        { year: 2025, month: 4, score: 68 },
+        { year: 2025, month: 5, score: 68.5 },
+      ],
+      actual: [{ year: 2025, month: 4, score: 66 }],
+      cumulative_actual: [{ year: 2025, month: 4, score: 66 }],
+      simulation: [{ year: 2025, month: 5, score: 67 }],
+      cumulative_actual_or_simulation: [
+        { year: 2025, month: 4, score: 66 },
+        { year: 2025, month: 5, score: 66.5 },
+      ],
+      implied_target: 75,
+      gap_to_mean: 4,
+      slope: 1,
+      unreachable: false,
+      suggested_implied_target: null,
+      capped: false,
+    },
+  ],
+  unreachable: [],
+};
 
 const plan: FivePercentPlan = {
   metric_id: 'five_percent',
@@ -86,6 +127,7 @@ function renderDrawer(overrides?: {
   onStoreChange?: (id: number) => void;
   onApplyPlan?: (next: FivePercentPlan) => void;
   plan?: FivePercentPlan;
+  slopeSimulation?: SimulationResponse | null;
 }) {
   const onStoreChange = overrides?.onStoreChange ?? vi.fn();
   const onApplyPlan = overrides?.onApplyPlan ?? vi.fn();
@@ -108,6 +150,11 @@ function renderDrawer(overrides?: {
           onClose={vi.fn()}
           onStoreChange={onStoreChange}
           onApplyPlan={onApplyPlan}
+          slopeSimulation={
+            overrides && 'slopeSimulation' in overrides
+              ? overrides.slopeSimulation
+              : null
+          }
         />
       </ThemeProvider>,
     ),
@@ -121,6 +168,9 @@ describe('StoreAuditDrawer', () => {
     expect(screen.getByTestId('store-inspect-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
     expect(screen.getByText(/Store snapshot/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fact As-Of \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plan As-Of \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByTestId('inspect-fact-as-of-hint')).toBeInTheDocument();
     expect(screen.getByText('66.0%')).toBeInTheDocument();
     expect(screen.getByText('68.0%')).toBeInTheDocument();
     expect(screen.getByText('−2.0 pp')).toBeInTheDocument();
@@ -133,6 +183,7 @@ describe('StoreAuditDrawer', () => {
     expect(screen.getByLabelText(/Session sandbox what-if/i)).toBeInTheDocument();
     expect(screen.getByTestId('store-hero-evaluation-chart')).toBeInTheDocument();
     expect(screen.getByText(/Store evaluation/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('cumulative-slope-hero-chart')).not.toBeInTheDocument();
     expect(screen.queryByText(/as-of gap/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Same evaluation grammar/i)).not.toBeInTheDocument();
     await waitFor(() => {
@@ -253,5 +304,28 @@ describe('StoreAuditDrawer', () => {
     const estimate = screen.getByLabelText(/Last month estimate/i) as HTMLInputElement;
     expect(Number(estimate.value)).toBeCloseTo(72, 5);
     expect(screen.getByTestId('inspect-reset')).toBeDisabled();
+  });
+
+  it('renders dual-panel Slope chart when slopeSimulation is provided', async () => {
+    renderDrawer({ slopeSimulation });
+
+    expect(screen.getByText(/Store evaluation/i)).toBeInTheDocument();
+    expect(screen.getByTestId('cumulative-slope-hero-chart')).toBeInTheDocument();
+    expect(screen.queryByTestId('store-hero-evaluation-chart')).not.toBeInTheDocument();
+    expect(screen.getByTestId('slope-cutover-caption')).toBeInTheDocument();
+    expect(screen.getByTestId('slope-status-hint')).toBeInTheDocument();
+    // Aligned glance: last plotted fact from slope curves (2025-04 in fixture).
+    expect(screen.getByText('Fact As-Of (2025-04)')).toBeInTheDocument();
+    expect(screen.getByText('Baseline → Plan end (monthly)')).toBeInTheDocument();
+    expect(screen.getByText('EOY plan (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('EOY forecast (cum.)')).toBeInTheDocument();
+    expect(screen.getByTestId('slope-cutover-caption').textContent).toMatch(
+      /declared as-of/i,
+    );
+    expect(screen.getByTestId('slope-panel-cumulative')).toBeInTheDocument();
+    expect(screen.getByTestId('slope-panel-monthly')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getAllByTestId('store-hero-plotly-mock').length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

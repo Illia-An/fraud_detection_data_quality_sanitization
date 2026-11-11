@@ -277,22 +277,82 @@ export const en = {
   'planner.savePlanDisabledTip': 'Run a simulation first, then save a baseline version.',
   'planner.savePlanFailed': 'Could not save the plan version.',
   'planner.savePlanSaved': 'Plan version saved.',
-  'planner.unreachableChip': '{count} stores may miss target',
+  'planner.unreachableChip': '{count} stores: unrealistic implied targets',
   'planner.unreachableChipTip':
-    'Required growth exceeds a realistic rate. Open Inspect for suggested store targets.',
-  'planner.slope.actual': 'Actual',
-  'planner.slope.plan': 'Baseline plan',
-  'planner.slope.simulation': 'Simulation',
-  'planner.slope.cumActualSim': 'Cumulative actual / sim',
-  'planner.slope.tip.actual': 'Cleansed monthly fact through as-of (black).',
+    'Not the same as Ahead/Behind or network EOY vs target. These stores need growth above a realistic history cap to hit their implied target. Click to Inspect and apply a suggested store target.',
+  'planner.unreachable.title': 'Implied store target may be unreachable',
+  'planner.unreachable.body':
+    'Suggested store target {implied}% → {suggested}%. Simulation will recompute with this limited adjustment (does not Save Plan).',
+  'planner.unreachable.networkImpact': 'Network EOY impact if applied: {impact}',
+  'planner.unreachable.reason': 'Reason: {reason}',
+  'planner.unreachable.apply': 'Apply suggestion',
+  'planner.unreachable.applyPending': 'Applying…',
+  'planner.unreachable.applyFailed': 'Could not apply the suggested target.',
+  'planner.atRisk.mayMiss': 'May miss',
+  'planner.slope.actual': 'Fact',
+  'planner.slope.plan': 'Plan',
+  'planner.slope.planCum': 'Plan (cumulative)',
+  'planner.slope.simulation': 'Simulation forecast',
+  'planner.slope.cumActualSimYtd': 'Planning-year fact + forecast (cumulative)',
+  'planner.slope.cumActualSimYtdForecast': 'Planning-year forecast (after cutover)',
+  'planner.slope.cumActualSim': 'History cumulative (since data start)',
+  'planner.slope.requiredMonthly': 'Required monthly (to network target)',
+  'planner.slope.requiredCumulative': 'Required cumulative (to network target)',
+  'planner.slope.tip.actual':
+    'Cleansed monthly fact through the last available fact month (black points). Not the same as Plan.',
   'planner.slope.tip.plan':
-    'Frozen baseline monthly targets after Save Plan; otherwise the current computed plan path (blue).',
+    'Monthly plan targets (blue). After Save Plan these freeze; otherwise they follow the live computed path.',
+  'planner.slope.tip.planCum':
+    'Running mean of monthly plan in the planning year — fair compare to Planning-year fact + forecast (cumulative).',
+  'planner.slope.tip.cumActualSimYtd':
+    'Planning-year running mean only (not full history): solid through last fact, dashed after (forecast). This is the EOY forecast used vs Target. Same grain as Plan (cumulative).',
   'planner.slope.tip.simulation':
-    'Live forecast after as-of from cumulative actuals — recalculates with new facts (grey).',
+    'Live monthly forecast after the last fact month — grey dashed line with diamond markers; recalculates with new facts. May overlap Plan before Save.',
   'planner.slope.tip.cumActualSim':
-    'Running mean from data start through as-of, then continued with simulation.',
+    'Long-run running mean since data start (e.g. 2025-01). Context only — not the EOY planning-year verdict. Hidden by default.',
+  'planner.slope.tip.requiredMonthly':
+    'Not fact, not Simulation, and not this store’s implied target: monthly scores after the last fact that would carry the data-start running mean to the network target by Dec of the planning year. Often above a realistic cap — hidden by default.',
+  'planner.slope.tip.requiredCumulative':
+    'Running mean of fact from data start through the last fact, then required monthlies to the network target (not store implied). Hidden by default.',
+  'planner.slope.panelCumulative': 'Cumulative path (plan vs planning-year fact / forecast)',
+  'planner.slope.panelMonthly': 'Monthly levels (fact · plan · simulation forecast)',
+  'planner.slope.legendShow': 'Show legend',
+  'planner.slope.legendHide': 'Hide legend',
+  'planner.slope.legendToggleAria': 'Show or hide Slope chart legend',
   'planner.slope.caption':
-    'Plan (blue) freezes on Save · Actual (black) · Simulation (grey) updates live · click legend to hide series.',
+    'Two views of one plan: cumulative verdict (top) · monthly tempo (bottom) · each panel has its own legend · Plan freezes on Save · Simulation updates live.',
+  'planner.slope.cutoverCaption':
+    'Cutover: plotted fact through {factEnd} · forecast from {forecastStart} · declared as-of {declaredAsOf}',
+  'planner.slope.cutoverCaptionNoFact':
+    'Cutover: no plotted fact months · forecast from {forecastStart} · declared as-of {declaredAsOf}',
+  'planner.slope.cutoverLine': 'fact→plan/forecast',
+  'planner.slope.cutoverLegend': 'Cutover',
+  'planner.slope.tip.cutover':
+    'Vertical boundary after the last plotted fact month (may differ from declared as-of if that month has no fact yet): left = fact, right = plan / simulation forecast.',
+  'planner.slope.eoyPlan': 'EOY plan (planning year): {value}%',
+  'planner.slope.eoySim': 'EOY forecast (planning year): {value}%',
+  'planner.slope.eoyTarget': 'Network target: {value}%',
+  'planner.slope.statusHint':
+    'Three different reads — (1) Ahead/Behind = fact vs plan at cutover · (2) Year outcome = EOY planning-year forecast vs target {target}% · (3) Yellow chip = unrealistic store implied targets. Not the same verdict.',
+  'planner.heroSubSlope':
+    'Planning-year cumulative verdict · monthly tempo · history optional · cutover = last plotted fact',
+  'planner.inspect.boostTitle': 'Boost / slope',
+  'planner.inspect.boostGap': 'Gap to network mean: {gap} pp',
+  'planner.inspect.boostSlope': 'Monthly slope: {slope} pp',
+  'planner.inspect.boostHint':
+    'Positive gap = below mean → steeper boost. Mild/plateau when ahead.',
+  'planner.inspect.factAsOfMonth': 'Fact As-Of ({month})',
+  'planner.inspect.planAsOfMonth': 'Plan As-Of ({month})',
+  'planner.inspect.factAsOfHint':
+    'Cleansed fact for the monitoring as-of month — not the blue Plan point on the chart.',
+  'planner.inspect.factAsOfHintAligned':
+    'Fact As-Of = last plotted fact on the chart. Gap = fact vs plan at that month (Ahead/Behind). Plan end (monthly) ≠ EOY plan/forecast (cumulative on the top chart). Required lines (if shown) aim at the network target, not this store’s implied target.',
+  'planner.inspect.glanceSubAligned':
+    'Store snapshot · last plotted fact {factMonth} · declared as-of {declaredAsOf} · Lift follows monthly plan end (Estimate overrides End)',
+  'planner.inspect.baselinePlanEnd': 'Baseline → Plan end (monthly)',
+  'planner.inspect.eoyPlanCum': 'EOY plan (cum.)',
+  'planner.inspect.eoyForecast': 'EOY forecast (cum.)',
+  'planner.slope.lastFact': 'Last fact',
   'planner.revertDraft': 'Revert draft',
   'planner.revertDraftTip':
     'Restore the session baseline plan (before Apply / surplus edits). Closes Inspect.',
@@ -422,7 +482,8 @@ export const en = {
 
   'planner.inspect.titlePrefix': 'Inspect ·',
   'planner.inspect.storeSelect': 'Select store',
-  'planner.inspect.glanceSub': 'Store snapshot · as-of {asOf} · End / Lift follow Estimate',
+  'planner.inspect.glanceSub':
+    'Store snapshot · monitoring as-of {asOf} · Fact As-Of is cleansed fact that month · End / Lift follow Estimate',
   'planner.inspect.sandboxWarn':
     'Session sandbox what-if — draft only. Does not mutate the accepted plan, Export CSV, or DB.',
   'planner.inspect.estimateTitle': 'Estimate vs actual',
@@ -474,8 +535,8 @@ export const en = {
   'planner.hero.cone': 'Forecast cone',
   'planner.hero.coneSlack': 'Forecast cone (±slack)',
   'planner.hero.fact': 'Cleansed fact',
-  'planner.hero.requiredMonthly': 'Required monthly (to hit target)',
-  'planner.hero.requiredCumulative': 'Required cumulative (if required monthly)',
+  'planner.hero.requiredMonthly': 'Required monthly (to network target)',
+  'planner.hero.requiredCumulative': 'Required cumulative (to network target)',
   'planner.hero.cumulative': 'Cumulative actual',
   'planner.hero.windowCumulative': 'Path to target (−3 mo)',
   'planner.hero.planCumulative': 'Cumulative plan (if draft)',

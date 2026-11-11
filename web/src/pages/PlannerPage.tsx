@@ -35,7 +35,12 @@ import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { postExcelReport } from '../api/client';
-import { usePlan, useRunSimulation, useSavePlanVersion } from '../api/hooks';
+import {
+  useAdjustSimulation,
+  usePlan,
+  useRunSimulation,
+  useSavePlanVersion,
+} from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import {
   activeAnswerLabelKey,
@@ -43,11 +48,18 @@ import {
 } from '../components/planner/activeAnswer';
 import { createAnswerUndoSnapshot, type AnswerUndoSnapshot } from '../components/planner/answerUndo';
 import { CumulativeSlopeHeroChart } from '../components/planner/CumulativeSlopeHeroChart';
-import { buildNetworkCumulativeSlopeLayers } from '../components/planner/cumulativeSlopeLayers';
+import {
+  buildNetworkCumulativeSlopeLayers,
+  getStoreBoostGlance,
+} from '../components/planner/cumulativeSlopeLayers';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
+import {
+  mergeImpliedAdjustment,
+  type ImpliedAdjustment,
+} from '../components/planner/impliedAdjustments';
 import { panelToSimulationFacts } from '../components/planner/panelToSimulationFacts';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
-import type { SimulationResponse } from '../schemas/cumulativePlan';
+import type { SimulationResponse, UnreachableHint } from '../schemas/cumulativePlan';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
@@ -186,6 +198,7 @@ export function PlannerPage() {
   const setActivePlanVersionId = usePlannerScenarioStore((s) => s.setActivePlanVersionId);
 
   const simulationMutation = useRunSimulation();
+  const adjustSimulationMutation = useAdjustSimulation();
   const savePlanMutation = useSavePlanVersion();
 
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
@@ -194,8 +207,11 @@ export function PlannerPage() {
   const [excelExporting, setExcelExporting] = useState(false);
   const [excelExportError, setExcelExportError] = useState(false);
   const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
+  /** Session overrides from Apply suggestion — sent together on each /simulation/adjust. */
+  const [impliedAdjustments, setImpliedAdjustments] = useState<ImpliedAdjustment[]>([]);
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
+  const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
   /** Keep legacy Hero as default; Slope is opt-in after /simulation lands. */
   const [heroViewMode, setHeroViewMode] = useState<'legacy' | 'slope'>('legacy');
 
@@ -425,7 +441,10 @@ export function PlannerPage() {
       },
       {
         onSuccess: (response) => {
+          // Fresh /simulation has no overrides — drop session Apply stack.
+          setImpliedAdjustments([]);
           setSlopeSimulation(response);
+          setHeroViewMode('slope');
         },
       },
     );
@@ -530,6 +549,69 @@ export function PlannerPage() {
     );
   };
 
+  const buildSimulationRequestBase = (opts?: {
+    networkTarget?: number;
+    asOf?: { year: number; month: number };
+    planVersionId?: string | null;
+  }) => {
+    if (!panel) {
+      return null;
+    }
+    const facts = panelToSimulationFacts(panel);
+    if (facts.length === 0) {
+      return null;
+    }
+    const asOf = opts?.asOf ?? {
+      year:
+        asOfYear ??
+        draftPlan?.chain_trajectory[0]?.year ??
+        effectiveYear ??
+        new Date().getFullYear(),
+      month:
+        asOfMonth ??
+        draftPlan?.chain_trajectory[0]?.month ??
+        effectiveMonth ??
+        1,
+    };
+    return {
+      network_target: opts?.networkTarget ?? target,
+      as_of: asOf,
+      planning_year: asOf.year,
+      cumulative_start: { year: 2025, month: 1 } as const,
+      solver: 'cumulative_slope' as const,
+      active_plan_version_id: opts?.planVersionId ?? activePlanVersionId,
+      facts,
+    };
+  };
+
+  const handleApplyUnreachableSuggestion = (hint: UnreachableHint) => {
+    const base = buildSimulationRequestBase();
+    if (base == null || adjustSimulationMutation.isPending) {
+      return;
+    }
+    setAdjustSuggestionError(false);
+    const nextAdjustments = mergeImpliedAdjustment(impliedAdjustments, {
+      store_id: hint.store_id,
+      new_implied_target: hint.suggested_implied_target,
+    });
+    adjustSimulationMutation.mutate(
+      {
+        ...base,
+        adjustments: nextAdjustments,
+      },
+      {
+        onSuccess: (response) => {
+          setImpliedAdjustments(nextAdjustments);
+          setSlopeSimulation(response);
+          setHeroViewMode('slope');
+        },
+        onError: () => {
+          setAdjustSuggestionError(true);
+        },
+      },
+    );
+  };
+
   const handleSavePlan = () => {
     if (!panel || !draftPlan) {
       return;
@@ -588,6 +670,26 @@ export function PlannerPage() {
     [slopeSimulation],
   );
   const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
+  const unreachableStoreIds = useMemo(() => {
+    if (!slopeSimulation?.unreachable.length) {
+      return undefined;
+    }
+    return new Set(slopeSimulation.unreachable.map((h) => h.store_id));
+  }, [slopeSimulation]);
+  const selectedUnreachableHint = useMemo(() => {
+    if (selectedStoreId == null || !slopeSimulation?.unreachable.length) {
+      return null;
+    }
+    return (
+      slopeSimulation.unreachable.find((h) => h.store_id === selectedStoreId) ?? null
+    );
+  }, [selectedStoreId, slopeSimulation]);
+  const selectedBoostGlance = useMemo(() => {
+    if (selectedStoreId == null || slopeSimulation == null) {
+      return null;
+    }
+    return getStoreBoostGlance(slopeSimulation, selectedStoreId);
+  }, [selectedStoreId, slopeSimulation]);
 
   const handleExportExcel = () => {
     if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
@@ -814,6 +916,8 @@ export function PlannerPage() {
                     setAnswerUndo(null);
                     setAsOfYear(null);
                     setAsOfMonth(null);
+                    setSlopeSimulation(null);
+                    setImpliedAdjustments([]);
                   }}
                 >
                   {refs.map((ref) => (
@@ -1103,6 +1207,11 @@ export function PlannerPage() {
                   {t('planner.savePlanFailed')}
                 </Alert>
               ) : null}
+              {adjustSuggestionError ? (
+                <Alert severity="error" sx={{ py: 0.5 }}>
+                  {t('planner.unreachable.applyFailed')}
+                </Alert>
+              ) : null}
               {excelExportError ? (
                 <Alert severity="error" sx={{ py: 0.5 }}>
                   {t('planner.exportExcelFailed')}
@@ -1304,7 +1413,11 @@ export function PlannerPage() {
                 >
                   <CardHeader
                     title={t('planner.heroTitle')}
-                    subheader={t('planner.heroSub')}
+                    subheader={t(
+                      slopeLayers && heroViewMode === 'slope'
+                        ? 'planner.heroSubSlope'
+                        : 'planner.heroSub',
+                    )}
                     action={
                       slopeLayers ? (
                         <ToggleButtonGroup
@@ -1351,11 +1464,19 @@ export function PlannerPage() {
                       '&:last-child': { pb: 1.5 },
                     }}
                   >
-                    {unreachableCount > 0 ? (
+                    {unreachableCount > 0 && slopeSimulation ? (
                       <Tooltip title={t('planner.unreachableChipTip')}>
                         <Chip
                           size="small"
                           color="warning"
+                          clickable
+                          onClick={() => {
+                            const first = slopeSimulation.unreachable[0];
+                            if (first) {
+                              setAtRiskExpanded(true);
+                              selectStore(first.store_id);
+                            }
+                          }}
                           sx={{ alignSelf: 'flex-start', mb: 1 }}
                           label={t('planner.unreachableChip', { count: unreachableCount })}
                           data-testid="planner-unreachable-chip"
@@ -1363,7 +1484,9 @@ export function PlannerPage() {
                       </Tooltip>
                     ) : null}
                     {panel && slopeLayers && heroViewMode === 'slope' ? (
-                      <CumulativeSlopeHeroChart layers={slopeLayers} />
+                      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                        <CumulativeSlopeHeroChart layers={slopeLayers} />
+                      </Box>
                     ) : panel ? (
                       <HeroSimulationChart
                         draftPlan={draftPlan}
@@ -1481,6 +1604,7 @@ export function PlannerPage() {
                           setAsOfMonth(month);
                         }}
                         onInspect={(storeId) => selectStore(storeId)}
+                        unreachableStoreIds={unreachableStoreIds}
                       />
                     </AccordionDetails>
                   </Accordion>
@@ -1501,6 +1625,15 @@ export function PlannerPage() {
                 onClose={() => selectStore(null)}
                 onStoreChange={(id) => selectStore(id)}
                 onApplyPlan={(next) => patchDraftPlan(next)}
+                unreachableHint={selectedUnreachableHint}
+                onApplyUnreachableSuggestion={
+                  selectedUnreachableHint
+                    ? () => handleApplyUnreachableSuggestion(selectedUnreachableHint)
+                    : undefined
+                }
+                unreachableApplyPending={adjustSimulationMutation.isPending}
+                boostGlance={selectedBoostGlance}
+                slopeSimulation={slopeSimulation}
               />
             )}
           </Box>

@@ -146,6 +146,12 @@ describe('buildExcelReportRequestFromSimulation', () => {
     expect(matrix.monthly_target[3]).toBeNull();
     expect(matrix.actual[2]).toBe(62);
     expect(matrix.actual[3]).toBeNull();
+    // Required from data start → target (planning-year slots).
+    expect(matrix.required_monthly).toHaveLength(12);
+    expect(matrix.required_cumulative).toHaveLength(12);
+    expect(matrix.required_monthly[2]).toBe(62); // stitches last fact (Mar)
+    expect(matrix.required_monthly[3]).not.toBeNull(); // Apr onward required
+    expect(matrix.required_cumulative[11]).toBeCloseTo(75); // lands on target Dec
     expect(request.plan_version?.version_id).toBe('ver-1');
     expect(request.plan_version?.as_of_year).toBe(2025);
     expect(request.plan_version?.as_of_month).toBe(3);

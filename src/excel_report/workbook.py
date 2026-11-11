@@ -18,6 +18,8 @@ _MATRIX_METRICS: tuple[tuple[str, str], ...] = (
     ("cumulative_planned", "cumulative_planned"),
     ("actual", "actual"),
     ("cumulative_actual_or_simulation", "cumulative_actual_or_simulation"),
+    ("required_monthly", "required_monthly"),
+    ("required_cumulative", "required_cumulative"),
 )
 
 
@@ -35,6 +37,8 @@ def _append_store_matrix(book: Workbook, matrices: tuple[StoreMonthMatrix, ...])
             "cumulative_planned": store.cumulative_planned,
             "actual": store.actual,
             "cumulative_actual_or_simulation": store.cumulative_actual_or_simulation,
+            "required_monthly": store.required_monthly,
+            "required_cumulative": store.required_cumulative,
         }
         for metric_key, _ in _MATRIX_METRICS:
             sheet.append([store.store_id, metric_key, *series[metric_key]])

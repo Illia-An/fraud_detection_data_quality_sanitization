@@ -11,6 +11,7 @@ import {
   postPlanVersion,
   postProcess,
   postSimulation,
+  postSimulationAdjust,
   postTtsPlan,
 } from './client';
 import {
@@ -19,6 +20,7 @@ import {
   type SampleDbParams,
   type SamplePreset,
 } from '../schemas/api';
+import type { SimulationAdjustRequest } from '../schemas/cumulativePlan';
 import type { PlanRequest } from '../schemas/plan';
 import type { TtsPlanRequest } from '../schemas/ttsPlan';
 import type { TtsKpiPreset } from '../schemas/ttsKpiPanel';
@@ -89,6 +91,12 @@ export function useSavePlanVersion() {
 export function useRunSimulation() {
   return useMutation({
     mutationFn: postSimulation,
+  });
+}
+
+export function useAdjustSimulation() {
+  return useMutation({
+    mutationFn: (request: SimulationAdjustRequest) => postSimulationAdjust(request),
   });
 }
 

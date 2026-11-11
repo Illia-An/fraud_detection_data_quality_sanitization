@@ -38,6 +38,8 @@ class StoreMonthMatrix:
     cumulative_planned: tuple[float | None, ...]
     actual: tuple[float | None, ...]
     cumulative_actual_or_simulation: tuple[float | None, ...]
+    required_monthly: tuple[float | None, ...]
+    required_cumulative: tuple[float | None, ...]
 
     def __post_init__(self) -> None:
         for name in (
@@ -45,6 +47,8 @@ class StoreMonthMatrix:
             "cumulative_planned",
             "actual",
             "cumulative_actual_or_simulation",
+            "required_monthly",
+            "required_cumulative",
         ):
             values = getattr(self, name)
             if len(values) != 12:

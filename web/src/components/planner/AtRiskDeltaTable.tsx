@@ -55,6 +55,8 @@ interface AtRiskDeltaTableProps {
   onInspect: (storeId: number) => void;
   /** Spotlight target for product tour Inspect tip (survey vs TTS planner). */
   inspectOnboardingId?: string;
+  /** Store ids flagged unreachable by cumulative-slope simulation (SPEC-P001). */
+  unreachableStoreIds?: ReadonlySet<number>;
 }
 
 function formatScore(value: number | null, unit: string): string {
@@ -129,6 +131,7 @@ export function AtRiskDeltaTable({
   onAsOfChange,
   onInspect,
   inspectOnboardingId = 'planner-inspect',
+  unreachableStoreIds,
 }: AtRiskDeltaTableProps) {
   const t = useT();
   const unit = plan.unit;
@@ -438,18 +441,35 @@ export function AtRiskDeltaTable({
                         >
                           {t('planner.atRisk.storeId', { id: row.storeId })}
                         </Typography>
-                        <Chip
-                          size="small"
-                          label={row.status}
-                          sx={{
-                            bgcolor: SIGNAL_COLORS[row.signal],
-                            color: '#fff',
-                            height: 16,
-                            fontSize: '0.65rem',
-                            alignSelf: 'flex-start',
-                            '& .MuiChip-label': { px: 0.5 },
-                          }}
-                        />
+                        <Stack direction="row" spacing={0.35} flexWrap="wrap" useFlexGap>
+                          <Chip
+                            size="small"
+                            label={row.status}
+                            sx={{
+                              bgcolor: SIGNAL_COLORS[row.signal],
+                              color: '#fff',
+                              height: 16,
+                              fontSize: '0.65rem',
+                              alignSelf: 'flex-start',
+                              '& .MuiChip-label': { px: 0.5 },
+                            }}
+                          />
+                          {unreachableStoreIds?.has(row.storeId) ? (
+                            <Chip
+                              size="small"
+                              color="warning"
+                              variant="outlined"
+                              label={t('planner.atRisk.mayMiss')}
+                              data-testid={`atrisk-may-miss-${row.storeId}`}
+                              sx={{
+                                height: 16,
+                                fontSize: '0.65rem',
+                                alignSelf: 'flex-start',
+                                '& .MuiChip-label': { px: 0.5 },
+                              }}
+                            />
+                          ) : null}
+                        </Stack>
                       </Stack>
                     </TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
