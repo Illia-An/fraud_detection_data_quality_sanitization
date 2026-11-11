@@ -92,8 +92,8 @@ describe('StoreHeroEvaluationChart', () => {
     });
     const payload = screen.getByTestId('store-hero-plotly').textContent ?? '';
     expect(payload).toContain('Cleansed fact');
-    expect(payload).toContain('Required monthly (to hit target)');
-    expect(payload).toContain('Required cumulative (if required monthly)');
+    expect(payload).toContain('Required monthly (to network target)');
+    expect(payload).toContain('Required cumulative (to network target)');
     expect(payload).not.toContain('Cumulative actual');
     expect(payload).not.toContain('Cumulative plan (if draft)');
     expect(payload).toContain('Draft simulation');
