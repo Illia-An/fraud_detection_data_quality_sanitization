@@ -88,7 +88,8 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(dialog.getByText(/Inspect/i).first()).toBeVisible();
     await expect(page.getByTestId('inspect-store-select')).toBeVisible();
     await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
-    await expect(page.getByTestId('store-hero-evaluation-chart')).toBeVisible();
+    // After Run, Inspect uses Slope store layers (not legacy store-hero-evaluation-chart).
+    await expect(dialog.getByTestId('cumulative-slope-hero-chart')).toBeVisible();
 
     // Estimate funnel is collapsed by default.
     await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
