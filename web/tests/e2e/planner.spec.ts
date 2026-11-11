@@ -58,9 +58,10 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(page.getByTestId('planner-save-plan')).toBeEnabled({ timeout: 60_000 });
     const heroMode = page.getByTestId('planner-hero-view-mode');
     await expect(heroMode).toBeVisible({ timeout: 15_000 });
-    await heroMode.getByRole('button', { name: /Legacy/i }).click();
+    // ToggleButton accessible name comes from aria-label, not the visible "Legacy"/"Slope" text.
+    await heroMode.getByRole('button', { name: /Classic evaluation/i }).click();
     await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible({ timeout: 15_000 });
-    await heroMode.getByRole('button', { name: /Slope/i }).click();
+    await heroMode.getByRole('button', { name: /Cumulative-slope/i }).click();
     await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
       timeout: 15_000,
     });
