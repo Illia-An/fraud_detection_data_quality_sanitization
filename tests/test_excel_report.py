@@ -74,6 +74,8 @@ def test_store_matrix_and_version_context_sheet():
     planned = tuple(float(i) + 0.5 for i in range(1, 13))
     actual = tuple([60.0, 61.0, 62.0] + [None] * 9)
     cum = tuple(float(60 + i) for i in range(12))
+    req_m = tuple([None, None, None] + [70.0 + i for i in range(9)])
+    req_c = tuple(float(61 + i * 0.5) for i in range(12))
     document = _document(
         store_matrices=(
             StoreMonthMatrix(
@@ -82,6 +84,8 @@ def test_store_matrix_and_version_context_sheet():
                 cumulative_planned=planned,
                 actual=actual,
                 cumulative_actual_or_simulation=cum,
+                required_monthly=req_m,
+                required_cumulative=req_c,
             ),
         ),
         plan_version=PlanVersionContext(
@@ -111,6 +115,10 @@ def test_store_matrix_and_version_context_sheet():
     assert matrix[3][1] == "actual"
     assert matrix[3][2:5] == (60.0, 61.0, 62.0)
     assert matrix[3][5] is None
+    assert matrix[5][1] == "required_monthly"
+    assert matrix[5][2:] == req_m
+    assert matrix[6][1] == "required_cumulative"
+    assert matrix[6][2:] == req_c
 
 
 def test_empty_sanitization_is_rejected():

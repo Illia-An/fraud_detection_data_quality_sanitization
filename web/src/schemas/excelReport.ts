@@ -2,6 +2,7 @@
 
 import { z } from 'zod';
 
+import { buildStoreCumulativeSlopeLayers } from '../components/planner/cumulativeSlopeLayers';
 import type { PipelineConfig } from './api';
 import type { SimulationResponse } from './cumulativePlan';
 import type { FivePercentPlan } from './plan';
@@ -52,6 +53,10 @@ export const excelReportRequestSchema = z.object({
         cumulative_planned: monthSlot12Schema,
         actual: monthSlot12Schema,
         cumulative_actual_or_simulation: monthSlot12Schema,
+        /** Required monthly (data start → target), planning-year M1–12. */
+        required_monthly: monthSlot12Schema,
+        /** Required cumulative (data start → target), planning-year M1–12. */
+        required_cumulative: monthSlot12Schema,
       }),
     )
     .default([]),
@@ -100,6 +105,54 @@ function slots12(
   return Array.from({ length: 12 }, (_, i) => byMonth.get(i + 1) ?? null);
 }
 
+function emptySlots12(): (number | null)[] {
+  return Array.from({ length: 12 }, () => null);
+}
+
+/** Pull planning-year months 1–12 from a full spine series (chart parity). */
+export function planningYearSlots12(
+  labels: string[],
+  values: (number | null)[],
+  planningYear: number,
+): (number | null)[] {
+  const out = emptySlots12();
+  const prefix = `${planningYear}-`;
+  for (let i = 0; i < labels.length; i += 1) {
+    const lab = labels[i];
+    if (lab == null || !lab.startsWith(prefix)) {
+      continue;
+    }
+    const month = Number(lab.slice(5));
+    if (month >= 1 && month <= 12) {
+      out[month - 1] = values[i] ?? null;
+    }
+  }
+  return out;
+}
+
+/** Required pair for one store — same grammar as Slope Inspect layers. */
+function requiredSlots12ForStore(
+  simulation: SimulationResponse,
+  storeId: number,
+): { required_monthly: (number | null)[]; required_cumulative: (number | null)[] } {
+  const layers = buildStoreCumulativeSlopeLayers(simulation, storeId);
+  if (!layers) {
+    return { required_monthly: emptySlots12(), required_cumulative: emptySlots12() };
+  }
+  return {
+    required_monthly: planningYearSlots12(
+      layers.labels,
+      layers.requiredMonthlyYs,
+      simulation.planning_year,
+    ),
+    required_cumulative: planningYearSlots12(
+      layers.labels,
+      layers.requiredCumulativeYs,
+      simulation.planning_year,
+    ),
+  };
+}
+
 export function buildExcelReportRequest(
   panel: SanitizedPanel,
   plan: FivePercentPlan,
@@ -143,16 +196,21 @@ export function buildExcelReportRequestFromSimulation(
   } | null,
 ): ExcelReportRequest {
   const planningYear = simulation.planning_year;
-  const store_matrices = simulation.stores.map((store) => ({
-    store_id: store.store_id,
-    monthly_target: slots12(planningYear, store.monthly_target),
-    cumulative_planned: slots12(planningYear, store.cumulative_planned),
-    actual: slots12(planningYear, store.actual),
-    cumulative_actual_or_simulation: slots12(
-      planningYear,
-      store.cumulative_actual_or_simulation,
-    ),
-  }));
+  const store_matrices = simulation.stores.map((store) => {
+    const required = requiredSlots12ForStore(simulation, store.store_id);
+    return {
+      store_id: store.store_id,
+      monthly_target: slots12(planningYear, store.monthly_target),
+      cumulative_planned: slots12(planningYear, store.cumulative_planned),
+      actual: slots12(planningYear, store.actual),
+      cumulative_actual_or_simulation: slots12(
+        planningYear,
+        store.cumulative_actual_or_simulation,
+      ),
+      required_monthly: required.required_monthly,
+      required_cumulative: required.required_cumulative,
+    };
+  });
 
   return excelReportRequestSchema.parse({
     method: sanitizationMethodLabel(panel.echo_config),

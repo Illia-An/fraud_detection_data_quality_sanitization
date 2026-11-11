@@ -32,6 +32,10 @@ class StorePlanIn(BaseModel):
     months: list[PlanMonthIn] = Field(min_length=1)
 
 
+def _empty_month_slots() -> list[float | None]:
+    return [None] * 12
+
+
 class StoreMonthMatrixIn(BaseModel):
     store_id: int
     monthly_target: list[float | None] = Field(min_length=12, max_length=12)
@@ -39,6 +43,12 @@ class StoreMonthMatrixIn(BaseModel):
     actual: list[float | None] = Field(min_length=12, max_length=12)
     cumulative_actual_or_simulation: list[float | None] = Field(
         min_length=12, max_length=12
+    )
+    required_monthly: list[float | None] = Field(
+        default_factory=_empty_month_slots, min_length=12, max_length=12
+    )
+    required_cumulative: list[float | None] = Field(
+        default_factory=_empty_month_slots, min_length=12, max_length=12
     )
 
 
@@ -125,6 +135,8 @@ def to_excel_report_document(body: ExcelReportRequest) -> ExcelReportDocument:
                 cumulative_planned=tuple(row.cumulative_planned),
                 actual=tuple(row.actual),
                 cumulative_actual_or_simulation=tuple(row.cumulative_actual_or_simulation),
+                required_monthly=tuple(row.required_monthly),
+                required_cumulative=tuple(row.required_cumulative),
             )
             for row in body.store_matrices
         ),

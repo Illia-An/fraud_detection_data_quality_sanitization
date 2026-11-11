@@ -2,7 +2,7 @@ import { Box, Stack, Typography } from '@mui/material';
 import { useMemo } from 'react';
 
 import { useT } from '../../i18n';
-import type { DirectedPlan } from '../../schemas/metricScore';
+import { directionAwareDeviation, type DirectedPlan } from '../../schemas/metricScore';
 import { periodLabel } from '../../schemas/plan';
 import {
   SIGNAL_COLORS,
@@ -13,6 +13,7 @@ import {
   planEndScore,
   type StoreBaselineRow,
 } from './atRiskRowMetrics';
+import type { InspectSlopeAlign } from './cumulativeSlopeLayers';
 
 interface InspectStoreGlanceProps {
   plan: DirectedPlan;
@@ -21,6 +22,11 @@ interface InspectStoreGlanceProps {
   baselineRows: StoreBaselineRow[];
   /** Local Estimate preview for last-month end (before/without Apply). */
   draftLast: number | null;
+  /**
+   * When Slope sim is open: fact month / ends come from plotted curves
+   * (last actual ≤ declared as_of), not raw monitoring as_of alone.
+   */
+  slopeAlign?: InspectSlopeAlign | null;
 }
 
 function formatScore(value: number | null, unit: string): string {
@@ -85,23 +91,55 @@ export function InspectStoreGlance({
   storeId,
   baselineRows,
   draftLast,
+  slopeAlign = null,
 }: InspectStoreGlanceProps) {
   const t = useT();
   const unit = plan.unit;
   const monitor = insights.stores.find((s) => s.store_id === storeId);
-  const asOfLabel = periodLabel(insights.as_of_year, insights.as_of_month);
+  const monitoringAsOfLabel = periodLabel(insights.as_of_year, insights.as_of_month);
 
   const metrics = useMemo(() => {
+    const baseline = baselineScore(baselineRows, storeId);
+    if (slopeAlign != null && slopeAlign.factMonth != null) {
+      const fact = slopeAlign.fact;
+      const planAtAsOf = slopeAlign.planAtFact;
+      const gapPp = directionAwareDeviation(fact, planAtAsOf, plan.direction);
+      const end = draftLast ?? slopeAlign.planEndMonthly;
+      const liftToEnd =
+        fact != null && end != null ? Math.round((end - fact) * 100) / 100 : null;
+      return {
+        factMonth: slopeAlign.factMonth,
+        fact,
+        planAtAsOf,
+        gapPp,
+        baseline,
+        end,
+        liftToEnd,
+        eoyForecast: slopeAlign.eoyForecastCumulative,
+        eoyPlanCum: slopeAlign.eoyPlanCumulative,
+        aligned: true as const,
+      };
+    }
     const fact = monitor?.actual ?? null;
     const planAtAsOf = monitor?.planned ?? null;
     const gapPp = monitor?.deviation ?? null;
-    const baseline = baselineScore(baselineRows, storeId);
     const endFromPlan = planEndScore(plan, storeId);
     const end = draftLast ?? endFromPlan;
     const liftToEnd =
       fact != null && end != null ? Math.round((end - fact) * 100) / 100 : null;
-    return { fact, planAtAsOf, gapPp, baseline, end, liftToEnd };
-  }, [monitor, baselineRows, storeId, plan, draftLast]);
+    return {
+      factMonth: monitoringAsOfLabel,
+      fact,
+      planAtAsOf,
+      gapPp,
+      baseline,
+      end,
+      liftToEnd,
+      eoyForecast: null as number | null,
+      eoyPlanCum: null as number | null,
+      aligned: false as const,
+    };
+  }, [monitor, baselineRows, storeId, plan, draftLast, slopeAlign, monitoringAsOfLabel]);
 
   const gapColor =
     metrics.gapPp == null
@@ -125,7 +163,12 @@ export function InspectStoreGlance({
       }}
     >
       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-        {t('planner.inspect.glanceSub', { asOf: asOfLabel })}
+        {metrics.aligned
+          ? t('planner.inspect.glanceSubAligned', {
+              factMonth: metrics.factMonth,
+              declaredAsOf: slopeAlign?.declaredAsOfLabel ?? monitoringAsOfLabel,
+            })
+          : t('planner.inspect.glanceSub', { asOf: monitoringAsOfLabel })}
       </Typography>
       <Stack
         direction="row"
@@ -134,9 +177,12 @@ export function InspectStoreGlance({
         useFlexGap
         sx={{ rowGap: 0.75 }}
       >
-        <GlanceCell label={t('planner.atRisk.col.actual')} value={formatScore(metrics.fact, unit)} />
         <GlanceCell
-          label={t('planner.atRisk.col.target')}
+          label={t('planner.inspect.factAsOfMonth', { month: metrics.factMonth })}
+          value={formatScore(metrics.fact, unit)}
+        />
+        <GlanceCell
+          label={t('planner.inspect.planAsOfMonth', { month: metrics.factMonth })}
           value={formatScore(metrics.planAtAsOf, unit)}
         />
         <GlanceCell
@@ -145,14 +191,40 @@ export function InspectStoreGlance({
           valueColor={gapColor}
         />
         <GlanceCell
-          label={t('planner.atRisk.col.baselineEnd')}
+          label={
+            metrics.aligned
+              ? t('planner.inspect.baselinePlanEnd')
+              : t('planner.atRisk.col.baselineEnd')
+          }
           value={`${formatScore(metrics.baseline, unit)} → ${formatScore(metrics.end, unit)}`}
         />
+        {metrics.aligned ? (
+          <GlanceCell
+            label={t('planner.inspect.eoyPlanCum')}
+            value={formatScore(metrics.eoyPlanCum, unit)}
+          />
+        ) : null}
+        {metrics.aligned ? (
+          <GlanceCell
+            label={t('planner.inspect.eoyForecast')}
+            value={formatScore(metrics.eoyForecast, unit)}
+          />
+        ) : null}
         <GlanceCell
           label={t('planner.atRisk.col.lift')}
           value={formatGap(metrics.liftToEnd, unit)}
         />
       </Stack>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}
+        data-testid="inspect-fact-as-of-hint"
+      >
+        {metrics.aligned
+          ? t('planner.inspect.factAsOfHintAligned')
+          : t('planner.inspect.factAsOfHint')}
+      </Typography>
     </Stack>
   );
 }
