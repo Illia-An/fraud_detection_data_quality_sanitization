@@ -156,12 +156,12 @@ export function asOfShapes(
         {
           x: lineLabel,
           y: 1,
-          xref: 'x',
-          yref: 'paper',
+          xref: 'x' as const,
+          yref: 'paper' as const,
           text: annotationText,
           showarrow: false,
-          xanchor: 'left',
-          yanchor: 'bottom',
+          xanchor: 'left' as const,
+          yanchor: 'bottom' as const,
           xshift: 4,
           font: { size: 10, color: '#616161' },
         },
@@ -173,12 +173,12 @@ export function asOfShapes(
 export interface PlotlyAnnotation {
   x: string | number;
   y: number;
-  xref?: string;
-  yref?: string;
+  xref?: 'x' | 'paper';
+  yref?: 'y' | 'paper';
   text: string;
   showarrow?: boolean;
-  xanchor?: string;
-  yanchor?: string;
+  xanchor?: 'left' | 'center' | 'right';
+  yanchor?: 'top' | 'middle' | 'bottom';
   xshift?: number;
   yshift?: number;
   font?: { size?: number; color?: string };
