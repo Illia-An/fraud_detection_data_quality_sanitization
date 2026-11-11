@@ -3,6 +3,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
 import {
@@ -24,23 +25,41 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { postExcelReport } from '../api/client';
-import { usePlan } from '../api/hooks';
+import {
+  useAdjustSimulation,
+  usePlan,
+  useRunSimulation,
+  useSavePlanVersion,
+} from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import {
   activeAnswerLabelKey,
   type ActiveAnswer,
 } from '../components/planner/activeAnswer';
 import { createAnswerUndoSnapshot, type AnswerUndoSnapshot } from '../components/planner/answerUndo';
+import { CumulativeSlopeHeroChart } from '../components/planner/CumulativeSlopeHeroChart';
+import {
+  buildNetworkCumulativeSlopeLayers,
+  getStoreBoostGlance,
+} from '../components/planner/cumulativeSlopeLayers';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
+import {
+  mergeImpliedAdjustment,
+  type ImpliedAdjustment,
+} from '../components/planner/impliedAdjustments';
+import { panelToSimulationFacts } from '../components/planner/panelToSimulationFacts';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
+import type { SimulationResponse, UnreachableHint } from '../schemas/cumulativePlan';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
@@ -50,7 +69,10 @@ import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
 import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
-import { buildExcelReportRequest } from '../schemas/excelReport';
+import {
+  buildExcelReportRequest,
+  buildExcelReportRequestFromSimulation,
+} from '../schemas/excelReport';
 import {
   buildSanitizedPanelFromProcess,
   type SanitizedPanel,
@@ -172,12 +194,26 @@ export function PlannerPage() {
   const discardDraft = usePlannerScenarioStore((s) => s.discardDraft);
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
   const selectStore = usePlannerScenarioStore((s) => s.selectStore);
+  const activePlanVersionId = usePlannerScenarioStore((s) => s.activePlanVersionId);
+  const setActivePlanVersionId = usePlannerScenarioStore((s) => s.setActivePlanVersionId);
+
+  const simulationMutation = useRunSimulation();
+  const adjustSimulationMutation = useAdjustSimulation();
+  const savePlanMutation = useSavePlanVersion();
 
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
   const [excelExporting, setExcelExporting] = useState(false);
   const [excelExportError, setExcelExportError] = useState(false);
+  const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
+  /** Session overrides from Apply suggestion — sent together on each /simulation/adjust. */
+  const [impliedAdjustments, setImpliedAdjustments] = useState<ImpliedAdjustment[]>([]);
+  const [savePlanError, setSavePlanError] = useState(false);
+  const [savePlanOk, setSavePlanOk] = useState(false);
+  const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
+  /** Keep legacy Hero as default; Slope is opt-in after /simulation lands. */
+  const [heroViewMode, setHeroViewMode] = useState<'legacy' | 'slope'>('legacy');
 
   const onboardingStatus = useOnboardingStore((s) => s.status);
   const onboardingStepId = useOnboardingStore((s) => s.stepId);
@@ -381,6 +417,39 @@ export function PlannerPage() {
     return { target: nextTarget, horizon: nextHorizon };
   };
 
+  const refreshSlopeSimulation = (opts: {
+    networkTarget: number;
+    asOf: { year: number; month: number };
+    planVersionId?: string | null;
+  }) => {
+    if (!panel) {
+      return;
+    }
+    const facts = panelToSimulationFacts(panel);
+    if (facts.length === 0) {
+      return;
+    }
+    simulationMutation.mutate(
+      {
+        network_target: opts.networkTarget,
+        as_of: opts.asOf,
+        planning_year: opts.asOf.year,
+        cumulative_start: { year: 2025, month: 1 },
+        solver: 'cumulative_slope',
+        active_plan_version_id: opts.planVersionId ?? activePlanVersionId,
+        facts,
+      },
+      {
+        onSuccess: (response) => {
+          // Fresh /simulation has no overrides — drop session Apply stack.
+          setImpliedAdjustments([]);
+          setSlopeSimulation(response);
+          setHeroViewMode('slope');
+        },
+      },
+    );
+  };
+
   const handleRun = () => {
     const goal = commitGoalDrafts();
     const block = plannerRunBlockReason({
@@ -415,6 +484,10 @@ export function PlannerPage() {
             const asOf = defaultAsOf(next, panel);
             setAsOfYear(asOf.year);
             setAsOfMonth(asOf.month);
+            refreshSlopeSimulation({
+              networkTarget: goal.target,
+              asOf,
+            });
           }
         },
         onError: () => {
@@ -462,11 +535,120 @@ export function PlannerPage() {
           setMixNote(t('planner.packs.result.applied'));
           setActiveAnswer({ kind: 'pack', id: packId });
           setPendingPackId(null);
+          refreshSlopeSimulation({
+            networkTarget: goal.target,
+            asOf,
+          });
         },
         onError: () => {
           setPendingPackId(null);
           setParams(undoSnap.params);
           setAnswerUndo(null);
+        },
+      },
+    );
+  };
+
+  const buildSimulationRequestBase = (opts?: {
+    networkTarget?: number;
+    asOf?: { year: number; month: number };
+    planVersionId?: string | null;
+  }) => {
+    if (!panel) {
+      return null;
+    }
+    const facts = panelToSimulationFacts(panel);
+    if (facts.length === 0) {
+      return null;
+    }
+    const asOf = opts?.asOf ?? {
+      year:
+        asOfYear ??
+        draftPlan?.chain_trajectory[0]?.year ??
+        effectiveYear ??
+        new Date().getFullYear(),
+      month:
+        asOfMonth ??
+        draftPlan?.chain_trajectory[0]?.month ??
+        effectiveMonth ??
+        1,
+    };
+    return {
+      network_target: opts?.networkTarget ?? target,
+      as_of: asOf,
+      planning_year: asOf.year,
+      cumulative_start: { year: 2025, month: 1 } as const,
+      solver: 'cumulative_slope' as const,
+      active_plan_version_id: opts?.planVersionId ?? activePlanVersionId,
+      facts,
+    };
+  };
+
+  const handleApplyUnreachableSuggestion = (hint: UnreachableHint) => {
+    const base = buildSimulationRequestBase();
+    if (base == null || adjustSimulationMutation.isPending) {
+      return;
+    }
+    setAdjustSuggestionError(false);
+    const nextAdjustments = mergeImpliedAdjustment(impliedAdjustments, {
+      store_id: hint.store_id,
+      new_implied_target: hint.suggested_implied_target,
+    });
+    adjustSimulationMutation.mutate(
+      {
+        ...base,
+        adjustments: nextAdjustments,
+      },
+      {
+        onSuccess: (response) => {
+          setImpliedAdjustments(nextAdjustments);
+          setSlopeSimulation(response);
+          setHeroViewMode('slope');
+        },
+        onError: () => {
+          setAdjustSuggestionError(true);
+        },
+      },
+    );
+  };
+
+  const handleSavePlan = () => {
+    if (!panel || !draftPlan) {
+      return;
+    }
+    const facts = panelToSimulationFacts(panel);
+    if (facts.length === 0 || savePlanMutation.isPending) {
+      return;
+    }
+    const asOf = {
+      year: asOfYear ?? draftPlan.chain_trajectory[0]?.year ?? effectiveYear ?? new Date().getFullYear(),
+      month: asOfMonth ?? draftPlan.chain_trajectory[0]?.month ?? effectiveMonth ?? 1,
+    };
+    setSavePlanError(false);
+    setSavePlanOk(false);
+    savePlanMutation.mutate(
+      {
+        label: `baseline-${asOf.year}-${String(asOf.month).padStart(2, '0')}`,
+        network_target: target,
+        as_of: asOf,
+        planning_year: asOf.year,
+        cumulative_start: { year: 2025, month: 1 },
+        solver: 'cumulative_slope',
+        facts,
+      },
+      {
+        onSuccess: (version) => {
+          setActivePlanVersionId(version.meta.id);
+          setSavePlanOk(true);
+          acceptDraftAsApproved();
+          refreshSlopeSimulation({
+            networkTarget: target,
+            asOf,
+            planVersionId: version.meta.id,
+          });
+        },
+        onError: () => {
+          setSavePlanError(true);
         },
       },
     );
@@ -481,6 +663,33 @@ export function PlannerPage() {
   };
 
   const canExportExcel = draftPlan != null && panel != null && panel.rows.length > 0;
+  const canSavePlan =
+    draftPlan != null && panel != null && panelToSimulationFacts(panel).length > 0;
+  const slopeLayers = useMemo(
+    () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
+    [slopeSimulation],
+  );
+  const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
+  const unreachableStoreIds = useMemo(() => {
+    if (!slopeSimulation?.unreachable.length) {
+      return undefined;
+    }
+    return new Set(slopeSimulation.unreachable.map((h) => h.store_id));
+  }, [slopeSimulation]);
+  const selectedUnreachableHint = useMemo(() => {
+    if (selectedStoreId == null || !slopeSimulation?.unreachable.length) {
+      return null;
+    }
+    return (
+      slopeSimulation.unreachable.find((h) => h.store_id === selectedStoreId) ?? null
+    );
+  }, [selectedStoreId, slopeSimulation]);
+  const selectedBoostGlance = useMemo(() => {
+    if (selectedStoreId == null || slopeSimulation == null) {
+      return null;
+    }
+    return getStoreBoostGlance(slopeSimulation, selectedStoreId);
+  }, [selectedStoreId, slopeSimulation]);
 
   const handleExportExcel = () => {
     if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
@@ -488,7 +697,10 @@ export function PlannerPage() {
     }
     setExcelExportError(false);
     setExcelExporting(true);
-    const request = buildExcelReportRequest(panel, draftPlan);
+    const request =
+      slopeSimulation != null
+        ? buildExcelReportRequestFromSimulation(panel, draftPlan, slopeSimulation)
+        : buildExcelReportRequest(panel, draftPlan);
     void postExcelReport(request)
       .then((blob) => {
         const url = URL.createObjectURL(blob);
@@ -704,6 +916,8 @@ export function PlannerPage() {
                     setAnswerUndo(null);
                     setAsOfYear(null);
                     setAsOfMonth(null);
+                    setSlopeSimulation(null);
+                    setImpliedAdjustments([]);
                   }}
                 >
                   {refs.map((ref) => (
@@ -894,6 +1108,30 @@ export function PlannerPage() {
                 </span>
               </Tooltip>
               <Stack direction="row" spacing={1}>
+                <Tooltip
+                  title={canSavePlan ? t('planner.savePlanTip') : t('planner.savePlanDisabledTip')}
+                >
+                  <span style={{ flex: 1 }}>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      fullWidth
+                      size="small"
+                      startIcon={
+                        savePlanMutation.isPending ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <SaveRoundedIcon />
+                        )
+                      }
+                      disabled={!canSavePlan || savePlanMutation.isPending}
+                      onClick={handleSavePlan}
+                      data-testid="planner-save-plan"
+                    >
+                      {t('planner.savePlan')}
+                    </Button>
+                  </span>
+                </Tooltip>
                 <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
                   <span style={{ flex: 1 }}>
                     <Button
@@ -923,38 +1161,57 @@ export function PlannerPage() {
                       }
                       disabled={!canExportExcel || excelExporting}
                       onClick={handleExportExcel}
+                      data-testid="planner-export-excel"
                     >
                       {t('planner.exportExcel')}
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip
-                  title={
-                    isDirty && approvedPlan
-                      ? t('planner.revertDraftTip')
-                      : t('planner.revertDraftDisabledTip')
-                  }
-                >
-                  <span style={{ flex: 1 }}>
-                    <Button
-                      variant="text"
-                      color="warning"
-                      fullWidth
-                      size="small"
-                      disabled={!isDirty || approvedPlan == null}
-                      onClick={() => {
-                        discardDraft();
-                        setActiveAnswer(null);
-                        setMixNote(null);
-                        setAnswerUndo(null);
-                      }}
-                      data-testid="planner-revert-draft"
-                    >
-                      {t('planner.revertDraft')}
-                    </Button>
-                  </span>
-                </Tooltip>
               </Stack>
+              <Tooltip
+                title={
+                  isDirty && approvedPlan
+                    ? t('planner.revertDraftTip')
+                    : t('planner.revertDraftDisabledTip')
+                }
+              >
+                <span>
+                  <Button
+                    variant="text"
+                    color="warning"
+                    fullWidth
+                    size="small"
+                    disabled={!isDirty || approvedPlan == null}
+                    onClick={() => {
+                      discardDraft();
+                      setActiveAnswer(null);
+                      setMixNote(null);
+                      setAnswerUndo(null);
+                    }}
+                    data-testid="planner-revert-draft"
+                  >
+                    {t('planner.revertDraft')}
+                  </Button>
+                </span>
+              </Tooltip>
+              {savePlanOk ? (
+                <Alert severity="success" sx={{ py: 0.5 }} onClose={() => setSavePlanOk(false)}>
+                  {t('planner.savePlanSaved')}
+                  {activePlanVersionId
+                    ? ` · ${activePlanVersionId.slice(0, 8)}…`
+                    : ''}
+                </Alert>
+              ) : null}
+              {savePlanError ? (
+                <Alert severity="error" sx={{ py: 0.5 }}>
+                  {t('planner.savePlanFailed')}
+                </Alert>
+              ) : null}
+              {adjustSuggestionError ? (
+                <Alert severity="error" sx={{ py: 0.5 }}>
+                  {t('planner.unreachable.applyFailed')}
+                </Alert>
+              ) : null}
               {excelExportError ? (
                 <Alert severity="error" sx={{ py: 0.5 }}>
                   {t('planner.exportExcelFailed')}
@@ -1156,7 +1413,44 @@ export function PlannerPage() {
                 >
                   <CardHeader
                     title={t('planner.heroTitle')}
-                    subheader={t('planner.heroSub')}
+                    subheader={t(
+                      slopeLayers && heroViewMode === 'slope'
+                        ? 'planner.heroSubSlope'
+                        : 'planner.heroSub',
+                    )}
+                    action={
+                      slopeLayers ? (
+                        <ToggleButtonGroup
+                          size="small"
+                          exclusive
+                          value={heroViewMode}
+                          onChange={(
+                            _event: MouseEvent<HTMLElement>,
+                            next: 'legacy' | 'slope' | null,
+                          ) => {
+                            if (next != null) {
+                              setHeroViewMode(next);
+                            }
+                          }}
+                          aria-label={t('planner.hero.viewModeAria')}
+                          data-testid="planner-hero-view-mode"
+                          sx={{ mr: 1, mt: 0.5 }}
+                        >
+                          <ToggleButton
+                            value="legacy"
+                            aria-label={t('planner.hero.viewLegacyAria')}
+                          >
+                            {t('planner.hero.viewLegacy')}
+                          </ToggleButton>
+                          <ToggleButton
+                            value="slope"
+                            aria-label={t('planner.hero.viewSlopeAria')}
+                          >
+                            {t('planner.hero.viewSlope')}
+                          </ToggleButton>
+                        </ToggleButtonGroup>
+                      ) : undefined
+                    }
                     sx={{ flexShrink: 0, pb: 0 }}
                   />
                   <CardContent
@@ -1170,7 +1464,30 @@ export function PlannerPage() {
                       '&:last-child': { pb: 1.5 },
                     }}
                   >
-                    {panel ? (
+                    {unreachableCount > 0 && slopeSimulation ? (
+                      <Tooltip title={t('planner.unreachableChipTip')}>
+                        <Chip
+                          size="small"
+                          color="warning"
+                          clickable
+                          onClick={() => {
+                            const first = slopeSimulation.unreachable[0];
+                            if (first) {
+                              setAtRiskExpanded(true);
+                              selectStore(first.store_id);
+                            }
+                          }}
+                          sx={{ alignSelf: 'flex-start', mb: 1 }}
+                          label={t('planner.unreachableChip', { count: unreachableCount })}
+                          data-testid="planner-unreachable-chip"
+                        />
+                      </Tooltip>
+                    ) : null}
+                    {panel && slopeLayers && heroViewMode === 'slope' ? (
+                      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                        <CumulativeSlopeHeroChart layers={slopeLayers} />
+                      </Box>
+                    ) : panel ? (
                       <HeroSimulationChart
                         draftPlan={draftPlan}
                         panel={panel}
@@ -1287,6 +1604,7 @@ export function PlannerPage() {
                           setAsOfMonth(month);
                         }}
                         onInspect={(storeId) => selectStore(storeId)}
+                        unreachableStoreIds={unreachableStoreIds}
                       />
                     </AccordionDetails>
                   </Accordion>
@@ -1307,6 +1625,15 @@ export function PlannerPage() {
                 onClose={() => selectStore(null)}
                 onStoreChange={(id) => selectStore(id)}
                 onApplyPlan={(next) => patchDraftPlan(next)}
+                unreachableHint={selectedUnreachableHint}
+                onApplyUnreachableSuggestion={
+                  selectedUnreachableHint
+                    ? () => handleApplyUnreachableSuggestion(selectedUnreachableHint)
+                    : undefined
+                }
+                unreachableApplyPending={adjustSimulationMutation.isPending}
+                boostGlance={selectedBoostGlance}
+                slopeSimulation={slopeSimulation}
               />
             )}
           </Box>

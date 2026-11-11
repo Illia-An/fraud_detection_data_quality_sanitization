@@ -1,17 +1,18 @@
 # Contract: Sanitized monthly panel → Planner (TASK-14 experiment)
 
-**Status:** Experiment on `feat/planner-shell-handoff`  
+**Status:** Active handoff (Survey Planner)  
 **Metric:** Q10012 top-box % (`Answer_Value = 5`) — same as Sanitization.  
-**Flow:** Sanitization `/process` success → client derives panel → Planner page may Run / export.
+**Flow:** Sanitization `/process` success → client derives panel → Planner page may Run / export / Save Plan version.
 
 ## Locked product rules
 
 1. Planner **Run is blocked** until a successful Sanitization run left a `processResult` in session (empty-state A).
 2. Panel scores are **cleansed** (after tiers), not raw actual.
-3. v1 persist = **file export** of the panel (CSV, Excel-openable). No DB Save.
-4. TTS / plan engine port / DB write-back = out of scope for this experiment.
-5. **Chain aggregation (product lock):** Planner `Current` / `/plans` `current_chain` =
-   **equal-weight mean** of cleansed store `five_percent` at the **reference month**
+3. Panel / CSV / Excel export remain available. **Baseline Plan versions** are persisted in the SQLite plan store (`PLAN_STORE_PATH`) — see [SPEC-P001](../planner-target-simulation/SPEC-P001-target-simulation-planning.md) and [RUNBOOK-plan-store.md](../planner-target-simulation/RUNBOOK-plan-store.md). That supersedes the old “No DB Save” experiment note **for plan versions only** (not for writing back to MSSQL `TargetsByMetrics`).
+4. TTS Planner port of cumulative-slope + enterprise `TargetsByMetrics` write-back remain out of scope for Survey MVP.
+5. **Chain aggregation (product lock):** Planner `Current` / `/plans` `current_chain` /
+   cumulative-slope network mean =
+   **equal-weight mean** of cleansed store `five_percent` at the **reference / as-of month**
    (each store weight `1/n`). No volume / response influence yet.
    - Sanitization **Final** KPI remains whole-period **response-weighted** — a different
      question; do **not** force Final = Current unless product explicitly revisits this.
@@ -60,5 +61,6 @@
 ## Non-goals
 
 - Mixing Question_ID=1 SQL baseline into this path.
-- Saving estimates to `TargetsByMetrics`.
+- Saving estimates to enterprise `TargetsByMetrics` / MSSQL OLTP.
 - Merging Angular planner iframe.
+- Volume-weighted network mean (deferred; equal-weight lock remains).
