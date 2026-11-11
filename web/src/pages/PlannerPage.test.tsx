@@ -90,7 +90,7 @@ describe('PlannerPage Phase A', () => {
     expect(screen.getByLabelText(/Reference month/i)).toBeInTheDocument();
     expect(screen.getByText(/Advanced allocator options/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Export CSV/i })).toBeDisabled();
-    expect(screen.getByRole('button', { name: /Save Excel report/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Export Excel/i })).toBeDisabled();
     expect(screen.getByText(/Set levers and Run simulation/i)).toBeInTheDocument();
   });
 

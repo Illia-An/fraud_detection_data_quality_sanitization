@@ -38,6 +38,18 @@ from backend.schemas import (
     SamplePresetMeta,
     SurveyAnswerRow,
 )
+from backend.cumulative_plan_schemas import (
+    PlanVersionCreateRequest,
+    PlanVersionListOut,
+    PlanVersionOut,
+    SimulationAdjustRequest,
+    SimulationOut,
+    SimulationRequest,
+    list_item_to_out,
+    maybe_overlay,
+    plan_version_to_out,
+    simulation_to_out,
+)
 from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
 from backend.tts_kpi_ap import load_ap_tts_kpi_panel
 from backend.tts_plan_schemas import (
@@ -54,7 +66,10 @@ from backend.tts_kitchen_queries import KitchenReadError
 from backend.tts_kitchen_schemas import KitchenBeforeAfterResponse
 from backend.tts_kitchen_service import run_tts_kitchen_before_after
 from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
+from planner.cumulative_slope import build_baseline_plan, simulate
+from planner.cumulative_slope.plan_version import build_plan_version
 from planner.five_percent import plan_five_percent
+from planner.plan_store import PlanStore, default_plan_store_path
 from planner.tts import plan_tts
 from planner.tts_baseline import TtsKpiPresetName, generate_tts_kpi_panel
 from planner.tts_kpi_ap import TtsKpiSourceError
@@ -93,6 +108,11 @@ def _as_sanitization_response(
     if meta_extra:
         payload["meta"] = {**(payload.get("meta") or {}), **meta_extra}
     return SanitizationResponse.model_validate(payload)
+
+
+def _plan_store() -> PlanStore:
+    """SQLite Baseline Plan versions (PLAN_STORE_PATH or data/plan_store.sqlite)."""
+    return PlanStore(default_plan_store_path(_ROOT))
 
 
 def create_app() -> FastAPI:
@@ -455,6 +475,129 @@ def create_app() -> FastAPI:
                 ],
             )
             return TtsPlanResponse(metrics={"tts": metric})
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post(
+        f"{API_PREFIX}/plan-versions",
+        response_model=PlanVersionOut,
+        status_code=201,
+        tags=["plan-versions"],
+        responses={422: {"description": "Validation error"}},
+    )
+    def create_plan_version(body: PlanVersionCreateRequest) -> PlanVersionOut:
+        """Compute and persist an immutable Baseline Plan version."""
+        try:
+            params = body.params.to_domain()
+            cumulative_start = body.cumulative_start.to_domain()
+            result = build_baseline_plan(
+                facts=[f.to_domain() for f in body.facts],
+                network_target=body.network_target,
+                as_of=body.as_of.to_domain(),
+                planning_year=body.planning_year,
+                cumulative_start=cumulative_start,
+                params=params,
+            )
+            version = build_plan_version(
+                result,
+                cumulative_start=cumulative_start,
+                params=params,
+                label=body.label,
+            )
+            saved = _plan_store().insert(version)
+            return plan_version_to_out(saved)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.get(
+        f"{API_PREFIX}/plan-versions",
+        response_model=PlanVersionListOut,
+        tags=["plan-versions"],
+    )
+    def list_plan_versions(
+        limit: int = Query(default=50, ge=1, le=200),
+        metric_id: str = Query(default="five_percent"),
+    ) -> PlanVersionListOut:
+        items = _plan_store().list_versions(limit=limit, metric_id=metric_id)
+        return PlanVersionListOut(items=[list_item_to_out(i) for i in items])
+
+    @app.get(
+        f"{API_PREFIX}/plan-versions/{{version_id}}",
+        response_model=PlanVersionOut,
+        tags=["plan-versions"],
+        responses={404: {"description": "Unknown plan version"}},
+    )
+    def get_plan_version(version_id: str) -> PlanVersionOut:
+        version = _plan_store().get(version_id)
+        if version is None:
+            raise HTTPException(status_code=404, detail="Plan version not found")
+        return plan_version_to_out(version)
+
+    @app.post(
+        f"{API_PREFIX}/simulation",
+        response_model=SimulationOut,
+        tags=["simulation"],
+        responses={
+            404: {"description": "Unknown active plan version"},
+            422: {"description": "Validation error"},
+        },
+    )
+    def run_simulation(body: SimulationRequest) -> SimulationOut:
+        """Live simulation from facts; optional frozen blue overlay from a plan version."""
+        store = _plan_store()
+        frozen = None
+        if body.active_plan_version_id:
+            frozen = store.get(body.active_plan_version_id)
+            if frozen is None:
+                raise HTTPException(status_code=404, detail="Plan version not found")
+        try:
+            result = simulate(
+                facts=[f.to_domain() for f in body.facts],
+                network_target=body.network_target,
+                as_of=body.as_of.to_domain(),
+                planning_year=body.planning_year,
+                cumulative_start=body.cumulative_start.to_domain(),
+                params=body.params.to_domain(),
+            )
+            result = maybe_overlay(result, frozen)
+            return simulation_to_out(
+                result, active_plan_version_id=body.active_plan_version_id
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @app.post(
+        f"{API_PREFIX}/simulation/adjust",
+        response_model=SimulationOut,
+        tags=["simulation"],
+        responses={
+            404: {"description": "Unknown active plan version"},
+            422: {"description": "Validation error"},
+        },
+    )
+    def run_simulation_adjust(body: SimulationAdjustRequest) -> SimulationOut:
+        """Re-simulate with limited store implied-target overrides (does not Save)."""
+        store = _plan_store()
+        frozen = None
+        if body.active_plan_version_id:
+            frozen = store.get(body.active_plan_version_id)
+            if frozen is None:
+                raise HTTPException(status_code=404, detail="Plan version not found")
+        overrides = {a.store_id: a.new_implied_target for a in body.adjustments}
+        try:
+            result = simulate(
+                facts=[f.to_domain() for f in body.facts],
+                network_target=body.network_target,
+                as_of=body.as_of.to_domain(),
+                planning_year=body.planning_year,
+                cumulative_start=body.cumulative_start.to_domain(),
+                params=body.params.to_domain(),
+                implied_target_overrides=overrides,
+            )
+            result = maybe_overlay(result, frozen)
+            return simulation_to_out(
+                result, active_plan_version_id=body.active_plan_version_id
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
 

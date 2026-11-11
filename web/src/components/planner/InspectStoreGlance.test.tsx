@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { FivePercentPlan } from '../../schemas/plan';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
 import { appTheme } from '../../theme';
+import type { InspectSlopeAlign } from './cumulativeSlopeLayers';
 import { InspectStoreGlance } from './InspectStoreGlance';
 
 const plan: FivePercentPlan = {
@@ -64,6 +65,9 @@ describe('InspectStoreGlance', () => {
     );
 
     expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
+    expect(screen.getByText(/Fact As-Of \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plan As-Of \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByTestId('inspect-fact-as-of-hint')).toBeInTheDocument();
     expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
     expect(screen.getByText('+6.0 pp')).toBeInTheDocument();
 
@@ -81,5 +85,40 @@ describe('InspectStoreGlance', () => {
 
     expect(screen.getByText('65.0% → 80.0%')).toBeInTheDocument();
     expect(screen.getByText('+14.0 pp')).toBeInTheDocument();
+  });
+
+  it('aligns Fact As-Of to slope last-fact month and shows EOY forecast', () => {
+    const slopeAlign: InspectSlopeAlign = {
+      factMonth: '2025-12',
+      fact: 58,
+      planAtFact: 60,
+      planEndMonthly: 72,
+      eoyPlanCumulative: 68,
+      eoyForecastCumulative: 64.2,
+      declaredAsOfLabel: '2026-01',
+    };
+    render(
+      <ThemeProvider theme={appTheme}>
+        <InspectStoreGlance
+          plan={plan}
+          insights={insights}
+          storeId={10}
+          baselineRows={[{ store_id: 10, five_percent: 65 }]}
+          draftLast={null}
+          slopeAlign={slopeAlign}
+        />
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByText('Fact As-Of (2025-12)')).toBeInTheDocument();
+    expect(screen.getByText('Plan As-Of (2025-12)')).toBeInTheDocument();
+    expect(screen.getByText('58.0%')).toBeInTheDocument();
+    expect(screen.getByText('Baseline → Plan end (monthly)')).toBeInTheDocument();
+    expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
+    expect(screen.getByText('EOY plan (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('68.0%')).toBeInTheDocument();
+    expect(screen.getByText('EOY forecast (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('64.2%')).toBeInTheDocument();
+    expect(screen.getByText(/last plotted fact 2025-12/i)).toBeInTheDocument();
   });
 });

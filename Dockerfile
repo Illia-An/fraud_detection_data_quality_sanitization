@@ -3,6 +3,8 @@
 #   docker build -t fraud-dq-sanitization:local .
 #   docker run -d --name fraud-dq -p 8000:8000 --env-file .env.docker ^
 #     -v "%CD%/data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro" ^
+#     -v "%CD%/data/plan_store:/app/data/plan_store" ^
+#     -e PLAN_STORE_PATH=/app/data/plan_store/plans.sqlite ^
 #     fraud-dq-sanitization:local
 # Open http://localhost:8000  (UI + /api/v1 + /docs)
 #
@@ -34,6 +36,7 @@ ENV PYTHONUNBUFFERED=1 \
     SNAPSHOT_URL=sqlite:///data/q10012_snapshot.sqlite \
     TTS_KPI_SOURCE=snapshot \
     TTS_KPI_SNAPSHOT_URL=sqlite:///data/tts_kpi_snapshot.sqlite \
+    PLAN_STORE_PATH=/app/data/plan_store/plans.sqlite \
     API_CORS_ORIGINS=http://localhost:8000 \
     PORT=8000
 

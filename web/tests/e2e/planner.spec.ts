@@ -43,12 +43,28 @@ test.describe('Planner alt-UI smoke', () => {
       timeout: 15_000,
     });
 
+    await expect(page.getByTestId('planner-save-plan')).toBeVisible();
+    await expect(page.getByTestId('planner-export-excel')).toBeVisible();
+
     await page.getByRole('button', { name: /Run simulation/i }).click();
 
     await expect(page.getByTestId('planner-glance-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Projected network KPI/i)).toBeVisible();
     await expect(page.getByText(/Hero evaluation/i)).toBeVisible();
-    await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible();
+    // After /simulation lands, Hero switches to Slope; Legacy remains via toggle.
+    await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(page.getByTestId('planner-save-plan')).toBeEnabled({ timeout: 60_000 });
+    const heroMode = page.getByTestId('planner-hero-view-mode');
+    await expect(heroMode).toBeVisible({ timeout: 15_000 });
+    // ToggleButton accessible name comes from aria-label, not the visible "Legacy"/"Slope" text.
+    await heroMode.getByRole('button', { name: /Classic evaluation/i }).click();
+    await expect(page.getByTestId('hero-evaluation-chart')).toBeVisible({ timeout: 15_000 });
+    await heroMode.getByRole('button', { name: /Cumulative-slope/i }).click();
+    await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // At-risk is a collapsed bottom overlay — expand before asserting the table.
     await page.getByText(/At-Risk Exception List/i).click();
@@ -72,11 +88,12 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(dialog.getByText(/Inspect/i).first()).toBeVisible();
     await expect(page.getByTestId('inspect-store-select')).toBeVisible();
     await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
-    await expect(page.getByTestId('store-hero-evaluation-chart')).toBeVisible();
+    // After Run, Inspect uses Slope store layers (not legacy store-hero-evaluation-chart).
+    await expect(dialog.getByTestId('cumulative-slope-hero-chart')).toBeVisible();
 
     // Estimate funnel is collapsed by default.
     await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
-    await expect(dialog.getByRole('button', { name: /Recalculate/i })).toBeVisible();
+    await expect(dialog.getByTestId('inspect-recalculate')).toBeVisible();
 
     await dialog.locator('.MuiDialogActions-root').getByRole('button', { name: 'Close' }).click();
     await expect(page.getByTestId('store-inspect-dialog')).toHaveCount(0);
