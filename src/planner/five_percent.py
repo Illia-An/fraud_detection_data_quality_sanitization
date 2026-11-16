@@ -1,7 +1,7 @@
 """Simplified higher-is-better five_percent allocation (TASK-15 Phase A).
 
 Inspired by store-score-allocation ``StorePlanner`` but stdlib-only and
-five_percent-only. Good enough for React Planner heatmap experiment.
+five_percent-only. Core math lives in ``planner.allocate`` (Wave 8).
 """
 
 from __future__ import annotations
@@ -80,118 +80,36 @@ def plan_five_percent(
     """Allocate store×month score improvements toward a chain target.
 
     Baseline values are cleansed five_percent at the reference month.
-    Equal store weights (product lock: no volume influence yet; matches allocation prepare path).
+    Equal store weights (product lock: no volume influence yet).
     """
-    if not baseline:
-        raise ValueError("baseline must contain at least one store")
-    if not (1 <= reference_month <= 12):
-        raise ValueError("reference_month must be 1..12")
-    if n_months < 1 or n_months > 12:
-        raise ValueError("n_months must be 1..12")
-    if max_monthly_improve < 0.01:
-        raise ValueError("max_monthly_improve must be >= 0.01")
-    if priority_power < 0.1:
-        raise ValueError("priority_power must be >= 0.1")
-    if not (0.0 <= growth_factor <= 1.0):
-        raise ValueError("growth_factor must be in [0, 1]")
-    if target < floor or target > ceiling:
-        raise ValueError(f"target must be within [{floor}, {ceiling}]")
+    from planner.allocate import allocate_plan
 
-    store_ids = sorted(baseline.keys())
-    n = len(store_ids)
-    weight = 1.0 / n
-    scores = {sid: float(baseline[sid]) for sid in store_ids}
-    current_chain = sum(scores.values()) / n
-    required = max(0.0, target - current_chain)
-
-    capacity: dict[int, float] = {}
-    priority: dict[int, float] = {}
-    for sid in store_ids:
-        value = scores[sid]
-        gap = max(0.0, target - value)
-        if gap > 0:
-            cap = min(gap, max_monthly_improve * n_months)
-            pri = weight * (gap**priority_power)
-        else:
-            room = max(0.0, ceiling - value)
-            proximity = 1.0 - min(1.0, (value - target) / max(ceiling - target, 1e-9))
-            cap = min(room * proximity * growth_factor, max_monthly_improve * n_months)
-            pri = weight * proximity * room * 0.3
-        capacity[sid] = max(0.0, cap)
-        priority[sid] = max(0.0, pri)
-
-    totals = {sid: 0.0 for sid in store_ids}
-    if required > 1e-12 and sum(capacity.values()) > 1e-12:
-        denom = sum(weight * priority[sid] for sid in store_ids)
-        if denom <= 0:
-            capable = [sid for sid in store_ids if capacity[sid] > 0]
-            if capable:
-                share = required / (weight * len(capable))
-                for sid in capable:
-                    totals[sid] = min(capacity[sid], share)
-        else:
-            for sid in store_ids:
-                totals[sid] = min(capacity[sid], priority[sid] * (required / denom))
-
-        # Redistribute remaining chain need among stores with leftover capacity.
-        for _ in range(40):
-            achieved = sum(weight * totals[sid] for sid in store_ids)
-            remaining_needed = required - achieved
-            if remaining_needed <= 1e-8:
-                break
-            rem_cap = {
-                sid: max(0.0, capacity[sid] - totals[sid]) for sid in store_ids
-            }
-            if sum(rem_cap.values()) <= 1e-12:
-                break
-            alloc_pri = {sid: weight * rem_cap[sid] for sid in store_ids}
-            denom2 = sum(weight * alloc_pri[sid] for sid in store_ids)
-            if denom2 <= 0:
-                break
-            for sid in store_ids:
-                add = alloc_pri[sid] * (remaining_needed / denom2)
-                add = min(add, rem_cap[sid])
-                totals[sid] += add
-
-    month_weights = trajectory_weights(n_months, trajectory, trajectory_power)
-    periods = [
-        add_calendar_months(reference_year, reference_month, i + 1)
-        for i in range(n_months)
-    ]
-
-    current = dict(scores)
-    chain_traj: list[MonthScore] = []
-    store_month_scores: dict[int, list[MonthScore]] = {sid: [] for sid in store_ids}
-
-    for mi, (year, month) in enumerate(periods):
-        w_m = month_weights[mi]
-        for sid in store_ids:
-            desired = totals[sid] * w_m
-            room = max(0.0, ceiling - current[sid])
-            take = min(desired, max_monthly_improve, room)
-            current[sid] = min(ceiling, max(floor, current[sid] + take))
-            store_month_scores[sid].append(
-                MonthScore(year=year, month=month, score=round(current[sid], 4))
-            )
-        chain = sum(current.values()) / n
-        chain_traj.append(MonthScore(year=year, month=month, score=round(chain, 4)))
-
-    final_chain = chain_traj[-1].score if chain_traj else current_chain
-    feasible = final_chain + 1e-8 >= target or required <= 1e-8
-
-    projections = tuple(
-        StoreProjection(store_id=sid, months=tuple(store_month_scores[sid]))
-        for sid in store_ids
-    )
-    return FivePercentPlanResult(
+    result = allocate_plan(
+        baseline=baseline,
+        target=target,
+        n_months=n_months,
+        direction="higher_is_better",
         metric_id="five_percent",
         unit="%",
-        direction="higher_is_better",
-        target=target,
-        current_chain=round(current_chain, 4),
-        required_change=round(required, 4),
-        final_chain=round(final_chain, 4),
-        chain_trajectory=tuple(chain_traj),
-        projections=projections,
-        feasible=feasible,
+        max_monthly_improve=max_monthly_improve,
+        priority_power=priority_power,
+        trajectory=trajectory,
+        trajectory_power=trajectory_power,
+        growth_factor=growth_factor,
+        reference_year=reference_year,
+        reference_month=reference_month,
+        floor=floor,
+        ceiling=ceiling,
+    )
+    return FivePercentPlanResult(
+        metric_id=result.metric_id,
+        unit=result.unit,
+        direction=result.direction,
+        target=result.target,
+        current_chain=result.current_chain,
+        required_change=result.required_change,
+        final_chain=result.final_chain,
+        chain_trajectory=result.chain_trajectory,
+        projections=result.projections,
+        feasible=result.feasible,
     )

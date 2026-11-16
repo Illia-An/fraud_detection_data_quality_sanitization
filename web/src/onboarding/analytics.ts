@@ -18,7 +18,6 @@ type TrackFn = (event: OnboardingAnalyticsEvent, props?: OnboardingAnalyticsProp
 
 let trackImpl: TrackFn = (event, props) => {
   if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
     console.debug('[onboarding]', event, props ?? {});
   }
 };

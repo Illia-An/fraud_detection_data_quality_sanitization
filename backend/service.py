@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -57,6 +58,44 @@ STEP_TIER1 = "tier1"
 STEP_TIER2 = "tier2"
 STEP_TIER3 = "tier3"
 STEP_TIER4 = "tier4"
+
+
+@dataclass(frozen=True)
+class RowTierStepSpec:
+    """One row-level tier step shared by inline and pushdown pipelines (M-06)."""
+
+    step_name: str
+    enabled: bool
+    apply_fn: Callable[[pd.DataFrame], pd.DataFrame]
+
+
+def _row_tier_step_specs(
+    config: PipelineConfig,
+    *,
+    tiers_23_enabled: bool,
+) -> tuple[RowTierStepSpec, ...]:
+    """Single table of blacklist → freq → always-5 steps."""
+    return (
+        RowTierStepSpec(
+            step_name=STEP_TIER1,
+            enabled=config.tier1_blacklist_enabled,
+            apply_fn=lambda df: apply_blacklist_tier(
+                df, config=_blacklist_tier_config(config)
+            ),
+        ),
+        RowTierStepSpec(
+            step_name=STEP_TIER2,
+            enabled=tiers_23_enabled and config.tier2_freq_enabled,
+            apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
+        ),
+        RowTierStepSpec(
+            step_name=STEP_TIER3,
+            enabled=tiers_23_enabled and config.tier3_always_five_enabled,
+            apply_fn=lambda df: apply_always_topbox_tier(
+                df, config=_always_topbox_tier_config(config)
+            ),
+        ),
+    )
 
 
 def _rows_to_frame(rows: list[SurveyAnswerRow]) -> pd.DataFrame:
@@ -505,43 +544,20 @@ def run_pipeline_pushdown(
     }
     cell_snapshots: list[dict[tuple[float, int, int], tuple[int, int]]] = []
 
-    working, cells, step_t1, drop_reasons[STEP_TIER1] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER1,
-        rows_in,
-        enabled=config.tier1_blacklist_enabled,
-        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
-    )
-    steps.append(step_t1)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t1.rows_out
-
-    working, cells, step_t2, drop_reasons[STEP_TIER2] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER2,
-        rows_in,
-        enabled=tiers_23_on_candidates and config.tier2_freq_enabled,
-        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
-    )
-    steps.append(step_t2)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t2.rows_out
-
-    working, cells, step_t3, drop_reasons[STEP_TIER3] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER3,
-        rows_in,
-        enabled=tiers_23_on_candidates and config.tier3_always_five_enabled,
-        apply_fn=lambda df: apply_always_topbox_tier(
-            df, config=_always_topbox_tier_config(config)
-        ),
-    )
-    steps.append(step_t3)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t3.rows_out
+    for spec in _row_tier_step_specs(config, tiers_23_enabled=tiers_23_on_candidates):
+        working, cells, step_metric, drop_reasons[spec.step_name] = (
+            _pushdown_row_tier_step(
+                working,
+                cells,
+                spec.step_name,
+                rows_in,
+                enabled=spec.enabled,
+                apply_fn=spec.apply_fn,
+            )
+        )
+        steps.append(step_metric)
+        cell_snapshots.append(dict(cells))
+        rows_in = step_metric.rows_out
 
     t4_cfg = _tier4_config(config)
     high_store_months_out: list[dict] = []
@@ -694,34 +710,18 @@ def run_pipeline(
         STEP_TIER4: {},
     }
 
-    current, step_t1, drop_reasons[STEP_TIER1] = _apply_row_tier_step(
-        current,
-        STEP_TIER1,
-        enabled=config.tier1_blacklist_enabled,
-        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
-    )
-    steps.append(step_t1)
-    after_t1 = current
+    after_stages: list[pd.DataFrame] = []
+    for spec in _row_tier_step_specs(config, tiers_23_enabled=True):
+        current, step_metric, drop_reasons[spec.step_name] = _apply_row_tier_step(
+            current,
+            spec.step_name,
+            enabled=spec.enabled,
+            apply_fn=spec.apply_fn,
+        )
+        steps.append(step_metric)
+        after_stages.append(current)
 
-    current, step_t2, drop_reasons[STEP_TIER2] = _apply_row_tier_step(
-        current,
-        STEP_TIER2,
-        enabled=config.tier2_freq_enabled,
-        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
-    )
-    steps.append(step_t2)
-    after_t2 = current
-
-    current, step_t3, drop_reasons[STEP_TIER3] = _apply_row_tier_step(
-        current,
-        STEP_TIER3,
-        enabled=config.tier3_always_five_enabled,
-        apply_fn=lambda df: apply_always_topbox_tier(
-            df, config=_always_topbox_tier_config(config)
-        ),
-    )
-    steps.append(step_t3)
-    after_t3 = current
+    after_t1, after_t2, after_t3 = after_stages
 
     current, step_t4, high_store_months_out, drop_reasons[STEP_TIER4] = _apply_tier4_row_step(
         current, config

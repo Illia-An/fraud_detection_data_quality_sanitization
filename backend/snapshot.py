@@ -17,10 +17,18 @@ from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.db_sample import DbSampleError
+from backend.snapshot_base import (
+    ensure_sqlite_url_with_path,
+    get_sqlite_engine,
+    init_sqlite_schema,
+    project_root,
+    resolve_sqlite_file_url,
+    resolve_sqlite_path_from_url,
+)
 
 logger = logging.getLogger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = project_root()
 DEFAULT_SNAPSHOT_PATH = _PROJECT_ROOT / "data" / "q10012_snapshot.sqlite"
 DEFAULT_SNAPSHOT_URL = f"sqlite:///{DEFAULT_SNAPSHOT_PATH.as_posix()}"
 
@@ -118,45 +126,33 @@ def view_source_dev_warning() -> str | None:
 
 def resolve_snapshot_url() -> str:
     """``SNAPSHOT_URL`` or default file under ``data/``."""
-    raw = os.environ.get("SNAPSHOT_URL", "").strip()
-    if raw:
-        return raw
-    return DEFAULT_SNAPSHOT_URL
+    return resolve_sqlite_file_url(
+        os.environ.get("SNAPSHOT_URL", ""),
+        default_path=DEFAULT_SNAPSHOT_PATH,
+    )
 
 
 def resolve_snapshot_path() -> Path:
     """Filesystem path for file-backed ``sqlite:///`` URLs; else default path."""
-    url = resolve_snapshot_url()
-    prefix = "sqlite:///"
-    if url.startswith(prefix):
-        rest = url[len(prefix) :]
-        # sqlalchemy allows sqlite:////abs and sqlite:///rel
-        path = Path(rest)
-        if not path.is_absolute():
-            path = _PROJECT_ROOT / path
-        return path
-    return DEFAULT_SNAPSHOT_PATH
+    return resolve_sqlite_path_from_url(
+        resolve_snapshot_url(), default_path=DEFAULT_SNAPSHOT_PATH
+    )
 
 
 def get_snapshot_engine(*, create_schema: bool = False) -> Engine:
     """SQLAlchemy engine for the local snapshot DB (cached per URL)."""
-    from backend.data_access import get_cached_engine
-
-    url = resolve_snapshot_url()
-    if url.startswith("sqlite:///"):
-        path = resolve_snapshot_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        url = f"sqlite:///{path.as_posix()}"
-    engine = get_cached_engine(url)
-    if create_schema:
-        init_snapshot_schema(engine)
-    return engine
+    path = resolve_snapshot_path()
+    url = ensure_sqlite_url_with_path(resolve_snapshot_url(), path)
+    return get_sqlite_engine(
+        url, schema_sql=_SCHEMA_SQL if create_schema else None
+    )
 
 
 def get_snapshot_engine_at(path: Path, *, create_schema: bool = False) -> Engine:
     """Engine for an explicit SQLite file path (refresh tmp / tests)."""
     path = path.resolve()
     path.parent.mkdir(parents=True, exist_ok=True)
+    # Uncached: refresh tmp paths must not pin long-lived engines.
     engine = create_engine(f"sqlite:///{path.as_posix()}")
     if create_schema:
         init_snapshot_schema(engine)
@@ -165,11 +161,7 @@ def get_snapshot_engine_at(path: Path, *, create_schema: bool = False) -> Engine
 
 def init_snapshot_schema(engine: Engine) -> None:
     """Create tables/indexes if missing (idempotent)."""
-    with engine.begin() as conn:
-        for stmt in _SCHEMA_SQL.strip().split(";"):
-            chunk = stmt.strip()
-            if chunk:
-                conn.execute(text(chunk))
+    init_sqlite_schema(engine, _SCHEMA_SQL)
 
 
 def set_meta_conn(conn: Connection, values: dict[str, str]) -> None:

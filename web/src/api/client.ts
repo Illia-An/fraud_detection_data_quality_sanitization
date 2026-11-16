@@ -37,8 +37,10 @@ import {
 } from '../schemas/cumulativePlan';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 import {
+  ttsPlanBoundsSchema,
   ttsPlanRequestSchema,
   ttsPlanResponseSchema,
+  type TtsPlanBounds,
   type TtsPlanRequest,
   type TtsPlanResponse,
 } from '../schemas/ttsPlan';
@@ -233,6 +235,13 @@ export function postTtsPlan(request: TtsPlanRequest): Promise<TtsPlanResponse> {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function fetchTtsPlanBounds(): Promise<TtsPlanBounds> {
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/plans-tts/bounds`,
+    ttsPlanBoundsSchema,
+  );
 }
 
 export function parseProcessRequest(input: unknown): ProcessRequest {

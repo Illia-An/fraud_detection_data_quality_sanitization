@@ -13,7 +13,7 @@ export const PERIOD_PRESET_OPTIONS: ReadonlyArray<{
   value: PeriodPreset;
   label: string;
 }> = [
-  { value: 'ytd_2026', label: '2026 YTD' },
+  { value: 'ytd_2026', label: 'YTD' },
   { value: 'from_2025', label: '2025 – Present' },
   { value: 'custom', label: 'Custom Range' },
 ];
@@ -42,8 +42,14 @@ export function resolvePeriodWindow(
   now: Date = new Date(),
 ): PeriodWindow {
   switch (preset) {
-    case 'ytd_2026':
-      return { from_date: '2026-01-01', to_date: formatLocalIsoDate(now) };
+    case 'ytd_2026': {
+      // Preset id kept for session compat; window tracks the current calendar year (A-11).
+      const year = now.getFullYear();
+      return {
+        from_date: `${year}-01-01`,
+        to_date: formatLocalIsoDate(now),
+      };
+    }
     case 'from_2025':
       return { from_date: '2025-01-01', to_date: null };
     case 'custom': {

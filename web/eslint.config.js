@@ -20,12 +20,7 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-    },
-  },
-  {
-    files: ['src/test/**'],
-    rules: {
+      // Wave 8 / M-15: co-exported helpers next to components are intentional.
       'react-refresh/only-export-components': 'off',
     },
   },
