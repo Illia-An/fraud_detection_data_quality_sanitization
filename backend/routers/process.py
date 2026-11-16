@@ -48,6 +48,7 @@ def process(body: ProcessRequest) -> SanitizationResponse:
             db_query_a_time_ms=outcome.db_query_a_time_ms,
             db_query_b_time_ms=outcome.db_query_b_time_ms,
             execution_time_ms=outcome.execution_time_ms,
+            result_cache=outcome.meta_extra.get("result_cache"),
             snapshot_loaded_at=outcome.meta_extra.get("snapshot_loaded_at"),
             snapshot_age_s=outcome.meta_extra.get("snapshot_age_s"),
             enabled_tiers={

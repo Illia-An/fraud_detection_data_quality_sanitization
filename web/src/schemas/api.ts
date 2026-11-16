@@ -33,8 +33,7 @@ export const surveyAnswerRowSchema = z
     PrintDateTime: z.string().nullable().optional(),
     Year: z.number().int().min(2000).max(2100).nullable().optional(),
     Month: z.number().int().min(1).max(12).nullable().optional(),
-  })
-  .passthrough();
+  });
 
 export type SurveyAnswerRow = z.infer<typeof surveyAnswerRowSchema>;
 
@@ -87,7 +86,8 @@ export const defaultPipelineConfig: PipelineConfig = pipelineConfigSchema.parse(
 export const processRequestSchema = z
   .object({
     source: z.enum(['inline', 'db']).default('inline'),
-    rows: z.array(surveyAnswerRowSchema).max(50_000).default([]),
+    // Wave 9: matches backend default max_process_rows() (stress ≈ 13k).
+    rows: z.array(surveyAnswerRowSchema).max(15_000).default([]),
     config: pipelineConfigSchema.default({}),
     from_date: z
       .string()
@@ -198,11 +198,11 @@ export const storeImpactPointSchema = z.object({
   rows_dropped: z.number().int().min(0),
 });
 
-/** SPEC §5.3 profiling keys — required on /process responses. */
+/** SPEC §5.3 profiling keys — peak_memory_mb only when PROFILE_TRACEMALLOC=1. */
 export const responseMetaSchema = z
   .object({
     execution_time_ms: z.number(),
-    peak_memory_mb: z.number(),
+    peak_memory_mb: z.number().optional(),
     rows_scanned: z.number().int().nonnegative(),
     db_query_a_time_ms: z.number().optional(),
     db_query_b_time_ms: z.number().optional(),
