@@ -1,5 +1,3 @@
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -30,8 +28,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useMemo, useState, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import { postExcelReport } from '../api/client';
@@ -42,11 +39,7 @@ import {
   useSavePlanVersion,
 } from '../api/hooks';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
-import {
-  activeAnswerLabelKey,
-  type ActiveAnswer,
-} from '../components/planner/activeAnswer';
-import { createAnswerUndoSnapshot, type AnswerUndoSnapshot } from '../components/planner/answerUndo';
+import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
 import { CumulativeSlopeHeroChart } from '../components/planner/CumulativeSlopeHeroChart';
 import {
   buildNetworkCumulativeSlopeLayers,
@@ -95,24 +88,19 @@ import {
   type StoreMixQuestionId,
 } from '../schemas/storeMixQuestions';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
-import { useOnboardingStore } from '../onboarding';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import {
-  PLANNER_RAIL_COLLAPSED_PX,
-  PLANNER_RAIL_WIDTH_PX,
+  PLANNER_AT_RISK_GAP_PX,
+  PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+  PLANNER_PREFERRED_REFERENCE,
 } from '../components/planner/plannerShell';
+import { PlannerAtRiskDock } from '../components/planner/PlannerAtRiskDock';
+import { PlannerPageShell } from '../components/planner/PlannerPageShell';
+import { useCollapsedPlayReveal } from '../components/planner/useCollapsedPlayReveal';
+import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
+import { useAnswerShell } from '../components/planner/useAnswerShell';
+import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
-
-/** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
-const COLLAPSED_PLAY_REVEAL_MS = 250;
-/** Collapsed At-risk summary height reserved so Hero is not covered on md. */
-const AT_RISK_SUMMARY_RESERVE_PX = 80;
-/** Gap above At-risk overlay — same as KPI strip ↔ Hero (`gap: 1.5` → 12px). */
-const AT_RISK_GAP_PX = 12;
-/** Expanded At-risk overlay cap on md — scrolls internally; Hero underneath does not move. */
-const AT_RISK_OVERLAY_MAX_HEIGHT = '45vh';
-/** Prefer this month when present in the cleansed panel (DB demo path). */
-const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
 
 function baselineRowsAtReference(
   panel: SanitizedPanel,
@@ -182,7 +170,6 @@ function downloadPlanCsv(plan: FivePercentPlan): void {
 
 export function PlannerPage() {
   const t = useT();
-  const theme = useTheme();
   const processResult = useUiStore((state) => state.processResult);
   const planMutation = usePlan();
 
@@ -204,7 +191,7 @@ export function PlannerPage() {
   const savePlanMutation = useSavePlanVersion();
 
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
-  const [showCollapsedPlay, setShowCollapsedPlay] = useState(false);
+  const showCollapsedPlay = useCollapsedPlayReveal(controlsOpen);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
   const [excelExporting, setExcelExporting] = useState(false);
   const [excelExportError, setExcelExportError] = useState(false);
@@ -217,44 +204,8 @@ export function PlannerPage() {
   /** Keep legacy Hero as default; Slope is opt-in after /simulation lands. */
   const [heroViewMode, setHeroViewMode] = useState<'legacy' | 'slope'>('legacy');
 
-  const onboardingStatus = useOnboardingStore((s) => s.status);
-  const onboardingStepId = useOnboardingStore((s) => s.stepId);
-
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
-  useEffect(() => {
-    if (onboardingStatus !== 'active') {
-      return;
-    }
-    if (onboardingStepId === 'planner-levers') {
-      setControlsOpen(true);
-      setAtRiskExpanded(false);
-      return;
-    }
-    if (onboardingStepId === 'planner-hero') {
-      setAtRiskExpanded(false);
-      const timerId = window.setTimeout(() => {
-        document
-          .querySelector<HTMLElement>('[data-onboarding="planner-hero"]')
-          ?.scrollIntoView({ block: 'center', behavior: 'auto' });
-      }, 80);
-      return () => window.clearTimeout(timerId);
-    }
-    if (onboardingStepId === 'planner-at-risk' || onboardingStepId === 'planner-inspect') {
-      setAtRiskExpanded(true);
-      // After Accordion opens, bring the sheet into view for spotlight.
-      const timerId = window.setTimeout(() => {
-        document
-          .querySelector<HTMLElement>('[data-onboarding="planner-at-risk"]')
-          ?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-        if (onboardingStepId === 'planner-inspect') {
-          document
-            .querySelector<HTMLElement>('[data-onboarding="planner-inspect"]')
-            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
-      }, 80);
-      return () => window.clearTimeout(timerId);
-    }
-  }, [onboardingStatus, onboardingStepId, setControlsOpen]);
+  usePlannerOnboardingShell({ prefix: 'planner', setControlsOpen, setAtRiskExpanded });
 
   const panel = useMemo(() => {
     if (!processResult) {
@@ -270,8 +221,8 @@ export function PlannerPage() {
   const refs = useMemo(() => (panel ? availableReferences(panel) : []), [panel]);
   const suggested = refs.length ? refs[refs.length - 1] : null;
 
-  const [referenceYear, setReferenceYear] = useState<number | null>(PREFERRED_REFERENCE.year);
-  const [referenceMonth, setReferenceMonth] = useState<number | null>(PREFERRED_REFERENCE.month);
+  const { referenceYear, referenceMonth, setReferenceYear, setReferenceMonth } =
+    useReferenceSelection(refs, PLANNER_PREFERRED_REFERENCE);
   const [target, setTarget] = useState(75);
   const [horizon, setHorizon] = useState(12);
   const [targetText, setTargetText] = useState('75');
@@ -279,42 +230,21 @@ export function PlannerPage() {
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
-  const [mixNote, setMixNote] = useState<string | null>(null);
-  const [pendingPackId, setPendingPackId] = useState<ScenarioPackId | null>(null);
-  const [pendingMixId, setPendingMixId] = useState<StoreMixQuestionId | null>(null);
-  const [activeAnswer, setActiveAnswer] = useState<ActiveAnswer | null>(null);
-  const [answerUndo, setAnswerUndo] = useState<AnswerUndoSnapshot | null>(null);
-
-  const railWidth = controlsOpen ? PLANNER_RAIL_WIDTH_PX : PLANNER_RAIL_COLLAPSED_PX;
-
-  useEffect(() => {
-    if (controlsOpen) {
-      setShowCollapsedPlay(false);
-      return;
-    }
-    const timerId = window.setTimeout(() => setShowCollapsedPlay(true), COLLAPSED_PLAY_REVEAL_MS);
-    return () => window.clearTimeout(timerId);
-  }, [controlsOpen]);
-
-  useEffect(() => {
-    if (refs.length === 0) {
-      return;
-    }
-    const selectionOk =
-      referenceYear != null &&
-      referenceMonth != null &&
-      refs.some((ref) => ref.year === referenceYear && ref.month === referenceMonth);
-    if (selectionOk) {
-      return;
-    }
-    const preferred = refs.find(
-      (ref) =>
-        ref.year === PREFERRED_REFERENCE.year && ref.month === PREFERRED_REFERENCE.month,
-    );
-    const next = preferred ?? refs[refs.length - 1];
-    setReferenceYear(next.year);
-    setReferenceMonth(next.month);
-  }, [refs, referenceYear, referenceMonth]);
+  const {
+    pendingPackId,
+    setPendingPackId,
+    pendingMixId,
+    setPendingMixId,
+    activeAnswer,
+    setActiveAnswer,
+    mixNote,
+    setMixNote,
+    answerUndo,
+    resetAnswerState,
+    captureUndo,
+    clearUndo,
+    consumeUndo,
+  } = useAnswerShell<FivePercentPlan, PlanParams>();
 
   const effectiveYear = referenceYear ?? suggested?.year ?? null;
   const effectiveMonth = referenceMonth ?? suggested?.month ?? null;
@@ -353,25 +283,13 @@ export function PlannerPage() {
     monitoring.summary.ahead > 0 &&
     monitoring.summary.behind > 0;
 
-  const captureAnswerUndo = (): AnswerUndoSnapshot => {
-    const snap = createAnswerUndoSnapshot({
-      plan: draftPlan,
-      activeAnswer,
-      params,
-      mixNote,
-    });
-    setAnswerUndo(snap);
-    return snap;
-  };
+  const captureAnswerUndo = () => captureUndo({ plan: draftPlan, params });
 
   const handleUndoAnswer = () => {
-    if (!answerUndo) {
+    const snap = consumeUndo();
+    if (!snap) {
       return;
     }
-    const snap = answerUndo;
-    setAnswerUndo(null);
-    setActiveAnswer(snap.activeAnswer);
-    setMixNote(snap.mixNote);
     setParams(snap.params);
     if (snap.plan) {
       patchDraftPlan(snap.plan);
@@ -494,7 +412,7 @@ export function PlannerPage() {
         },
         onError: () => {
           setParams(undoSnap.params);
-          setAnswerUndo(null);
+          clearUndo();
         },
       },
     );
@@ -545,7 +463,7 @@ export function PlannerPage() {
         onError: () => {
           setPendingPackId(null);
           setParams(undoSnap.params);
-          setAnswerUndo(null);
+          clearUndo();
         },
       },
     );
@@ -721,80 +639,33 @@ export function PlannerPage() {
   };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: { xs: 'column', md: 'row' },
-        flex: 1,
-        minHeight: 0,
-        height: { xs: 'auto', md: '100%' },
-        overflow: { xs: 'auto', md: 'hidden' },
-        gap: { xs: 2, md: 0 },
-      }}
-    >
-      <Box
-        component="aside"
-        data-testid="controls-rail"
-        data-collapsed={controlsOpen ? 'false' : 'true'}
-        sx={{
-          width: { xs: '100%', md: railWidth },
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: { md: 0 },
-          overflow: { md: 'hidden' },
-          borderRight: { md: 1 },
-          borderColor: { md: 'divider' },
-          pr: { md: controlsOpen ? 2 : 0.5 },
-          mr: { md: controlsOpen ? 2 : 1 },
-          transition: theme.transitions.create(['width', 'padding', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
-        }}
-      >
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            justifyContent: controlsOpen ? 'flex-end' : 'center',
-            flexShrink: 0,
-            pb: 0.5,
-          }}
-        >
-          <Tooltip
-            title={controlsOpen ? t('common.collapseControls') : t('common.expandControls')}
-            placement="right"
-          >
+    <PlannerPageShell
+      controlsOpen={controlsOpen}
+      onToggleControls={() => setControlsOpen((open) => !open)}
+      railTestId="controls-rail"
+      showCollapsedPlay={showCollapsedPlay}
+      collapsedPlay={
+        <Tooltip title={canRun ? t('planner.run') : runTooltip} placement="right">
+          <span>
             <IconButton
+              data-testid="collapsed-run"
+              color="primary"
+              onClick={handleRun}
+              disabled={!canRun}
+              aria-label={t('planner.run')}
               size="small"
-              onClick={() => setControlsOpen((open) => !open)}
-              aria-label={
-                controlsOpen ? t('common.collapseControls') : t('common.expandControls')
-              }
-              aria-expanded={controlsOpen}
             >
-              {controlsOpen ? (
-                <ChevronLeftIcon fontSize="small" />
+              {planMutation.isPending ? (
+                <CircularProgress size={18} color="inherit" />
               ) : (
-                <ChevronRightIcon fontSize="small" />
+                <PlayArrowIcon fontSize="small" />
               )}
             </IconButton>
-          </Tooltip>
-        </Box>
-
-        {/* Keep mounted when collapsed so form state is preserved. */}
-        <Box
-          sx={{
-            display: { xs: 'flex', md: controlsOpen ? 'flex' : 'none' },
-            flexDirection: 'column',
-            flex: { md: 1 },
-            minHeight: { md: 0 },
-            overflowY: { xs: 'visible', md: 'hidden' },
-            overflowX: 'hidden',
-            gap: 1.5,
-            pb: 1,
-          }}
-        >
+          </span>
+        </Tooltip>
+      }
+      rail={
+        <>
         {!baselineReady && (
           <Alert
             severity="info"
@@ -913,9 +784,7 @@ export function PlannerPage() {
                     setReferenceYear(y);
                     setReferenceMonth(m);
                     clearAll();
-                    setActiveAnswer(null);
-                    setMixNote(null);
-                    setAnswerUndo(null);
+                    resetAnswerState();
                     setAsOfYear(null);
                     setAsOfMonth(null);
                     setSlopeSimulation(null);
@@ -1186,9 +1055,7 @@ export function PlannerPage() {
                     disabled={!isDirty || approvedPlan == null}
                     onClick={() => {
                       discardDraft();
-                      setActiveAnswer(null);
-                      setMixNote(null);
-                      setAnswerUndo(null);
+                      resetAnswerState();
                     }}
                     data-testid="planner-revert-draft"
                   >
@@ -1243,54 +1110,9 @@ export function PlannerPage() {
             </Stack>
           </CardContent>
         </Card>
-        </Box>
-
-        {!controlsOpen && showCollapsedPlay ? (
-          <Box
-            sx={{
-              display: { xs: 'none', md: 'flex' },
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 1,
-              pt: 1,
-              flex: 1,
-            }}
-          >
-            <Tooltip title={canRun ? t('planner.run') : runTooltip} placement="right">
-              <span>
-                <IconButton
-                  data-testid="collapsed-run"
-                  color="primary"
-                  onClick={handleRun}
-                  disabled={!canRun}
-                  aria-label={t('planner.run')}
-                  size="small"
-                >
-                  {planMutation.isPending ? (
-                    <CircularProgress size={18} color="inherit" />
-                  ) : (
-                    <PlayArrowIcon fontSize="small" />
-                  )}
-                </IconButton>
-              </span>
-            </Tooltip>
-          </Box>
-        ) : null}
-      </Box>
-
-      <Box
-        component="main"
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          overflow: { xs: 'auto', md: 'hidden' },
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1.5,
-          pb: { xs: 2, md: 0 },
-        }}
-      >
+        </>
+      }
+    >
         {planMutation.isError && (
           <Alert severity="error" sx={{ flexShrink: 0 }}>
             {planMutation.error instanceof Error
@@ -1394,7 +1216,7 @@ export function PlannerPage() {
                   overflow: 'hidden',
                   pb:
                     panel && monitoring
-                      ? { md: `${AT_RISK_SUMMARY_RESERVE_PX + AT_RISK_GAP_PX}px` }
+                      ? { md: `${PLANNER_AT_RISK_SUMMARY_RESERVE_PX + PLANNER_AT_RISK_GAP_PX}px` }
                       : 0,
                 }}
               >
@@ -1519,78 +1341,15 @@ export function PlannerPage() {
               </Box>
 
               {panel && monitoring && (
-                <Box
-                  data-testid="planner-at-risk-sheet"
-                  data-onboarding="planner-at-risk"
-                  sx={{
-                    // xs: normal flow under Hero. md: bottom overlay over the pane.
-                    position: { xs: 'relative', md: 'absolute' },
-                    left: { md: 0 },
-                    right: { md: 0 },
-                    bottom: { md: AT_RISK_GAP_PX },
-                    zIndex: { md: 3 },
-                    flexShrink: 0,
-                    maxHeight: { md: AT_RISK_OVERLAY_MAX_HEIGHT },
-                    overflow: { md: 'auto' },
-                    scrollbarGutter: 'stable',
-                    mt: { xs: `${AT_RISK_GAP_PX}px`, md: 0 },
-                    bgcolor: 'background.paper',
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    boxShadow: { md: atRiskExpanded ? 8 : 2 },
-                  }}
+                <PlannerAtRiskDock
+                  testId="planner-at-risk-sheet"
+                  onboardingId="planner-at-risk"
+                  expanded={atRiskExpanded}
+                  onExpandedChange={setAtRiskExpanded}
+                  behindCount={monitoring.summary.behind}
+                  aheadCount={monitoring.summary.ahead}
+                  stableScrollbar
                 >
-                  <Accordion
-                    disableGutters
-                    expanded={atRiskExpanded}
-                    onChange={(_event, expanded) => setAtRiskExpanded(expanded)}
-                    sx={{
-                      '&:before': { display: 'none' },
-                      boxShadow: 'none',
-                      bgcolor: 'transparent',
-                    }}
-                  >
-                    <AccordionSummary
-                      expandIcon={<ExpandMoreIcon />}
-                      sx={{ minHeight: 48, py: 0.5 }}
-                    >
-                      <Box sx={{ minWidth: 0, pr: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {t('planner.atRiskTitle')}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          noWrap
-                          display="block"
-                        >
-                          {t('planner.atRisk.behindChip', {
-                            count: monitoring.summary.behind,
-                          })}
-                          {' · '}
-                          {t('planner.atRisk.aheadChip', {
-                            count: monitoring.summary.ahead,
-                          })}
-                        </Typography>
-                      </Box>
-                    </AccordionSummary>
-                    <AccordionDetails
-                      sx={{
-                        px: 1.5,
-                        pt: 0,
-                        pb: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minHeight: 0,
-                        maxHeight: {
-                          xs: '46vh',
-                          md: `calc(${AT_RISK_OVERLAY_MAX_HEIGHT} - ${AT_RISK_SUMMARY_RESERVE_PX}px)`,
-                        },
-                        overflow: 'auto',
-                        scrollbarGutter: 'stable',
-                      }}
-                    >
                       <AtRiskDeltaTable
                         plan={draftPlan}
                         approvedPlan={approvedPlan}
@@ -1608,9 +1367,7 @@ export function PlannerPage() {
                         onInspect={(storeId) => selectStore(storeId)}
                         unreachableStoreIds={unreachableStoreIds}
                       />
-                    </AccordionDetails>
-                  </Accordion>
-                </Box>
+                </PlannerAtRiskDock>
               )}
             </Box>
 
@@ -1644,7 +1401,6 @@ export function PlannerPage() {
             {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
           </Alert>
         )}
-      </Box>
-    </Box>
+    </PlannerPageShell>
   );
 }
