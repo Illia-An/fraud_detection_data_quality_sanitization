@@ -1,9 +1,11 @@
 services:
   app:
+    # Wave 5: deploy host sets IMAGE_REPO + IMAGE_TAG and runs pull && up (no local build).
+    image: ${IMAGE_REPO:-fraud-dq-sanitization}:${IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile
-    image: fraud-dq-sanitization:local
+    pull_policy: ${PULL_POLICY:-missing}
     container_name: fraud-dq
     ports:
       - "${API_PORT:-8000}:8000"

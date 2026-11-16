@@ -35,7 +35,18 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: {
-        API_CORS_ORIGINS: 'http://localhost:5173',
+        API_CORS_ORIGINS: process.env.API_CORS_ORIGINS ?? 'http://localhost:5173',
+        // Wave 5 / RG-N10: prefer committed (or CI-built) fixtures when set.
+        SANITIZATION_SOURCE:
+          process.env.SANITIZATION_SOURCE ?? 'snapshot',
+        SNAPSHOT_URL:
+          process.env.SNAPSHOT_URL ??
+          'sqlite:///testdata/fixtures/q10012_snapshot.sqlite',
+        TTS_KPI_SOURCE: process.env.TTS_KPI_SOURCE ?? 'snapshot',
+        TTS_KPI_SNAPSHOT_URL:
+          process.env.TTS_KPI_SNAPSHOT_URL ??
+          'sqlite:///testdata/fixtures/tts_kpi_snapshot.sqlite',
+        SNAPSHOT_MAX_AGE_DAYS: process.env.SNAPSHOT_MAX_AGE_DAYS ?? '36500',
       },
     },
     {
