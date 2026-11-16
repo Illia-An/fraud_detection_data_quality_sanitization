@@ -10,21 +10,21 @@ from typing import Any, Sequence
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.db_sample import (
+from backend.data_access import (
     DEFAULT_FROM_DATE,
-    VIEW_NAME,
     DbSampleError,
     DbSampleQuery,
+    ProcessSource,
     SqlDialect,
-    _period_params,
-    _process_engine,
-    redact_row,
+    period_params,
+    process_engine,
+    resolve_process_source,
 )
+from backend.db_sample import VIEW_NAME, redact_row
 from backend.schemas import PipelineConfig, SamplePresetMeta, SampleResponse, SurveyAnswerRow
 from backend.snapshot import (
     ANSWERS_TABLE,
     STORE_MONTH_TABLE,
-    get_sanitization_source,
     meta_as_dict,
     read_meta,
 )
@@ -174,7 +174,7 @@ FROM {STORE_MONTH_TABLE}
 """
         return sql, params
 
-    where, params = _period_params(query, dialect=dialect)
+    where, params = period_params(query, dialect=dialect)
     # Match filter_answered_metric_rows: Q10012 with non-null Answer_Value.
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
@@ -245,9 +245,13 @@ def load_actual_baseline_from_settings(
     period_start: date = DEFAULT_FROM_DATE,
     period_end: date | None = None,
     store_ids: Sequence[int | float] | None = None,
+    *,
+    engine: Engine | None = None,
+    dialect: SqlDialect | None = None,
 ) -> ActualBaseline:
     """Query A via VIEW or snapshot engine from settings."""
-    engine, dialect = _process_engine()
+    if engine is None or dialect is None:
+        engine, dialect = process_engine()
     return get_actual_baseline_aggregates(
         engine,
         period_start,
@@ -302,7 +306,7 @@ def _build_tier_candidate_sql_v1(
     *,
     dialect: SqlDialect,
 ) -> tuple[str, dict[str, Any]]:
-    where, params = _period_params(query, dialect=dialect)
+    where, params = period_params(query, dialect=dialect)
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
 
@@ -329,7 +333,7 @@ def _build_tier_candidate_sql_phase2(
     store_ids: Sequence[int | float] | None,
 ) -> tuple[str, dict[str, Any]]:
     """Snapshot Query B: rows that Tier1 may drop (blacklist / freq / always-5)."""
-    where, params = _period_params(query, dialect="sqlite")
+    where, params = period_params(query, dialect="sqlite")
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
 
@@ -447,7 +451,13 @@ def get_tier_candidate_rows(
         logger.exception("Query B (tier candidate rows) failed")
         raise DbSampleError("Database query failed") from exc
 
-    redacted = [_normalize_candidate_row(redact_row(r)) for r in raw_rows]
+    already_hashed = False
+    if dialect == "sqlite":
+        already_hashed = bool(read_meta(engine).pii_hashed_at_rest)
+    redacted = [
+        _normalize_candidate_row(redact_row(r, already_hashed=already_hashed))
+        for r in raw_rows
+    ]
     rows = [SurveyAnswerRow.model_validate(r) for r in redacted]
     stores = {r.PrintStore for r in rows if r.PrintStore is not None}
     months = {
@@ -479,9 +489,13 @@ def load_tier_candidates_from_settings(
     period_end: date | None = None,
     config: PipelineConfig | None = None,
     store_ids: Sequence[int | float] | None = None,
+    *,
+    engine: Engine | None = None,
+    dialect: SqlDialect | None = None,
 ) -> SampleResponse:
     """Query B via VIEW or snapshot engine from settings."""
-    engine, dialect = _process_engine()
+    if engine is None or dialect is None:
+        engine, dialect = process_engine()
     return get_tier_candidate_rows(
         engine,
         period_start,
@@ -492,14 +506,23 @@ def load_tier_candidates_from_settings(
     )
 
 
-def process_source_meta_extra() -> dict[str, Any]:
-    """Optional meta keys when ``SANITIZATION_SOURCE=snapshot``."""
-    if get_sanitization_source() != "snapshot":
-        return {"sanitization_source": "view"}
-    try:
-        from backend.snapshot import require_snapshot_engine
+def process_source_meta_extra(source: ProcessSource | None = None) -> dict[str, Any]:
+    """Optional meta keys for the resolved sanitization source."""
+    from backend.readiness import snapshot_freshness_fields
+    from backend.snapshot import view_source_dev_warning
 
-        engine = require_snapshot_engine()
-        return meta_as_dict(read_meta(engine))
+    src = source or resolve_process_source()
+    if src.sanitization_source != "snapshot":
+        extra: dict[str, Any] = {"sanitization_source": "view"}
+        warning = view_source_dev_warning()
+        if warning:
+            extra["source_warning"] = warning
+        return extra
+    try:
+        meta = read_meta(src.engine)
+        return {
+            **meta_as_dict(meta),
+            **snapshot_freshness_fields(meta.loaded_at),
+        }
     except DbSampleError:
         return {"sanitization_source": "snapshot"}

@@ -17,6 +17,14 @@ from pathlib import Path
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
+from backend.snapshot_base import (
+    ensure_sqlite_url_with_path,
+    get_sqlite_engine,
+    init_sqlite_schema,
+    project_root,
+    resolve_sqlite_file_url,
+    resolve_sqlite_path_from_url,
+)
 from planner.tts_kpi_ap import (
     DEFAULT_TABLE,
     KPI_NAME,
@@ -27,7 +35,7 @@ from planner.tts_kpi_ap import (
 
 logger = logging.getLogger(__name__)
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = project_root()
 DEFAULT_TTS_KPI_SNAPSHOT_PATH = _PROJECT_ROOT / "data" / "tts_kpi_snapshot.sqlite"
 DEFAULT_TTS_KPI_SNAPSHOT_URL = f"sqlite:///{DEFAULT_TTS_KPI_SNAPSHOT_PATH.as_posix()}"
 
@@ -61,41 +69,29 @@ class TtsKpiSnapshotMeta:
 
 
 def resolve_tts_kpi_snapshot_url() -> str:
-    raw = os.environ.get("TTS_KPI_SNAPSHOT_URL", "").strip()
-    if raw:
-        return raw
-    return DEFAULT_TTS_KPI_SNAPSHOT_URL
+    return resolve_sqlite_file_url(
+        os.environ.get("TTS_KPI_SNAPSHOT_URL", ""),
+        default_path=DEFAULT_TTS_KPI_SNAPSHOT_PATH,
+    )
 
 
 def resolve_tts_kpi_snapshot_path() -> Path:
-    url = resolve_tts_kpi_snapshot_url()
-    prefix = "sqlite:///"
-    if url.startswith(prefix):
-        path = Path(url[len(prefix) :])
-        if not path.is_absolute():
-            path = _PROJECT_ROOT / path
-        return path
-    return DEFAULT_TTS_KPI_SNAPSHOT_PATH
+    return resolve_sqlite_path_from_url(
+        resolve_tts_kpi_snapshot_url(),
+        default_path=DEFAULT_TTS_KPI_SNAPSHOT_PATH,
+    )
 
 
 def get_tts_kpi_snapshot_engine(*, create_schema: bool = False) -> Engine:
-    url = resolve_tts_kpi_snapshot_url()
-    if url.startswith("sqlite:///"):
-        path = resolve_tts_kpi_snapshot_path()
-        path.parent.mkdir(parents=True, exist_ok=True)
-        url = f"sqlite:///{path.as_posix()}"
-    engine = create_engine(url)
-    if create_schema:
-        init_tts_kpi_snapshot_schema(engine)
-    return engine
+    path = resolve_tts_kpi_snapshot_path()
+    url = ensure_sqlite_url_with_path(resolve_tts_kpi_snapshot_url(), path)
+    return get_sqlite_engine(
+        url, schema_sql=_SCHEMA_SQL if create_schema else None
+    )
 
 
 def init_tts_kpi_snapshot_schema(engine: Engine) -> None:
-    with engine.begin() as conn:
-        for stmt in _SCHEMA_SQL.strip().split(";"):
-            chunk = stmt.strip()
-            if chunk:
-                conn.execute(text(chunk))
+    init_sqlite_schema(engine, _SCHEMA_SQL)
 
 
 def set_tts_kpi_meta(engine: Engine, values: dict[str, str]) -> None:

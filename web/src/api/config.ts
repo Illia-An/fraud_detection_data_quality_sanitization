@@ -16,3 +16,13 @@ function resolveApiBaseUrl(): string {
 export const API_BASE_URL = resolveApiBaseUrl();
 
 export const API_PREFIX = '/api/v1';
+
+/** Wave 6 stop-gap: shared API key for `/api/v1/*` (empty = auth disabled server-side). */
+export function resolveApiKey(): string | undefined {
+  const raw = import.meta.env.VITE_API_KEY as string | undefined;
+  if (raw == null) {
+    return undefined;
+  }
+  const trimmed = String(raw).trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}

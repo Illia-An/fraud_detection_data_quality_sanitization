@@ -1,7 +1,10 @@
-"""Pure sanitization pipeline — no FastAPI / Jupyter dependencies."""
+"""Sanitization pipeline + process orchestration — no FastAPI dependencies."""
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pandas as pd
@@ -29,7 +32,22 @@ from fraud_guard.tier2 import (
     keep_clean_rows as keep_tier2_clean,
 )
 
-from backend.queries import ActualBaseline, network_top_box_pct
+from backend.db_sample import DEFAULT_FROM_DATE, DbSampleQuery
+from backend.data_access import resolve_process_source
+from backend.period_bounds import normalize_snapshot_period
+from backend.process_cache import (
+    get_process_result_cache,
+    make_process_cache_key,
+    process_result_cache_enabled,
+)
+from backend.profiler import profile_block, profiling_meta
+from backend.queries import (
+    ActualBaseline,
+    load_actual_baseline_from_settings,
+    load_tier_candidates_from_settings,
+    network_top_box_pct,
+    process_source_meta_extra,
+)
 from backend.schemas import (
     PipelineConfig,
     ProcessRequest,
@@ -45,6 +63,44 @@ STEP_TIER1 = "tier1"
 STEP_TIER2 = "tier2"
 STEP_TIER3 = "tier3"
 STEP_TIER4 = "tier4"
+
+
+@dataclass(frozen=True)
+class RowTierStepSpec:
+    """One row-level tier step shared by inline and pushdown pipelines (M-06)."""
+
+    step_name: str
+    enabled: bool
+    apply_fn: Callable[[pd.DataFrame], pd.DataFrame]
+
+
+def _row_tier_step_specs(
+    config: PipelineConfig,
+    *,
+    tiers_23_enabled: bool,
+) -> tuple[RowTierStepSpec, ...]:
+    """Single table of blacklist → freq → always-5 steps."""
+    return (
+        RowTierStepSpec(
+            step_name=STEP_TIER1,
+            enabled=config.tier1_blacklist_enabled,
+            apply_fn=lambda df: apply_blacklist_tier(
+                df, config=_blacklist_tier_config(config)
+            ),
+        ),
+        RowTierStepSpec(
+            step_name=STEP_TIER2,
+            enabled=tiers_23_enabled and config.tier2_freq_enabled,
+            apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
+        ),
+        RowTierStepSpec(
+            step_name=STEP_TIER3,
+            enabled=tiers_23_enabled and config.tier3_always_five_enabled,
+            apply_fn=lambda df: apply_always_topbox_tier(
+                df, config=_always_topbox_tier_config(config)
+            ),
+        ),
+    )
 
 
 def _rows_to_frame(rows: list[SurveyAnswerRow]) -> pd.DataFrame:
@@ -473,6 +529,9 @@ def run_pipeline_pushdown(
     answered = filter_answered_metric_rows(raw) if not raw.empty else raw
 
     tiers_23_on_candidates = query_b_mode == "tier1_full"
+    tiers_23_requested = bool(
+        config.tier2_freq_enabled or config.tier3_always_five_enabled
+    )
     reconciliation = (
         "query_a_minus_tiers_1_3_candidate_drops_then_tier4_on_aggregates"
         if tiers_23_on_candidates
@@ -490,43 +549,20 @@ def run_pipeline_pushdown(
     }
     cell_snapshots: list[dict[tuple[float, int, int], tuple[int, int]]] = []
 
-    working, cells, step_t1, drop_reasons[STEP_TIER1] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER1,
-        rows_in,
-        enabled=config.tier1_blacklist_enabled,
-        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
-    )
-    steps.append(step_t1)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t1.rows_out
-
-    working, cells, step_t2, drop_reasons[STEP_TIER2] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER2,
-        rows_in,
-        enabled=tiers_23_on_candidates and config.tier2_freq_enabled,
-        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
-    )
-    steps.append(step_t2)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t2.rows_out
-
-    working, cells, step_t3, drop_reasons[STEP_TIER3] = _pushdown_row_tier_step(
-        working,
-        cells,
-        STEP_TIER3,
-        rows_in,
-        enabled=tiers_23_on_candidates and config.tier3_always_five_enabled,
-        apply_fn=lambda df: apply_always_topbox_tier(
-            df, config=_always_topbox_tier_config(config)
-        ),
-    )
-    steps.append(step_t3)
-    cell_snapshots.append(dict(cells))
-    rows_in = step_t3.rows_out
+    for spec in _row_tier_step_specs(config, tiers_23_enabled=tiers_23_on_candidates):
+        working, cells, step_metric, drop_reasons[spec.step_name] = (
+            _pushdown_row_tier_step(
+                working,
+                cells,
+                spec.step_name,
+                rows_in,
+                enabled=spec.enabled,
+                apply_fn=spec.apply_fn,
+            )
+        )
+        steps.append(step_metric)
+        cell_snapshots.append(dict(cells))
+        rows_in = step_metric.rows_out
 
     t4_cfg = _tier4_config(config)
     high_store_months_out: list[dict] = []
@@ -588,6 +624,15 @@ def run_pipeline_pushdown(
             "actual_total_responses": actual_baseline.total_responses,
             "actual_top_box_count": actual_baseline.top_box_count,
             "tiers_123_dropped_rows": tiers_123_dropped,
+            "tiers_23_applied": tiers_23_on_candidates and tiers_23_requested,
+            **(
+                {
+                    "tiers_23_skipped": True,
+                    "tiers_23_skip_reason": "view_blacklist_only",
+                }
+                if tiers_23_requested and not tiers_23_on_candidates
+                else {}
+            ),
         },
     )
 
@@ -670,34 +715,18 @@ def run_pipeline(
         STEP_TIER4: {},
     }
 
-    current, step_t1, drop_reasons[STEP_TIER1] = _apply_row_tier_step(
-        current,
-        STEP_TIER1,
-        enabled=config.tier1_blacklist_enabled,
-        apply_fn=lambda df: apply_blacklist_tier(df, config=_blacklist_tier_config(config)),
-    )
-    steps.append(step_t1)
-    after_t1 = current
+    after_stages: list[pd.DataFrame] = []
+    for spec in _row_tier_step_specs(config, tiers_23_enabled=True):
+        current, step_metric, drop_reasons[spec.step_name] = _apply_row_tier_step(
+            current,
+            spec.step_name,
+            enabled=spec.enabled,
+            apply_fn=spec.apply_fn,
+        )
+        steps.append(step_metric)
+        after_stages.append(current)
 
-    current, step_t2, drop_reasons[STEP_TIER2] = _apply_row_tier_step(
-        current,
-        STEP_TIER2,
-        enabled=config.tier2_freq_enabled,
-        apply_fn=lambda df: apply_freq_tier(df, config=_freq_tier_config(config)),
-    )
-    steps.append(step_t2)
-    after_t2 = current
-
-    current, step_t3, drop_reasons[STEP_TIER3] = _apply_row_tier_step(
-        current,
-        STEP_TIER3,
-        enabled=config.tier3_always_five_enabled,
-        apply_fn=lambda df: apply_always_topbox_tier(
-            df, config=_always_topbox_tier_config(config)
-        ),
-    )
-    steps.append(step_t3)
-    after_t3 = current
+    after_t1, after_t2, after_t3 = after_stages
 
     current, step_t4, high_store_months_out, drop_reasons[STEP_TIER4] = _apply_tier4_row_step(
         current, config
@@ -736,3 +765,196 @@ def run_pipeline(
             ),
         },
     )
+
+
+@dataclass(frozen=True)
+class ProcessOutcome:
+    """Result of ``run_process`` before HTTP response wrapping / logging."""
+
+    result: SanitizationResponse
+    meta_extra: dict
+    rows_scanned: int
+    db_query_a_time_ms: float | None
+    db_query_b_time_ms: float | None
+    execution_time_ms: float
+    peak_memory_mb: float | None
+
+
+def run_process_db(body: ProcessRequest) -> tuple[SanitizationResponse, dict, int, float | None, float | None]:
+    """Query A → Query B → pushdown pipeline (no FastAPI).
+
+    Raises ``ValueError`` when the period has no Q10012 rows (HTTP 422).
+    Raises ``DbSampleError`` on source / connectivity failures.
+    """
+    src = resolve_process_source()
+    requested_start = body.from_date or DEFAULT_FROM_DATE
+    requested_end = body.to_date
+    period_start = requested_start
+    period_end = requested_end
+    period_normalized = False
+    if src.sanitization_source == "snapshot":
+        period_start, period_end, period_normalized = normalize_snapshot_period(
+            requested_start, requested_end
+        )
+    db_query = DbSampleQuery(
+        from_date=period_start,
+        to_date=period_end,
+    )
+
+    t_a = time.perf_counter()
+    actual_baseline = load_actual_baseline_from_settings(
+        period_start=db_query.from_date,
+        period_end=db_query.to_date,
+        engine=src.engine,
+        dialect=src.dialect,
+    )
+    db_query_a_time_ms = round((time.perf_counter() - t_a) * 1000.0, 3)
+    if actual_baseline.total_responses <= 0:
+        end_label = period_end.isoformat() if period_end is not None else "latest"
+        raise ValueError(
+            f"No Q10012 rows from {period_start.isoformat()} to {end_label}"
+        )
+
+    t_b = time.perf_counter()
+    sample = load_tier_candidates_from_settings(
+        period_start=db_query.from_date,
+        period_end=db_query.to_date,
+        config=body.config,
+        engine=src.engine,
+        dialect=src.dialect,
+    )
+    db_query_b_time_ms = round((time.perf_counter() - t_b) * 1000.0, 3)
+    result = run_pipeline_pushdown(
+        actual_baseline,
+        sample.rows,
+        body.config,
+        query_b_mode=src.query_b_mode,
+    )
+    meta_extra = {
+        "source": "db",
+        "sample": sample.meta.model_dump(),
+        "query_a_store_periods": len(actual_baseline.by_store_period),
+        "query_a_total_responses": actual_baseline.total_responses,
+        "query_b_candidate_rows": len(sample.rows),
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat() if period_end is not None else None,
+        "period_requested_start": requested_start.isoformat(),
+        "period_requested_end": (
+            requested_end.isoformat() if requested_end is not None else None
+        ),
+        "period_normalized_to_months": period_normalized,
+        **process_source_meta_extra(src),
+    }
+    return result, meta_extra, len(sample.rows), db_query_a_time_ms, db_query_b_time_ms
+
+
+_CACHE_META_SKIP = frozenset(
+    {
+        "execution_time_ms",
+        "peak_memory_mb",
+        "rows_scanned",
+        "db_query_a_time_ms",
+        "db_query_b_time_ms",
+        "result_cache",
+    }
+)
+
+
+def _outcome_from_profile(
+    *,
+    result: SanitizationResponse,
+    meta_extra: dict,
+    rows_scanned: int,
+    db_query_a_time_ms: float | None,
+    db_query_b_time_ms: float | None,
+    profile: dict,
+    result_cache: str,
+) -> ProcessOutcome:
+    peak_raw = profile.get("peak_memory_mb")
+    peak_memory_mb = float(peak_raw) if peak_raw is not None else None
+    meta_extra = {
+        **meta_extra,
+        **profiling_meta(
+            execution_time_ms=float(profile["execution_time_ms"]),
+            peak_memory_mb=peak_memory_mb,
+            rows_scanned=rows_scanned,
+            db_query_a_time_ms=db_query_a_time_ms,
+            db_query_b_time_ms=db_query_b_time_ms,
+        ),
+        "result_cache": result_cache,
+    }
+    return ProcessOutcome(
+        result=result,
+        meta_extra=meta_extra,
+        rows_scanned=rows_scanned,
+        db_query_a_time_ms=db_query_a_time_ms,
+        db_query_b_time_ms=db_query_b_time_ms,
+        execution_time_ms=float(profile["execution_time_ms"]),
+        peak_memory_mb=peak_memory_mb,
+    )
+
+
+def run_process(body: ProcessRequest) -> ProcessOutcome:
+    """Orchestrate inline or db sanitization without FastAPI (Wave 7 / A-07).
+
+    Wave 9 / P-04: optional LRU cache for snapshot ``source=db`` results.
+    """
+    cache_key: str | None = None
+    if body.source == "db" and process_result_cache_enabled():
+        src = resolve_process_source()
+        if src.sanitization_source == "snapshot":
+            from backend.snapshot import read_meta
+
+            loaded_at = read_meta(src.engine).loaded_at
+            cache_key = make_process_cache_key(
+                body, snapshot_loaded_at=loaded_at
+            )
+            cached = get_process_result_cache().get(cache_key)
+            if cached is not None:
+                result, meta_extra = cached
+                with profile_block() as profile:
+                    pass
+                rows_scanned = int(meta_extra.get("query_b_candidate_rows") or 0)
+                return _outcome_from_profile(
+                    result=result,
+                    meta_extra=meta_extra,
+                    rows_scanned=rows_scanned,
+                    db_query_a_time_ms=meta_extra.get("db_query_a_time_ms"),
+                    db_query_b_time_ms=meta_extra.get("db_query_b_time_ms"),
+                    profile=profile,
+                    result_cache="hit",
+                )
+
+    with profile_block() as profile:
+        db_query_a_time_ms: float | None = None
+        db_query_b_time_ms: float | None = None
+        if body.source == "db":
+            result, meta_extra, rows_scanned, db_query_a_time_ms, db_query_b_time_ms = (
+                run_process_db(body)
+            )
+        else:
+            result = run_pipeline(body)
+            rows_scanned = int(result.meta.get("input_rows", len(body.rows)))
+            meta_extra = {}
+
+    outcome = _outcome_from_profile(
+        result=result,
+        meta_extra=meta_extra,
+        rows_scanned=rows_scanned,
+        db_query_a_time_ms=db_query_a_time_ms,
+        db_query_b_time_ms=db_query_b_time_ms,
+        profile=profile,
+        result_cache="miss" if cache_key else "bypass",
+    )
+    if cache_key is not None and outcome.meta_extra.get("sanitization_source") == "snapshot":
+        to_store = {
+            k: v for k, v in outcome.meta_extra.items() if k not in _CACHE_META_SKIP
+        }
+        # Keep original query timings on subsequent hits for process_done clarity.
+        if db_query_a_time_ms is not None:
+            to_store["db_query_a_time_ms"] = db_query_a_time_ms
+        if db_query_b_time_ms is not None:
+            to_store["db_query_b_time_ms"] = db_query_b_time_ms
+        to_store["query_b_candidate_rows"] = rows_scanned
+        get_process_result_cache().put(cache_key, outcome.result, to_store)
+    return outcome

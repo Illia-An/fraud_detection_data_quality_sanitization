@@ -1,9 +1,11 @@
 services:
   app:
+    # Wave 5: deploy host sets IMAGE_REPO + IMAGE_TAG and runs pull && up (no local build).
+    image: ${IMAGE_REPO:-fraud-dq-sanitization}:${IMAGE_TAG:-local}
     build:
       context: .
       dockerfile: Dockerfile
-    image: fraud-dq-sanitization:local
+    pull_policy: ${PULL_POLICY:-missing}
     container_name: fraud-dq
     ports:
       - "${API_PORT:-8000}:8000"
@@ -13,15 +15,29 @@ services:
     environment:
       SANITIZATION_SOURCE: ${SANITIZATION_SOURCE:-snapshot}
       SNAPSHOT_URL: ${SNAPSHOT_URL:-sqlite:///data/q10012_snapshot.sqlite}
+      SNAPSHOT_MAX_AGE_DAYS: ${SNAPSHOT_MAX_AGE_DAYS:-14}
       TTS_KPI_SOURCE: ${TTS_KPI_SOURCE:-snapshot}
       TTS_KPI_SNAPSHOT_URL: ${TTS_KPI_SNAPSHOT_URL:-sqlite:///data/tts_kpi_snapshot.sqlite}
       PLAN_STORE_PATH: ${PLAN_STORE_PATH:-/app/data/plan_store/plans.sqlite}
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:8000}
       FRONTEND_DIST_DIR: /app/web/dist
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      API_KEY: ${API_KEY:-}
+      PII_HMAC_KEY: ${PII_HMAC_KEY:-}
+      ENABLE_DOCS: ${ENABLE_DOCS:-0}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      PROCESS_ALLOW_INLINE: ${PROCESS_ALLOW_INLINE:-1}
+      PROFILE_TRACEMALLOC: ${PROFILE_TRACEMALLOC:-0}
+      PROCESS_RESULT_CACHE: ${PROCESS_RESULT_CACHE:-1}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     volumes:
-      # Host snapshots (gitignored). Refresh via scripts/refresh_*_snapshot.py
-      - ./data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro
-      - ./data/tts_kpi_snapshot.sqlite:/app/data/tts_kpi_snapshot.sqlite:ro
-      # Baseline Plan versions (SPEC-P001) — read/write, separate from snapshots
+      # Mount data/ dir (Wave 2 / D-02) so atomic *.tmp → replace + *.prev work on host.
+      # Snapshots stay read-only in the container; refresh runs on the host.
+      - ./data:/app/data:ro
+      # Baseline Plan versions (SPEC-P001) — read/write overlay on the data mount
       - ./data/plan_store:/app/data/plan_store
     restart: unless-stopped

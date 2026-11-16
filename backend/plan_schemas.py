@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from backend.request_limits import max_plan_baseline_rows
+
 
 class PlanBaselineRow(BaseModel):
     store_id: int
@@ -32,6 +34,9 @@ class PlanRequest(BaseModel):
 
     @model_validator(mode="after")
     def _target_must_improve(self) -> PlanRequest:
+        limit = max_plan_baseline_rows()
+        if len(self.baseline_rows) > limit:
+            raise ValueError(f"baseline_rows exceeds limit of {limit}")
         scores = [row.five_percent for row in self.baseline_rows]
         current = sum(scores) / len(scores)
         if self.target < current - 1e-9:

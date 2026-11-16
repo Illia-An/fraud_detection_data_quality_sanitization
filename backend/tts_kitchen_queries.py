@@ -8,6 +8,7 @@ second scan. No writes and no joins.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from datetime import date, timedelta
@@ -20,11 +21,34 @@ from tts_kitchen.report import KitchenMonthCell
 
 logger = logging.getLogger(__name__)
 
-# Inclusive SaleDate window. The live view grows, so the screen uses this slice.
-KITCHEN_PERIOD_START = date(2026, 9, 1)
-KITCHEN_PERIOD_END = date(2026, 10, 20)
+
+def _env_date(name: str, default: date) -> date:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using default %s", name, raw, default)
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        logger.warning("Invalid %s=%r; using default %s", name, raw, default)
+        return default
+
+
+# Inclusive SaleDate window (overridable via env — Wave 8 / A-11, M-16).
+KITCHEN_PERIOD_START = _env_date("KITCHEN_PERIOD_START", date(2026, 9, 1))
+KITCHEN_PERIOD_END = _env_date("KITCHEN_PERIOD_END", date(2026, 10, 20))
 # Shorter than this is dropped. Exactly this many seconds stays.
-KITCHEN_MIN_SEC = 30
+KITCHEN_MIN_SEC = _env_int("KITCHEN_MIN_SEC", 30)
 DEFAULT_TTS_VIEW = "dbo.TargetsByMetrics_McKitiBump"
 
 _VIEW_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")

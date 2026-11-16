@@ -6,6 +6,13 @@ dist/
 wheels/
 *.egg-info
 .pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Frontend coverage (Wave 10)
+web/coverage/
 
 # Virtual environments
 .venv
@@ -26,6 +33,9 @@ docs/research/*_INTERNAL_PII*
 # Local Q10012 daily snapshot (may contain PII — never commit)
 data/*.sqlite
 data/*.sqlite-*
+data/*.sqlite.tmp
+data/*.sqlite.prev
+data/*.sqlite.prev.*
 # Baseline Plan versions (SPEC-P001) — local / compose volume
 data/plan_store/
 

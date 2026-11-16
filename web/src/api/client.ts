@@ -1,6 +1,6 @@
 import { z, type ZodTypeAny } from 'zod';
 
-import { API_BASE_URL, API_PREFIX } from './config';
+import { API_BASE_URL, API_PREFIX, resolveApiKey } from './config';
 import {
   healthResponseSchema,
   pipelineConfigSchema,
@@ -37,8 +37,10 @@ import {
 } from '../schemas/cumulativePlan';
 import { planRequestSchema, planResponseSchema, type PlanRequest, type PlanResponse } from '../schemas/plan';
 import {
+  ttsPlanBoundsSchema,
   ttsPlanRequestSchema,
   ttsPlanResponseSchema,
+  type TtsPlanBounds,
   type TtsPlanRequest,
   type TtsPlanResponse,
 } from '../schemas/ttsPlan';
@@ -63,6 +65,11 @@ export class ApiError extends Error {
   }
 }
 
+function apiAuthHeaders(): Record<string, string> {
+  const key = resolveApiKey();
+  return key ? { 'X-API-Key': key } : {};
+}
+
 async function fetchJson<T extends ZodTypeAny>(
   url: string,
   schema: T,
@@ -73,6 +80,7 @@ async function fetchJson<T extends ZodTypeAny>(
     headers: {
       Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...apiAuthHeaders(),
       ...init?.headers,
     },
   });
@@ -227,6 +235,13 @@ export function postTtsPlan(request: TtsPlanRequest): Promise<TtsPlanResponse> {
     method: 'POST',
     body: JSON.stringify(body),
   });
+}
+
+export function fetchTtsPlanBounds(): Promise<TtsPlanBounds> {
+  return fetchJson(
+    `${API_BASE_URL}${API_PREFIX}/plans-tts/bounds`,
+    ttsPlanBoundsSchema,
+  );
 }
 
 export function parseProcessRequest(input: unknown): ProcessRequest {

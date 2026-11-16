@@ -4,7 +4,8 @@ Architecture contract:
 - POST /api/v1/process accepts ``ProcessRequest`` (inline rows, or ``source=db``
   for the configured AnswerTime window; optional ``from_date`` / ``to_date``).
 - Returns ``SanitizationResponse`` with step metrics, store-month panel, KPI deltas, and ``echo_config``.
-- GET /health returns ``HealthResponse``.
+- GET /health returns ``HealthResponse`` (liveness).
+- GET /ready returns readiness (snapshot file / age / rows / schema_version).
 - Physical column names match ``SummerCampain.dbo.TargetsByMetrics_RateGetAnswers``.
 - Shared pipeline contracts live in ``src/schemas`` (SPEC.md Section 2).
 - Frontend TypeScript mirrors this module in ``web/src/schemas/api.ts``.
@@ -17,6 +18,11 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.request_limits import (
+    HARD_MAX_PROCESS_ROWS,
+    inline_allowed,
+    max_process_rows,
+)
 from schemas import PipelineConfig, SanitizationResponse, StepMetric
 
 
@@ -53,6 +59,7 @@ __all__ = [
     "ProcessResponse",
     "ResponseMeta",
     "HealthResponse",
+    "ReadyResponse",
     "SamplePresetMeta",
     "SampleResponse",
     "ErrorDetail",
@@ -65,9 +72,9 @@ __all__ = [
 
 
 class SurveyAnswerRow(BaseModel):
-    """One answered survey row. Extra columns are preserved for downstream mapping."""
+    """One answered survey row. Unknown client fields are ignored (Wave 9 / P-05)."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     ParticipateNumber: str | None = None
     Question_ID: int = Field(default=10012, ge=1)
@@ -97,7 +104,10 @@ class ProcessRequest(BaseModel):
     """
 
     source: Literal["inline", "db"] = "inline"
-    rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=500_000)
+    # Hard OpenAPI ceiling; operational default 15k via max_process_rows() (Wave 9).
+    rows: list[SurveyAnswerRow] = Field(
+        default_factory=list, max_length=HARD_MAX_PROCESS_ROWS
+    )
     config: PipelineConfig = Field(default_factory=PipelineConfig)
     from_date: date | None = Field(
         default=None,
@@ -110,8 +120,13 @@ class ProcessRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_rows_for_inline(self) -> ProcessRequest:
+        if self.source == "inline" and not inline_allowed():
+            raise ValueError("inline source is disabled (PROCESS_ALLOW_INLINE=0)")
         if self.source == "inline" and not self.rows:
             raise ValueError("rows must not be empty")
+        limit = max_process_rows()
+        if len(self.rows) > limit:
+            raise ValueError(f"rows exceeds limit of {limit}")
         if (
             self.from_date is not None
             and self.to_date is not None
@@ -156,10 +171,27 @@ class StoreImpactPoint(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """GET /health payload."""
+    """GET /health payload (liveness only)."""
 
     status: str = "ok"
-    version: str = "0.1.0"
+    # Callers must pass ``app_version()``; no hardcoded package default (Wave 7 / M-12).
+    version: str
+
+
+class ReadyResponse(BaseModel):
+    """GET /ready payload (data readiness; may be returned with HTTP 503)."""
+
+    status: Literal["ready", "not_ready"]
+    version: str
+    sanitization_source: str | None = None
+    snapshot_present: bool = False
+    snapshot_loaded_at: str | None = None
+    snapshot_age_s: float | None = None
+    snapshot_max_age_days: float | None = None
+    snapshot_row_count: int | None = None
+    schema_version: str | None = None
+    schema_ok: bool = False
+    reasons: list[str] = Field(default_factory=list)
 
 
 class SamplePresetMeta(BaseModel):

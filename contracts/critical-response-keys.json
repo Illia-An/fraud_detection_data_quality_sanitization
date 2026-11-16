@@ -1,0 +1,65 @@
+{
+  "_comment": "Wave 10 / C-01 — OpenAPI properties must include these keys; Zod mirrors must accept them.",
+  "checks": [
+    {
+      "method": "get",
+      "path": "/health",
+      "schema": "HealthResponse",
+      "critical_keys": ["status", "version"]
+    },
+    {
+      "method": "post",
+      "path": "/api/v1/process",
+      "schema": "SanitizationResponse",
+      "critical_keys": [
+        "baseline_top_box_pct",
+        "final_top_box_pct",
+        "network_delta_pp",
+        "steps",
+        "high_store_months",
+        "store_impact_series",
+        "echo_config",
+        "meta"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/v1/plans",
+      "schema": "PlanResponse",
+      "critical_keys": ["metrics"]
+    },
+    {
+      "method": "post",
+      "path": "/api/v1/plans-tts",
+      "schema": "TtsPlanResponse",
+      "critical_keys": ["metrics"]
+    },
+    {
+      "method": "get",
+      "path": "/api/v1/tts-kpi/ap",
+      "schema": "TtsKpiApPanelResponse",
+      "critical_keys": [
+        "period_start",
+        "period_end",
+        "reference_year",
+        "reference_month",
+        "row_count",
+        "rows"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/v1/tts-kitchen/before-after",
+      "schema": "KitchenBeforeAfterResponse",
+      "critical_keys": [
+        "period_start",
+        "period_end",
+        "tts_min_sec",
+        "network",
+        "network_months",
+        "by_store",
+        "by_meit"
+      ]
+    }
+  ]
+}

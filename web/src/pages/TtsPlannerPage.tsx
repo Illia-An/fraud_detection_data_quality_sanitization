@@ -64,13 +64,21 @@ import { buildTtsExcelReportRequest } from '../schemas/excelReport';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import type { TtsKpiPanel } from '../schemas/ttsKpiPanel';
 import type { TtsPlan, TtsPlanParams } from '../schemas/ttsPlan';
+import {
+  TTS_PLAN_DEFAULT_MAX_MONTHLY,
+  TTS_PLAN_DEFAULT_TARGET,
+  TTS_PLAN_TARGET_MAX,
+  TTS_PLAN_TARGET_MIN,
+} from '../schemas/ttsPlan';
+import {
+  PLANNER_RAIL_COLLAPSED_PX,
+  PLANNER_RAIL_WIDTH_PX,
+} from '../components/planner/plannerShell';
 import { useTtsPlannerScenarioStore } from '../store/ttsPlannerScenarioStore';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 
-const RAIL_WIDTH_PX = 320;
-const RAIL_COLLAPSED_PX = 40;
-const TTS_FLOOR = 0;
-const TTS_CEILING = 30;
+const TTS_FLOOR = TTS_PLAN_TARGET_MIN;
+const TTS_CEILING = TTS_PLAN_TARGET_MAX;
 const TTS_MONITOR_BAND_MIN = 0.05;
 /** Default Plan controls month when the loaded panel contains it. */
 const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
@@ -150,11 +158,11 @@ export function TtsPlannerPage() {
   const apLoadStarted = useRef(false);
   const [referenceYear, setReferenceYear] = useState<number | null>(null);
   const [referenceMonth, setReferenceMonth] = useState<number | null>(null);
-  const [target, setTarget] = useState(3.5);
-  const [targetText, setTargetText] = useState('3.5');
+  const [target, setTarget] = useState(TTS_PLAN_DEFAULT_TARGET);
+  const [targetText, setTargetText] = useState(String(TTS_PLAN_DEFAULT_TARGET));
   const [horizon, setHorizon] = useState(12);
   const [horizonText, setHorizonText] = useState('12');
-  const [maxMonthly, setMaxMonthly] = useState(0.25);
+  const [maxMonthly, setMaxMonthly] = useState(TTS_PLAN_DEFAULT_MAX_MONTHLY);
   const [priorityPower, setPriorityPower] = useState(1);
   const [trajectory, setTrajectory] = useState<'uniform' | 'front_loaded' | 'accelerated'>(
     'uniform',
@@ -209,7 +217,7 @@ export function TtsPlannerPage() {
       }, 80);
       return () => window.clearTimeout(timerId);
     }
-  }, [onboardingStatus, onboardingStepId]);
+  }, [onboardingStatus, onboardingStepId, setControlsOpen]);
 
   const params: TtsPlanParams = {
     trajectory,
@@ -248,7 +256,7 @@ export function TtsPlannerPage() {
       : [];
   const currentChain = meanMinutes(baselineRows);
   const baselineReady = panel != null && panel.row_count > 0;
-  const railWidth = controlsOpen ? RAIL_WIDTH_PX : RAIL_COLLAPSED_PX;
+  const railWidth = controlsOpen ? PLANNER_RAIL_WIDTH_PX : PLANNER_RAIL_COLLAPSED_PX;
 
   const directionKey =
     currentChain == null

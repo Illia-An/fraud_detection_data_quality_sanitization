@@ -16,6 +16,15 @@ describe('resolvePeriodWindow', () => {
     });
   });
 
+  // Wave 10 / T-11 — preset id stays ytd_2026 but window tracks calendar year (no 2027 time-bomb).
+  it('ytd_2026 preset uses current calendar year after 2026', () => {
+    const in2027 = new Date(2027, 2, 15); // local Mar 15, 2027
+    expect(resolvePeriodWindow('ytd_2026', '', '', in2027)).toEqual({
+      from_date: '2027-01-01',
+      to_date: '2027-03-15',
+    });
+  });
+
   it('resolves 2025 – Present as open-ended from 2025-01-01', () => {
     expect(resolvePeriodWindow('from_2025', '', '', now)).toEqual({
       from_date: '2025-01-01',

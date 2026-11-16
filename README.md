@@ -5,14 +5,14 @@ Batch data-quality pipeline for Q10012 survey responses (5% KPI). Pure rules in 
 ## Layout
 
 ```text
-backend/             FastAPI PoC API (port 8001)
+backend/             FastAPI API (port 8001; Docker serves SPA too)
 web/                 React 19 + Vite UI (port 5173)
-src/fraud_guard/     Pure fraud filter logic (Tier 1/2/3)
+src/fraud_guard/     Pure fraud filter logic (pipeline tiers)
+src/planner/         Pure planner / TTS allocation math
 notebooks/           EDA → promote rules into fraud_guard
 scripts/             One-off read-only DB helpers
 tests/               pytest (no live DB in CI)
-db/                  SQLAlchemy config / engine (future SQL Server reads)
-api/                 Legacy/alternate FastAPI entry (port 8000)
+db/                  SQLAlchemy config / engine
 ```
 
 Angular PoC is preserved on git tag `poc/angular-concept` (`frontend/`).
@@ -56,17 +56,6 @@ npm run test:e2e
 ```
 
 CI runs the same checks on push/PR via `.github/workflows/ci.yml` (pytest, web lint/unit/build, Playwright e2e). No live SQL Server in CI.
-
-## Quick start — legacy API (port 8000)
-
-```powershell
-copy .env.example .env
-uv sync --extra dev --system-certs
-uv run uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-- Health: http://127.0.0.1:8000/api/v1/health
-- Docs: http://127.0.0.1:8000/docs
 
 Notebooks (from repo root):
 

@@ -1,9 +1,8 @@
 """Plan API contracts for monthly TTS minutes (lower is better).
 
-Working bounds, same as ``plan_tts``: floor 0 min, ceiling 30 min,
-default step 0.25 min / month, default target 3.5 min.
-Read-only with respect to the source KPI table: the request carries a
-baseline snapshot and the response is a projection, never a DB write.
+Bounds come from ``planner.tts_bounds`` (Wave 8 / M-02). Read-only with
+respect to the source KPI table: the request carries a baseline snapshot
+and the response is a projection, never a DB write.
 """
 
 from __future__ import annotations
@@ -13,9 +12,41 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from backend.plan_schemas import MonthScoreOut, StoreProjectionOut
+from backend.request_limits import max_plan_baseline_rows
+from planner.tts_bounds import (
+    TTS_CEILING_MIN,
+    TTS_DEFAULT_MAX_MONTHLY_IMPROVE,
+    TTS_DEFAULT_TARGET_MIN,
+    TTS_FLOOR_MIN,
+    TTS_HORIZON_MAX,
+    TTS_HORIZON_MIN,
+)
 
-TTS_FLOOR_MIN = 0.0
-TTS_CEILING_MIN = 30.0
+# Re-export for callers that imported bounds from this module.
+__all__ = [
+    "TTS_CEILING_MIN",
+    "TTS_FLOOR_MIN",
+    "TtsKpiApPanelResponse",
+    "TtsKpiPanelResponse",
+    "TtsKpiPanelRowOut",
+    "TtsPlanBaselineRow",
+    "TtsPlanBoundsOut",
+    "TtsPlanOut",
+    "TtsPlanParams",
+    "TtsPlanRequest",
+    "TtsPlanResponse",
+]
+
+
+class TtsPlanBoundsOut(BaseModel):
+    """Working TTS planner bounds (single backend source)."""
+
+    floor: float
+    ceiling: float
+    default_target: float
+    default_max_monthly_improve: float
+    horizon_min: int
+    horizon_max: int
 
 
 class TtsPlanBaselineRow(BaseModel):
@@ -27,7 +58,9 @@ class TtsPlanParams(BaseModel):
     trajectory: Literal["uniform", "front_loaded", "accelerated"] = "uniform"
     trajectory_power: float = Field(default=2.0, ge=0.1)
     priority_power: float = Field(default=1.0, ge=0.1)
-    max_monthly_improve: float = Field(default=0.25, ge=0.01)
+    max_monthly_improve: float = Field(
+        default=TTS_DEFAULT_MAX_MONTHLY_IMPROVE, ge=0.01
+    )
     growth_factor: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
@@ -36,13 +69,20 @@ class TtsPlanRequest(BaseModel):
 
     reference_year: int = Field(ge=2000, le=2100)
     reference_month: int = Field(ge=1, le=12)
-    horizon: int = Field(default=12, ge=1, le=12)
-    target: float = Field(default=3.5, ge=TTS_FLOOR_MIN, le=TTS_CEILING_MIN)
+    horizon: int = Field(
+        default=12, ge=TTS_HORIZON_MIN, le=TTS_HORIZON_MAX
+    )
+    target: float = Field(
+        default=TTS_DEFAULT_TARGET_MIN, ge=TTS_FLOOR_MIN, le=TTS_CEILING_MIN
+    )
     params: TtsPlanParams = Field(default_factory=TtsPlanParams)
     baseline_rows: list[TtsPlanBaselineRow] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _target_must_improve(self) -> TtsPlanRequest:
+        limit = max_plan_baseline_rows()
+        if len(self.baseline_rows) > limit:
+            raise ValueError(f"baseline_rows exceeds limit of {limit}")
         scores = [row.tts for row in self.baseline_rows]
         current = sum(scores) / len(scores)
         if self.target > current + 1e-9:

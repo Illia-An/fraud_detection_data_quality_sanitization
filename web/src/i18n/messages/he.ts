@@ -121,6 +121,11 @@ export const he: Record<MessageKey, string> = {
   'sanitization.waitingData': 'ממתין לנתוני סקר (מסד נתונים או פריסט סינתטי).',
   'sanitization.runFailed': 'הרצת Pipeline נכשלה',
   'sanitization.runningAlert': 'מריץ תרחיש…',
+  'sanitization.tiers23Skipped':
+    'שלבים 2–3 לא הוחלו (מקור VIEW / blacklist בלבד). ה-KPI אינו ניקוי מלא.',
+  'sanitization.snapshotLoaded': 'Snapshot נטען ב־{loadedAt}.',
+  'sanitization.snapshotStale':
+    'ייתכן ש־Snapshot אינו עדכני (נטען ב־{loadedAt}; SLA רעננות {maxDays} ימים). ה-KPI עלול לא לשקף נתוני סקר עדכניים.',
   'sanitization.stepsTitle': 'משפך שלבי Pipeline',
   'sanitization.stepsHint': 'ספירת שורות, top-box %, ו־Δ מול השלב הקודם',
   'sanitization.largestDelta': 'Δ הגדול ביותר מול קודם: {hint}',

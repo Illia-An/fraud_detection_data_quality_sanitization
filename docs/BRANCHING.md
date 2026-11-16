@@ -6,9 +6,11 @@
 |-----|------|
 | `main` | Trunk — FastAPI + React (`web/`) + research `src/fraud_guard` |
 | `feat/*` / `experiment/*` | Short-lived topic branches → PR into `main` → delete |
-| `v*.*.*` tags | Release snapshots on `main` |
+| `v*.*.*` tags | Release snapshots on `main` → CI builds/pushes `ghcr.io/<owner>/fraud-dq-sanitization:vX.Y.Z` + `sha-*` |
 
 Do not develop long-lived feature trunks. Open a branch from current `main`, merge via PR, delete the branch.
+
+**Protect `main` (G-05):** require PR + green CI status checks; disallow force-push. Configure in GitHub branch protection (see `docs/ops/DEPLOY_RUNBOOK.md`).
 
 ## Tags
 
