@@ -31,9 +31,11 @@ test.describe('TTS Planner e2e (T-09 / J4)', () => {
     if (await levers.isVisible()) {
       await expect(page.getByTestId('tts-planner-run')).toBeVisible();
       await page.getByTestId('tts-planner-run').click();
-      await expect(
-        page.getByTestId('tts-planner-hero').or(page.getByTestId('tts-planner-at-risk')),
-      ).toBeVisible({ timeout: 60_000 });
+      // After a successful run both hero and at-risk cards mount — assert hero only
+      // (`.or()` + toBeVisible fails strict mode when both match).
+      await expect(page.getByTestId('tts-planner-hero')).toBeVisible({
+        timeout: 60_000,
+      });
     }
   });
 });
