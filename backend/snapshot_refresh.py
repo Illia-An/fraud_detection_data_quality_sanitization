@@ -17,6 +17,7 @@ from backend.snapshot import (
     set_meta_conn,
     utc_now_iso,
 )
+from fraud_guard.pii import hash_pii_value, pii_hmac_key
 
 _BATCH = 5_000
 
@@ -37,6 +38,13 @@ def write_snapshot_from_rows(
     snap = get_snapshot_engine_at(out_path, create_schema=True)
     loaded = loaded_at or utc_now_iso()
     store_month_count = 0
+    # Wave 6 / S-04: never persist raw contact/phone in the snapshot file.
+    hashed_rows: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        item["UserContact"] = hash_pii_value(item.get("UserContact"))
+        item["PhoneFromLog"] = hash_pii_value(item.get("PhoneFromLog"))
+        hashed_rows.append(item)
     insert_sql = text(
         f"""
 INSERT INTO {ANSWERS_TABLE} (
@@ -52,8 +60,8 @@ INSERT INTO {ANSWERS_TABLE} (
     )
     try:
         with snap.begin() as dst:
-            for i in range(0, len(rows), _BATCH):
-                chunk = rows[i : i + _BATCH]
+            for i in range(0, len(hashed_rows), _BATCH):
+                chunk = hashed_rows[i : i + _BATCH]
                 for row in chunk:
                     row.setdefault("LoadedAt", loaded)
                 if chunk:
@@ -84,7 +92,7 @@ GROUP BY PrintStore, Year, Month
                 dst.execute(text(f"SELECT COUNT(*) FROM {STORE_MONTH_TABLE}")).scalar()
                 or 0
             )
-            row_count = len(rows)
+            row_count = len(hashed_rows)
             set_meta_conn(
                 dst,
                 {
@@ -94,6 +102,10 @@ GROUP BY PrintStore, Year, Month
                     "source_view": source_view,
                     "from_date": from_date.isoformat(),
                     "schema_version": SCHEMA_VERSION,
+                    "pii_hashed_at_rest": "1",
+                    "pii_hash_scheme": (
+                        "hmac-sha256" if pii_hmac_key() is not None else "sha256"
+                    ),
                 },
             )
     finally:
@@ -101,9 +113,10 @@ GROUP BY PrintStore, Year, Month
 
     return {
         "path": str(out_path),
-        "row_count": len(rows),
+        "row_count": len(hashed_rows),
         "store_month_count": store_month_count,
         "loaded_at": loaded,
         "from_date": from_date.isoformat(),
         "schema_version": SCHEMA_VERSION,
+        "pii_hashed_at_rest": True,
     }

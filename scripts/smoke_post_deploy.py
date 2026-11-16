@@ -17,8 +17,15 @@ import urllib.request
 from typing import Any
 
 
+def _auth_headers() -> dict[str, str]:
+    import os
+
+    key = os.environ.get("API_KEY", "").strip()
+    return {"X-API-Key": key} if key else {}
+
+
 def _get(url: str, timeout: float = 15.0) -> tuple[int, bytes, str]:
-    req = urllib.request.Request(url, method="GET")
+    req = urllib.request.Request(url, method="GET", headers=_auth_headers())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return int(resp.status), resp.read(), resp.headers.get_content_type() or ""
@@ -32,7 +39,11 @@ def _post_json(url: str, payload: dict[str, Any], timeout: float = 60.0) -> tupl
         url,
         data=data,
         method="POST",
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            **_auth_headers(),
+        },
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:

@@ -18,6 +18,9 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
 # Same-origin API calls inside the monolith (web/.env.docker → empty VITE_API_BASE_URL).
+# Optional Wave 6 stop-gap: bake the same value as runtime API_KEY into the SPA.
+ARG VITE_API_KEY=
+ENV VITE_API_KEY=$VITE_API_KEY
 RUN npm run build -- --mode docker
 
 # ---- runtime ----
@@ -38,6 +41,7 @@ ENV PYTHONUNBUFFERED=1 \
     TTS_KPI_SNAPSHOT_URL=sqlite:///data/tts_kpi_snapshot.sqlite \
     PLAN_STORE_PATH=/app/data/plan_store/plans.sqlite \
     API_CORS_ORIGINS=http://localhost:8000 \
+    ENABLE_DOCS=0 \
     PORT=8000
 
 COPY pyproject.toml uv.lock README.md ./

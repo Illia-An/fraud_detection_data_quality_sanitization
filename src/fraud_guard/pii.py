@@ -1,20 +1,34 @@
-"""PII hashing for sanitization pipelines (SPEC Invariant 1)."""
+"""PII hashing for sanitization pipelines (SPEC Invariant 1 / Wave 6 S-04/S-05)."""
 
 from __future__ import annotations
 
 import hashlib
+import hmac
+import os
 from typing import Any
 
 import pandas as pd
 
 from fraud_guard.features import ColumnMapping
 
-# SHA-256 hex digest truncated length required by SPEC Invariant 1.
+# Hex digest truncated length required by SPEC Invariant 1.
 PII_HASH_LEN = 32
 
 
+def pii_hmac_key() -> bytes | None:
+    """Optional keyed pepper from ``PII_HMAC_KEY`` (Wave 6)."""
+    raw = os.environ.get("PII_HMAC_KEY", "").strip()
+    if not raw:
+        return None
+    return raw.encode("utf-8")
+
+
 def hash_pii_value(value: Any) -> str | None:
-    """SHA-256 truncated to 32 chars; empty / null → None (no fake entity key)."""
+    """Hash entity key; empty / null → None (no fake entity key).
+
+    Uses HMAC-SHA256 when ``PII_HMAC_KEY`` is set; otherwise plain SHA-256
+    (legacy / local). Digest truncated to ``PII_HASH_LEN`` hex chars.
+    """
     if value is None:
         return None
     if isinstance(value, float) and pd.isna(value):
@@ -22,7 +36,12 @@ def hash_pii_value(value: Any) -> str | None:
     text_value = str(value).strip()
     if not text_value or text_value in {"None", "nan", "NaT"}:
         return None
-    return hashlib.sha256(text_value.encode("utf-8")).hexdigest()[:PII_HASH_LEN]
+    key = pii_hmac_key()
+    if key is not None:
+        digest = hmac.new(key, text_value.encode("utf-8"), hashlib.sha256).hexdigest()
+    else:
+        digest = hashlib.sha256(text_value.encode("utf-8")).hexdigest()
+    return digest[:PII_HASH_LEN]
 
 
 def ensure_pii_hashed(

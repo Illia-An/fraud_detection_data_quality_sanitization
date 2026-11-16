@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 
+from backend.auth import ApiKeyMiddleware, auth_enabled
 from backend.db_sample import (
     DEFAULT_FROM_DATE,
     DbSampleError,
@@ -129,9 +130,24 @@ def _plan_store() -> PlanStore:
     return PlanStore(default_plan_store_path(_ROOT))
 
 
+def _docs_enabled() -> bool:
+    """``ENABLE_DOCS`` default: on outside Docker, off in Docker/prod."""
+    raw = os.environ.get("ENABLE_DOCS", "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    # Default: disable docs when running in a container (Wave 6 / S-10).
+    return not Path("/.dockerenv").exists() and os.environ.get(
+        "RUNNING_IN_DOCKER", ""
+    ).strip() not in ("1", "true", "yes")
+
+
 def _startup_log_fields() -> dict:
     """Safe startup diagnostics (no paths, credentials, or env dumps)."""
     ready = evaluate_readiness()
+    from fraud_guard.pii import pii_hmac_key
+
     return {
         "sanitization_source": get_sanitization_source(),
         "tts_kpi_source": os.environ.get("TTS_KPI_SOURCE", "synthetic").strip()
@@ -145,6 +161,9 @@ def _startup_log_fields() -> dict:
         "snapshot_max_age_days": snapshot_max_age_days(),
         "ready": ready.ok,
         "ready_reasons": ready.reasons,
+        "auth_enabled": auth_enabled(),
+        "docs_enabled": _docs_enabled(),
+        "pii_hmac_configured": pii_hmac_key() is not None,
     }
 
 
@@ -163,15 +182,21 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     configure_logging()
+    docs_on = _docs_enabled()
     app = FastAPI(
         title="Fraud Guard Sanitization PoC",
         version=app_version(),
         description="Tier 1/2 survey sanitization pipeline",
         lifespan=_lifespan,
+        docs_url="/docs" if docs_on else None,
+        redoc_url="/redoc" if docs_on else None,
+        openapi_url="/openapi.json" if docs_on else None,
     )
 
-    # Outer middleware runs first for incoming requests (body size → request id → CORS).
+    # Outer middleware runs first for incoming requests
+    # (body size → auth → request id → CORS).
     app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(ApiKeyMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
@@ -184,9 +209,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def validation_handler(_request, exc: RequestValidationError) -> JSONResponse:
+        # Wave 6 / S-10: do not echo raw ``input`` values (may contain PII).
         errors: list[dict] = []
         for err in exc.errors():
-            item = dict(err)
+            item = {k: v for k, v in dict(err).items() if k != "input"}
             ctx = item.get("ctx")
             if isinstance(ctx, dict) and "error" in ctx:
                 item["ctx"] = {**ctx, "error": str(ctx["error"])}
@@ -762,6 +788,14 @@ def create_app() -> FastAPI:
                 status_code=500,
                 detail="Kitchen before/after read failed",
             ) from exc
+
+    if not docs_on:
+        # Explicit 404 so SPA catch-all cannot serve index.html for API docs paths (S-10).
+        @app.get("/docs", include_in_schema=False)
+        @app.get("/redoc", include_in_schema=False)
+        @app.get("/openapi.json", include_in_schema=False)
+        def _docs_disabled() -> JSONResponse:
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
     # API routes first; SPA catch-all only when FRONTEND_DIST_DIR / web/dist exists.
     if mount_frontend(app):
