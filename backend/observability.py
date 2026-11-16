@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 import time
 import uuid
@@ -21,7 +20,10 @@ _CONFIGURED = False
 
 
 def app_version() -> str:
-    return os.environ.get("APP_VERSION", "0.1.0").strip() or "0.1.0"
+    """Deploy identity — see ``backend.version`` (single source / Wave 7)."""
+    from backend.version import app_version as _app_version
+
+    return _app_version()
 
 
 def get_request_id() -> str | None:

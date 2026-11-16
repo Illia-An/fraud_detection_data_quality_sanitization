@@ -102,11 +102,12 @@ def _ident_year_month(dialect: SqlDialect) -> tuple[str, str]:
     return "[Year]", "[Month]"
 
 
-def _period_params(
+def period_params(
     query: DbSampleQuery,
     *,
     dialect: SqlDialect = "mssql",
 ) -> tuple[str, dict[str, Any]]:
+    """Build AnswerTime / store / year / month WHERE clause + bind params."""
     year_col, month_col = _ident_year_month(dialect)
     where = """
 WHERE Question_ID = :question_id
@@ -139,6 +140,10 @@ WHERE Question_ID = :question_id
     return where, params
 
 
+# Back-compat alias (prefer ``period_params`` / ``backend.data_access``).
+_period_params = period_params
+
+
 def _filter_labels(query: DbSampleQuery) -> list[str]:
     filters: list[str] = [f"AnswerTime>={query.from_date.isoformat()}"]
     if query.to_date is not None:
@@ -156,9 +161,10 @@ def _meta_description(query: DbSampleQuery) -> str:
     return "SQL Server RateGetAnswers (Q10012, PII hashed); " + ", ".join(_filter_labels(query))
 
 
-def _build_sql(query: DbSampleQuery) -> tuple[str, dict[str, Any]]:
+def build_sql(query: DbSampleQuery) -> tuple[str, dict[str, Any]]:
+    """Parameterized Q10012 row SELECT for the VIEW."""
     cols = ", ".join(_SELECT_COLUMNS)
-    where, params = _period_params(query)
+    where, params = period_params(query)
     sql = f"""
 SELECT
     {cols}
@@ -168,8 +174,9 @@ FROM {VIEW_NAME}
     return sql, params
 
 
-def _build_meta_sql(query: DbSampleQuery) -> tuple[str, dict[str, Any]]:
-    where, params = _period_params(query)
+def build_meta_sql(query: DbSampleQuery) -> tuple[str, dict[str, Any]]:
+    """Parameterized period count SELECT for the VIEW."""
+    where, params = period_params(query)
     sql = f"""
 SELECT
     COUNT(*) AS row_count,
@@ -179,6 +186,10 @@ FROM {VIEW_NAME}
 {where}
 """
     return sql, params
+
+
+_build_sql = build_sql
+_build_meta_sql = build_meta_sql
 
 
 def _sample_meta(
@@ -196,7 +207,7 @@ def _sample_meta(
 def fetch_db_sample_meta(engine: Engine, query: DbSampleQuery | None = None) -> SampleResponse:
     """Period counts only — no survey rows in the payload."""
     q = query or DbSampleQuery()
-    sql, params = _build_meta_sql(q)
+    sql, params = build_meta_sql(q)
     try:
         with engine.connect() as conn:
             result = conn.execute(text(sql), params)
@@ -220,7 +231,7 @@ def fetch_db_sample_meta(engine: Engine, query: DbSampleQuery | None = None) -> 
 def fetch_db_sample(engine: Engine, query: DbSampleQuery | None = None) -> SampleResponse:
     """Execute a parameterized SELECT and return a ``SampleResponse`` with rows."""
     q = query or DbSampleQuery()
-    sql, params = _build_sql(q)
+    sql, params = build_sql(q)
 
     try:
         with engine.connect() as conn:
@@ -252,18 +263,24 @@ def fetch_db_sample(engine: Engine, query: DbSampleQuery | None = None) -> Sampl
     )
 
 
-def _engine_from_settings() -> Engine:
+def engine_from_settings() -> Engine:
+    """MSSQL / ``DATABASE_URL`` engine (cached; see ``backend.data_access``)."""
     try:
-        from db.connection import get_engine
+        from backend.data_access import get_cached_engine
         from db.config import get_settings
 
-        get_settings()  # fail fast if DATABASE_URL missing
-        return get_engine()
+        settings = get_settings()  # fail fast if DATABASE_URL missing
+        return get_cached_engine(settings.database_url)
     except ValueError as exc:
         raise DbSampleError(str(exc) or "DATABASE_URL is not configured") from exc
+    except DbSampleError:
+        raise
     except Exception as exc:
         logger.exception("db engine setup failed")
         raise DbSampleError("Database is not available") from exc
+
+
+_engine_from_settings = engine_from_settings
 
 
 @dataclass(frozen=True)
@@ -288,17 +305,20 @@ def resolve_process_source() -> ProcessSource:
             sanitization_source="snapshot",
         )
     return ProcessSource(
-        engine=_engine_from_settings(),
+        engine=engine_from_settings(),
         dialect="mssql",
         query_b_mode="blacklist_only",
         sanitization_source="view",
     )
 
 
-def _process_engine() -> tuple[Engine, SqlDialect]:
+def process_engine() -> tuple[Engine, SqlDialect]:
     """Engine for ``source=db``: VIEW (mssql) or local snapshot (sqlite)."""
     src = resolve_process_source()
     return src.engine, src.dialect
+
+
+_process_engine = process_engine
 
 
 def load_db_sample_meta_from_settings(query: DbSampleQuery | None = None) -> SampleResponse:
@@ -313,7 +333,7 @@ def load_db_sample_meta_from_settings(query: DbSampleQuery | None = None) -> Sam
     if get_sanitization_source() == "snapshot":
         engine = require_snapshot_engine()
         q = query or DbSampleQuery()
-        where, params = _period_params(q, dialect="sqlite")
+        where, params = period_params(q, dialect="sqlite")
         sql = f"""
 SELECT
     COUNT(*) AS row_count,
@@ -352,9 +372,9 @@ FROM {ANSWERS_TABLE}
                 description=desc,
             ),
         )
-    return fetch_db_sample_meta(_engine_from_settings(), query)
+    return fetch_db_sample_meta(engine_from_settings(), query)
 
 
 def load_db_sample_from_settings(query: DbSampleQuery | None = None) -> SampleResponse:
     """Create engine from ``.env`` and fetch the full period. Raises ``DbSampleError``."""
-    return fetch_db_sample(_engine_from_settings(), query)
+    return fetch_db_sample(engine_from_settings(), query)

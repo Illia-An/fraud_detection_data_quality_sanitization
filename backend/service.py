@@ -1,7 +1,9 @@
-"""Pure sanitization pipeline — no FastAPI / Jupyter dependencies."""
+"""Sanitization pipeline + process orchestration — no FastAPI dependencies."""
 
 from __future__ import annotations
 
+import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pandas as pd
@@ -29,7 +31,17 @@ from fraud_guard.tier2 import (
     keep_clean_rows as keep_tier2_clean,
 )
 
-from backend.queries import ActualBaseline, network_top_box_pct
+from backend.db_sample import DEFAULT_FROM_DATE, DbSampleQuery
+from backend.data_access import resolve_process_source
+from backend.period_bounds import normalize_snapshot_period
+from backend.profiler import profile_block, profiling_meta
+from backend.queries import (
+    ActualBaseline,
+    load_actual_baseline_from_settings,
+    load_tier_candidates_from_settings,
+    network_top_box_pct,
+    process_source_meta_extra,
+)
 from backend.schemas import (
     PipelineConfig,
     ProcessRequest,
@@ -747,4 +759,119 @@ def run_pipeline(
                 else 0
             ),
         },
+    )
+
+
+@dataclass(frozen=True)
+class ProcessOutcome:
+    """Result of ``run_process`` before HTTP response wrapping / logging."""
+
+    result: SanitizationResponse
+    meta_extra: dict
+    rows_scanned: int
+    db_query_a_time_ms: float | None
+    db_query_b_time_ms: float | None
+    execution_time_ms: float
+    peak_memory_mb: float
+
+
+def run_process_db(body: ProcessRequest) -> tuple[SanitizationResponse, dict, int, float | None, float | None]:
+    """Query A → Query B → pushdown pipeline (no FastAPI).
+
+    Raises ``ValueError`` when the period has no Q10012 rows (HTTP 422).
+    Raises ``DbSampleError`` on source / connectivity failures.
+    """
+    src = resolve_process_source()
+    requested_start = body.from_date or DEFAULT_FROM_DATE
+    requested_end = body.to_date
+    period_start = requested_start
+    period_end = requested_end
+    period_normalized = False
+    if src.sanitization_source == "snapshot":
+        period_start, period_end, period_normalized = normalize_snapshot_period(
+            requested_start, requested_end
+        )
+    db_query = DbSampleQuery(
+        from_date=period_start,
+        to_date=period_end,
+    )
+
+    t_a = time.perf_counter()
+    actual_baseline = load_actual_baseline_from_settings(
+        period_start=db_query.from_date,
+        period_end=db_query.to_date,
+        engine=src.engine,
+        dialect=src.dialect,
+    )
+    db_query_a_time_ms = round((time.perf_counter() - t_a) * 1000.0, 3)
+    if actual_baseline.total_responses <= 0:
+        end_label = period_end.isoformat() if period_end is not None else "latest"
+        raise ValueError(
+            f"No Q10012 rows from {period_start.isoformat()} to {end_label}"
+        )
+
+    t_b = time.perf_counter()
+    sample = load_tier_candidates_from_settings(
+        period_start=db_query.from_date,
+        period_end=db_query.to_date,
+        config=body.config,
+        engine=src.engine,
+        dialect=src.dialect,
+    )
+    db_query_b_time_ms = round((time.perf_counter() - t_b) * 1000.0, 3)
+    result = run_pipeline_pushdown(
+        actual_baseline,
+        sample.rows,
+        body.config,
+        query_b_mode=src.query_b_mode,
+    )
+    meta_extra = {
+        "source": "db",
+        "sample": sample.meta.model_dump(),
+        "query_a_store_periods": len(actual_baseline.by_store_period),
+        "query_a_total_responses": actual_baseline.total_responses,
+        "query_b_candidate_rows": len(sample.rows),
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat() if period_end is not None else None,
+        "period_requested_start": requested_start.isoformat(),
+        "period_requested_end": (
+            requested_end.isoformat() if requested_end is not None else None
+        ),
+        "period_normalized_to_months": period_normalized,
+        **process_source_meta_extra(src),
+    }
+    return result, meta_extra, len(sample.rows), db_query_a_time_ms, db_query_b_time_ms
+
+
+def run_process(body: ProcessRequest) -> ProcessOutcome:
+    """Orchestrate inline or db sanitization without FastAPI (Wave 7 / A-07)."""
+    with profile_block() as profile:
+        db_query_a_time_ms: float | None = None
+        db_query_b_time_ms: float | None = None
+        if body.source == "db":
+            result, meta_extra, rows_scanned, db_query_a_time_ms, db_query_b_time_ms = (
+                run_process_db(body)
+            )
+        else:
+            result = run_pipeline(body)
+            rows_scanned = int(result.meta.get("input_rows", len(body.rows)))
+            meta_extra = {}
+
+    meta_extra.update(
+        profiling_meta(
+            execution_time_ms=float(profile["execution_time_ms"]),
+            peak_memory_mb=float(profile["peak_memory_mb"]),
+            rows_scanned=rows_scanned,
+            db_query_a_time_ms=db_query_a_time_ms,
+            db_query_b_time_ms=db_query_b_time_ms,
+        )
+    )
+    return ProcessOutcome(
+        result=result,
+        meta_extra=meta_extra,
+        rows_scanned=rows_scanned,
+        db_query_a_time_ms=db_query_a_time_ms,
+        db_query_b_time_ms=db_query_b_time_ms,
+        execution_time_ms=float(profile["execution_time_ms"]),
+        peak_memory_mb=float(profile["peak_memory_mb"]),
     )

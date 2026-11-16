@@ -139,13 +139,15 @@ def resolve_snapshot_path() -> Path:
 
 
 def get_snapshot_engine(*, create_schema: bool = False) -> Engine:
-    """SQLAlchemy engine for the local snapshot DB."""
+    """SQLAlchemy engine for the local snapshot DB (cached per URL)."""
+    from backend.data_access import get_cached_engine
+
     url = resolve_snapshot_url()
     if url.startswith("sqlite:///"):
         path = resolve_snapshot_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         url = f"sqlite:///{path.as_posix()}"
-    engine = create_engine(url)
+    engine = get_cached_engine(url)
     if create_schema:
         init_snapshot_schema(engine)
     return engine

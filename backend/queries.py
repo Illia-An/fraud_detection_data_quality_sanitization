@@ -10,18 +10,17 @@ from typing import Any, Sequence
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.db_sample import (
+from backend.data_access import (
     DEFAULT_FROM_DATE,
-    VIEW_NAME,
     DbSampleError,
     DbSampleQuery,
     ProcessSource,
     SqlDialect,
-    _period_params,
-    _process_engine,
-    redact_row,
+    period_params,
+    process_engine,
     resolve_process_source,
 )
+from backend.db_sample import VIEW_NAME, redact_row
 from backend.schemas import PipelineConfig, SamplePresetMeta, SampleResponse, SurveyAnswerRow
 from backend.snapshot import (
     ANSWERS_TABLE,
@@ -175,7 +174,7 @@ FROM {STORE_MONTH_TABLE}
 """
         return sql, params
 
-    where, params = _period_params(query, dialect=dialect)
+    where, params = period_params(query, dialect=dialect)
     # Match filter_answered_metric_rows: Q10012 with non-null Answer_Value.
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
@@ -252,7 +251,7 @@ def load_actual_baseline_from_settings(
 ) -> ActualBaseline:
     """Query A via VIEW or snapshot engine from settings."""
     if engine is None or dialect is None:
-        engine, dialect = _process_engine()
+        engine, dialect = process_engine()
     return get_actual_baseline_aggregates(
         engine,
         period_start,
@@ -307,7 +306,7 @@ def _build_tier_candidate_sql_v1(
     *,
     dialect: SqlDialect,
 ) -> tuple[str, dict[str, Any]]:
-    where, params = _period_params(query, dialect=dialect)
+    where, params = period_params(query, dialect=dialect)
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
 
@@ -334,7 +333,7 @@ def _build_tier_candidate_sql_phase2(
     store_ids: Sequence[int | float] | None,
 ) -> tuple[str, dict[str, Any]]:
     """Snapshot Query B: rows that Tier1 may drop (blacklist / freq / always-5)."""
-    where, params = _period_params(query, dialect="sqlite")
+    where, params = period_params(query, dialect="sqlite")
     where += "  AND Answer_Value IS NOT NULL\n"
     where += _store_ids_clause(store_ids, params)
 
@@ -496,7 +495,7 @@ def load_tier_candidates_from_settings(
 ) -> SampleResponse:
     """Query B via VIEW or snapshot engine from settings."""
     if engine is None or dialect is None:
-        engine, dialect = _process_engine()
+        engine, dialect = process_engine()
     return get_tier_candidate_rows(
         engine,
         period_start,

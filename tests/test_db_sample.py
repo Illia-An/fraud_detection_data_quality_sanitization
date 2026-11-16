@@ -166,7 +166,7 @@ def test_sample_db_endpoint_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     monkeypatch.setattr(
-        "backend.main.load_db_sample_meta_from_settings",
+        "backend.routers.sample.load_db_sample_meta_from_settings",
         lambda query: fake,
     )
     client = TestClient(create_app())
@@ -182,7 +182,7 @@ def test_sample_db_endpoint_503(monkeypatch: pytest.MonkeyPatch) -> None:
     def _boom(_query):
         raise DbSampleError("DATABASE_URL is not set in .env")
 
-    monkeypatch.setattr("backend.main.load_db_sample_meta_from_settings", _boom)
+    monkeypatch.setattr("backend.routers.sample.load_db_sample_meta_from_settings", _boom)
     client = TestClient(create_app())
     res = client.get("/api/v1/sample/db")
     assert res.status_code == 503
@@ -231,13 +231,13 @@ def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> No
         query_b_mode="blacklist_only",
         sanitization_source="view",
     )
-    monkeypatch.setattr("backend.main.resolve_process_source", lambda: stub)
+    monkeypatch.setattr("backend.service.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
-        "backend.main.load_actual_baseline_from_settings",
+        "backend.service.load_actual_baseline_from_settings",
         lambda **_kwargs: baseline,
     )
     monkeypatch.setattr(
-        "backend.main.load_tier_candidates_from_settings",
+        "backend.service.load_tier_candidates_from_settings",
         lambda **_kwargs: fake,
     )
     client = TestClient(create_app())
@@ -268,9 +268,9 @@ def test_process_db_source_empty_period(monkeypatch: pytest.MonkeyPatch) -> None
         query_b_mode="blacklist_only",
         sanitization_source="view",
     )
-    monkeypatch.setattr("backend.main.resolve_process_source", lambda: stub)
+    monkeypatch.setattr("backend.service.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
-        "backend.main.load_actual_baseline_from_settings",
+        "backend.service.load_actual_baseline_from_settings",
         lambda **_kwargs: empty,
     )
     client = TestClient(create_app())

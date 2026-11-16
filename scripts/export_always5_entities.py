@@ -18,14 +18,14 @@ import pandas as pd
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from backend.db_sample import (
+from backend.data_access import (
     VIEW_NAME,
     DbSampleError,
     DbSampleQuery,
-    _SELECT_COLUMNS,
-    _build_sql,
-    _engine_from_settings,
+    build_sql,
+    engine_from_settings,
 )
+from backend.db_sample import _SELECT_COLUMNS
 from fraud_guard.tier1 import (
     ENTITY_COL,
     FLAG_COL,
@@ -48,8 +48,8 @@ def _parse_date(value: str) -> date:
 
 def _load_raw_frame(query: DbSampleQuery) -> pd.DataFrame:
     """Load Q10012 period rows WITHOUT hashing PII (internal research only)."""
-    engine = _engine_from_settings()
-    sql, params = _build_sql(query)
+    engine = engine_from_settings()
+    sql, params = build_sql(query)
     try:
         with engine.connect() as conn:
             result = conn.execute(text(sql), params)

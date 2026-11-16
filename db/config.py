@@ -29,7 +29,11 @@ def get_settings() -> Settings:
     tts_view = os.environ.get("TTS_VIEW", "").strip() or _DEFAULT_TTS_VIEW
     return Settings(
         database_url=database_url,
-        cors_origins=os.environ.get("API_CORS_ORIGINS", "http://localhost:4200").strip(),
+        # Align with AppSettings / main CORS default (Wave 7 / A-05).
+        cors_origins=os.environ.get(
+            "API_CORS_ORIGINS",
+            "http://localhost:5173,http://localhost:4201",
+        ).strip(),
         tts_database_url=tts_database_url,
         tts_view=tts_view,
     )
