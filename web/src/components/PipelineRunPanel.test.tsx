@@ -162,4 +162,42 @@ describe('PipelineRunPanel', () => {
       /Tiers 2–3 were not applied/i,
     );
   });
+
+  it('shows snapshot loaded_at from meta', () => {
+    renderPanel(
+      makeRunner({
+        displayResult: {
+          ...processResult,
+          meta: {
+            ...processResult.meta,
+            snapshot_loaded_at: '2026-11-16T08:00:00+00:00',
+            snapshot_stale: false,
+            snapshot_max_age_days: 14,
+          },
+        },
+      }),
+    );
+    expect(screen.getByTestId('sanitization-snapshot-freshness')).toHaveTextContent(
+      /Snapshot loaded at 2026-11-16T08:00:00\+00:00/i,
+    );
+  });
+
+  it('shows stale snapshot warning from meta', () => {
+    renderPanel(
+      makeRunner({
+        displayResult: {
+          ...processResult,
+          meta: {
+            ...processResult.meta,
+            snapshot_loaded_at: '2026-09-01T00:00:00+00:00',
+            snapshot_stale: true,
+            snapshot_max_age_days: 14,
+          },
+        },
+      }),
+    );
+    expect(screen.getByTestId('sanitization-snapshot-freshness')).toHaveTextContent(
+      /may be stale/i,
+    );
+  });
 });

@@ -141,6 +141,25 @@ export function PipelineRunPanel({
         </Alert>
       ) : null}
 
+      {showResults &&
+      typeof displayResult?.meta?.snapshot_loaded_at === 'string' &&
+      displayResult.meta.snapshot_loaded_at.length > 0 ? (
+        <Alert
+          severity={displayResult.meta.snapshot_stale === true ? 'warning' : 'info'}
+          data-testid="sanitization-snapshot-freshness"
+          sx={{ py: 0.5, flexShrink: 0 }}
+        >
+          {displayResult.meta.snapshot_stale === true
+            ? t('sanitization.snapshotStale', {
+                loadedAt: String(displayResult.meta.snapshot_loaded_at),
+                maxDays: Number(displayResult.meta.snapshot_max_age_days ?? 14),
+              })
+            : t('sanitization.snapshotLoaded', {
+                loadedAt: String(displayResult.meta.snapshot_loaded_at),
+              })}
+        </Alert>
+      ) : null}
+
       {showScenarioChrome || (showResults && displayResult) ? (
         <Box
           data-testid="sanitization-glance-row"

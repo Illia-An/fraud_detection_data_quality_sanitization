@@ -4,7 +4,8 @@ Architecture contract:
 - POST /api/v1/process accepts ``ProcessRequest`` (inline rows, or ``source=db``
   for the configured AnswerTime window; optional ``from_date`` / ``to_date``).
 - Returns ``SanitizationResponse`` with step metrics, store-month panel, KPI deltas, and ``echo_config``.
-- GET /health returns ``HealthResponse``.
+- GET /health returns ``HealthResponse`` (liveness).
+- GET /ready returns readiness (snapshot file / age / rows / schema_version).
 - Physical column names match ``SummerCampain.dbo.TargetsByMetrics_RateGetAnswers``.
 - Shared pipeline contracts live in ``src/schemas`` (SPEC.md Section 2).
 - Frontend TypeScript mirrors this module in ``web/src/schemas/api.ts``.
@@ -53,6 +54,7 @@ __all__ = [
     "ProcessResponse",
     "ResponseMeta",
     "HealthResponse",
+    "ReadyResponse",
     "SamplePresetMeta",
     "SampleResponse",
     "ErrorDetail",
@@ -157,10 +159,26 @@ class StoreImpactPoint(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """GET /health payload."""
+    """GET /health payload (liveness only)."""
 
     status: str = "ok"
     version: str = "0.1.0"
+
+
+class ReadyResponse(BaseModel):
+    """GET /ready payload (data readiness; may be returned with HTTP 503)."""
+
+    status: Literal["ready", "not_ready"]
+    version: str
+    sanitization_source: str | None = None
+    snapshot_present: bool = False
+    snapshot_loaded_at: str | None = None
+    snapshot_age_s: float | None = None
+    snapshot_max_age_days: float | None = None
+    snapshot_row_count: int | None = None
+    schema_version: str | None = None
+    schema_ok: bool = False
+    reasons: list[str] = Field(default_factory=list)
 
 
 class SamplePresetMeta(BaseModel):
