@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Connection, Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
 from backend.db_sample import DbSampleError
@@ -27,6 +27,9 @@ DEFAULT_SNAPSHOT_URL = f"sqlite:///{DEFAULT_SNAPSHOT_PATH.as_posix()}"
 ANSWERS_TABLE = "answers"
 STORE_MONTH_TABLE = "store_month"
 META_TABLE = "snapshot_meta"
+
+# Bump when answers / store_month / meta contract changes (Wave 2 / D-05).
+SCHEMA_VERSION = "1"
 
 SanitizationSource = Literal["view", "snapshot"]
 
@@ -78,6 +81,7 @@ class SnapshotMeta:
     store_month_count: int
     source_view: str | None
     from_date: str | None
+    schema_version: str | None = None
 
 
 def running_in_docker() -> bool:
@@ -145,6 +149,16 @@ def get_snapshot_engine(*, create_schema: bool = False) -> Engine:
     return engine
 
 
+def get_snapshot_engine_at(path: Path, *, create_schema: bool = False) -> Engine:
+    """Engine for an explicit SQLite file path (refresh tmp / tests)."""
+    path = path.resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
+    if create_schema:
+        init_snapshot_schema(engine)
+    return engine
+
+
 def init_snapshot_schema(engine: Engine) -> None:
     """Create tables/indexes if missing (idempotent)."""
     with engine.begin() as conn:
@@ -154,19 +168,24 @@ def init_snapshot_schema(engine: Engine) -> None:
                 conn.execute(text(chunk))
 
 
-def set_meta(engine: Engine, values: dict[str, str]) -> None:
-    """Upsert key/value rows in ``snapshot_meta``."""
-    with engine.begin() as conn:
-        for key, value in values.items():
-            conn.execute(
-                text(
-                    f"""
+def set_meta_conn(conn: Connection, values: dict[str, str]) -> None:
+    """Upsert ``snapshot_meta`` on an open connection/transaction."""
+    for key, value in values.items():
+        conn.execute(
+            text(
+                f"""
 INSERT INTO {META_TABLE} (key, value) VALUES (:key, :value)
 ON CONFLICT(key) DO UPDATE SET value = excluded.value
 """
-                ),
-                {"key": key, "value": value},
-            )
+            ),
+            {"key": key, "value": value},
+        )
+
+
+def set_meta(engine: Engine, values: dict[str, str]) -> None:
+    """Upsert key/value rows in ``snapshot_meta``."""
+    with engine.begin() as conn:
+        set_meta_conn(conn, values)
 
 
 def read_meta(engine: Engine) -> SnapshotMeta:
@@ -181,6 +200,7 @@ def read_meta(engine: Engine) -> SnapshotMeta:
             store_month_count=0,
             source_view=None,
             from_date=None,
+            schema_version=None,
         )
     kv = {str(k): str(v) for k, v in rows}
 
@@ -196,6 +216,7 @@ def read_meta(engine: Engine) -> SnapshotMeta:
         store_month_count=_int("store_month_count"),
         source_view=kv.get("source_view"),
         from_date=kv.get("from_date"),
+        schema_version=kv.get("schema_version"),
     )
 
 
@@ -207,7 +228,19 @@ def meta_as_dict(meta: SnapshotMeta) -> dict[str, Any]:
         "snapshot_row_count": meta.row_count,
         "snapshot_store_month_count": meta.store_month_count,
         "snapshot_from_date": meta.from_date,
+        "snapshot_schema_version": meta.schema_version,
     }
+
+
+def assert_snapshot_schema_version(meta: SnapshotMeta) -> None:
+    """Raise 503 when meta schema_version is missing or mismatched (D-05)."""
+    if meta.schema_version != SCHEMA_VERSION:
+        raise DbSampleError(
+            "Snapshot schema_version mismatch "
+            f"(found={meta.schema_version!r}, expected={SCHEMA_VERSION!r}). "
+            "Run: uv run python scripts/refresh_q10012_snapshot.py",
+            status_code=503,
+        )
 
 
 def utc_now_iso() -> str:
@@ -226,9 +259,21 @@ def require_snapshot_engine() -> Engine:
         )
     try:
         engine = get_snapshot_engine(create_schema=False)
-        # Touch meta / answers to fail fast on empty/corrupt DB.
-        with engine.connect() as conn:
-            conn.execute(text(f"SELECT 1 FROM {ANSWERS_TABLE} LIMIT 1"))
+        meta = read_meta(engine)
+        assert_snapshot_schema_version(meta)
+        if meta.row_count <= 0:
+            # Fail closed on empty / stale meta even if a row happens to exist.
+            with engine.connect() as conn:
+                n = int(
+                    conn.execute(text(f"SELECT COUNT(*) FROM {ANSWERS_TABLE}")).scalar()
+                    or 0
+                )
+            if n <= 0:
+                raise DbSampleError(
+                    f"Snapshot at {path} has no answer rows. "
+                    "Run: uv run python scripts/refresh_q10012_snapshot.py",
+                    status_code=503,
+                )
         return engine
     except DbSampleError:
         raise

@@ -20,6 +20,7 @@ from backend.queries import (
 from backend.schemas import PipelineConfig, ProcessRequest
 from backend.snapshot import (
     ANSWERS_TABLE,
+    SCHEMA_VERSION,
     STORE_MONTH_TABLE,
     get_sanitization_source,
     init_snapshot_schema,
@@ -128,6 +129,7 @@ VALUES
             "store_month_count": "2",
             "source_view": "dbo.TargetsByMetrics_RateGetAnswers",
             "from_date": "2026-01-01",
+            "schema_version": SCHEMA_VERSION,
         },
     )
 
@@ -168,9 +170,11 @@ def test_read_meta_and_as_dict(tmp_path: Path) -> None:
     assert meta.row_count == 3
     assert meta.store_month_count == 2
     assert meta.from_date == "2026-01-01"
+    assert meta.schema_version == SCHEMA_VERSION
     d = meta_as_dict(meta)
     assert d["sanitization_source"] == "snapshot"
     assert d["snapshot_row_count"] == 3
+    assert d["snapshot_schema_version"] == SCHEMA_VERSION
 
 
 def test_process_db_uses_snapshot(
@@ -281,6 +285,7 @@ VALUES
             "store_month_count": "1",
             "source_view": "dbo.TargetsByMetrics_RateGetAnswers",
             "from_date": "2026-02-01",
+            "schema_version": SCHEMA_VERSION,
         },
     )
 

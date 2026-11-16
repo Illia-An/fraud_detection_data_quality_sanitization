@@ -19,7 +19,14 @@ from backend.queries import (
 )
 from backend.schemas import PipelineConfig, ProcessRequest, SurveyAnswerRow
 from backend.service import run_pipeline, run_pipeline_pushdown
-from backend.snapshot import ANSWERS_TABLE, STORE_MONTH_TABLE, init_snapshot_schema, set_meta, utc_now_iso
+from backend.snapshot import (
+    ANSWERS_TABLE,
+    SCHEMA_VERSION,
+    STORE_MONTH_TABLE,
+    init_snapshot_schema,
+    set_meta,
+    utc_now_iso,
+)
 from fraud_guard.tier1 import CUSTOMER_BLACKLIST_VALUE
 from fraud_guard.pii import hash_pii_value
 
@@ -165,6 +172,7 @@ GROUP BY PrintStore, Year, Month
             "store_month_count": "3",
             "source_view": "test",
             "from_date": "2026-01-01",
+            "schema_version": SCHEMA_VERSION,
         },
     )
 
