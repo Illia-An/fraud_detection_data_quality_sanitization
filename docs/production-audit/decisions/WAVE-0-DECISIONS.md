@@ -31,8 +31,8 @@ Where the owner has not signed, status is `PENDING` and the “Audit recommendat
 | **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `DOCUMENTED` | Agent / 2026-11-16 | Procedure below; formal owner ACK still welcome before external exposure |
 | **PII** | Snapshot PII at rest | A003 S-04/S-05, A009 O-5 | **Either** keyed hash at refresh **or** signed disk-encryption / access waiver | `PENDING` | — | Choose one path before Wave 6; no implementation in this branch |
 | **ALERT** | Alert channel | A005 G-5, A009 O-3 | Where freshness / process failures page (email / Teams / other) | `PENDING` | — | Needed for Wave 4–5 ops; placeholder |
-| **REG** | Image registry | A006 O-1, A009 O-4 | Private GHCR or internal registry + publish rights | `PENDING` | — | Wave 5 |
-| **HOST** | Deploy / refresh host | A006, A011 O-1, A002 O-2 | Named host + who may edit `.env.docker` / run refresh | `PENDING` | — | Wave 5 / cutover |
+| **REG** | Image registry | A006 O-1, A009 O-4 | Private GHCR or internal registry + publish rights | `PROPOSED` | Agent / 2026-11-16 | **`ghcr.io/<owner>/fraud-dq-sanitization`** (CI push on `main` / `v*` tags). Owner may SIGN a different registry later. |
+| **HOST** | Deploy / refresh host | A006, A011 O-1, A002 O-2 | Named host + who may edit `.env.docker` / run refresh | `PENDING` | — | Named in `docs/ops/*`; second-operator slot open |
 | **DR** | RPO / RTO for snapshot copies | A006 O-5, A009 O-4 | Proposal in A006 pending sign-off (keep `.prev` / N copies) | `PENDING` | — | Wave 2 keeps `.prev`; numeric RPO/RTO still open |
 
 ---
@@ -81,3 +81,4 @@ This is an **ops control**, not enforced by application code.
 | 2026-11-11 | Owner | **G-1 / W1-SRC** yes (prod snapshot-only); **W1-MID** (A) month normalize; **W1-VIEW** (B) allow + UI flag |
 | 2026-11-16 | Agent (Wave 3) | **NET** procedure documented; S-01 history = no rewrite (strip outputs only) |
 | 2026-11-16 | Agent (Wave 4) | **FRESH** → `PROPOSED` 14 days (`SNAPSHOT_MAX_AGE_DAYS`); used by `/ready` until owner SIGNED |
+| 2026-11-16 | Agent (Wave 5) | **REG** → `PROPOSED` GHCR `fraud-dq-sanitization`; deploy/refresh runbooks added |

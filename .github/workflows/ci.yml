@@ -2,13 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main, feat/react-ui-v2, feat/db-sample-2026]
+    branches: [main]
+    tags: ["v*.*.*"]
   pull_request:
     branches: [main]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # Align with Dockerfile (Wave 5 / CD-08).
+  UV_VERSION: "0.6.14"
+  NODE_VERSION: "20"
+  IMAGE_NAME: fraud-dq-sanitization
 
 jobs:
   backend:
@@ -21,6 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -48,7 +56,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -78,6 +86,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+          version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -90,10 +99,13 @@ jobs:
       - name: Sync Python dependencies
         run: uv sync --extra dev
 
+      - name: Build CI snapshot fixtures
+        run: uv run python scripts/build_ci_fixtures.py
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: web/package-lock.json
 
@@ -111,3 +123,95 @@ jobs:
         env:
           CI: true
           API_CORS_ORIGINS: http://localhost:5173
+          SANITIZATION_SOURCE: snapshot
+          SNAPSHOT_URL: sqlite:///testdata/fixtures/q10012_snapshot.sqlite
+          TTS_KPI_SOURCE: snapshot
+          TTS_KPI_SNAPSHOT_URL: sqlite:///testdata/fixtures/tts_kpi_snapshot.sqlite
+          SNAPSHOT_MAX_AGE_DAYS: "36500"
+
+  image:
+    name: Image (build + smoke)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build CI snapshot fixtures
+        run: uv run python scripts/build_ci_fixtures.py
+
+      - name: Image metadata
+        id: meta
+        run: |
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          echo "sha_tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "app_version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version_tag=" >> "$GITHUB_OUTPUT"
+            echo "app_version=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+          # Wave 0 REG PROPOSED — lowercase for GHCR.
+          echo "image_repo=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}
+            ${{ env.IMAGE_NAME }}:ci
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.app_version }}
+
+      - name: Image smoke (SM-01/02 + /ready + SM-10…14)
+        env:
+          IMAGE_REF: ${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}
+          APP_VERSION: ${{ steps.meta.outputs.app_version }}
+          SNAPSHOT_MAX_AGE_DAYS: "36500"
+        run: |
+          chmod +x scripts/smoke_image.sh
+          ./scripts/smoke_image.sh
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push sha tag
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        run: |
+          SRC="${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}"
+          DST="${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.sha_tag }}"
+          docker tag "$SRC" "$DST"
+          docker push "$DST"
+
+      - name: Push version tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          SRC="${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.sha_tag }}"
+          DST="${{ steps.meta.outputs.image_repo }}:${{ steps.meta.outputs.version_tag }}"
+          docker tag "$SRC" "$DST"
+          docker push "$DST"
