@@ -1,29 +1,20 @@
-
 """FastAPI entry point for sanitization PoC."""
 
 from __future__ import annotations
 
 import logging
-import os
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.auth import ApiKeyMiddleware, auth_enabled
-from backend.db_sample import (
-    DEFAULT_FROM_DATE,
-    DbSampleError,
-    DbSampleQuery,
-    load_db_sample_meta_from_settings,
-    resolve_process_source,
-)
+from backend.data_access import dispose_engines
 from backend.observability import (
     RequestIdMiddleware,
     app_version,
@@ -32,126 +23,31 @@ from backend.observability import (
     log_shutdown,
     log_startup,
 )
-from backend.period_bounds import normalize_snapshot_period
-from backend.profiler import profile_block, profiling_meta
 from backend.readiness import evaluate_readiness, snapshot_max_age_days
-from backend.report_schemas import ExcelReportRequest, to_excel_report_document
-from backend.queries import (
-    load_actual_baseline_from_settings,
-    load_tier_candidates_from_settings,
-    process_source_meta_extra,
-)
 from backend.request_limits import BodySizeLimitMiddleware
+from backend.routers import include_routers
+from backend.settings import clear_app_settings_cache, get_app_settings
 from backend.snapshot import SCHEMA_VERSION, get_sanitization_source, view_source_dev_warning
-from backend.schemas import (
-    HealthResponse,
-    PipelineConfig,
-    ProcessRequest,
-    ReadyResponse,
-    SanitizationResponse,
-    SampleResponse,
-    SamplePresetMeta,
-    SurveyAnswerRow,
-)
-from backend.cumulative_plan_schemas import (
-    PlanVersionCreateRequest,
-    PlanVersionListOut,
-    PlanVersionOut,
-    SimulationAdjustRequest,
-    SimulationOut,
-    SimulationRequest,
-    list_item_to_out,
-    maybe_overlay,
-    plan_version_to_out,
-    simulation_to_out,
-)
-from backend.plan_schemas import PlanRequest, PlanResponse, FivePercentPlanOut, MonthScoreOut, StoreProjectionOut
-from backend.tts_kpi_ap import load_ap_tts_kpi_panel
-from backend.tts_plan_schemas import (
-    TtsKpiApPanelResponse,
-    TtsKpiPanelResponse,
-    TtsKpiPanelRowOut,
-    TtsPlanOut,
-    TtsPlanRequest,
-    TtsPlanResponse,
-)
-from backend.service import run_pipeline, run_pipeline_pushdown
 from backend.static_ui import mount_frontend
-from backend.tts_kitchen_queries import KitchenReadError
-from backend.tts_kitchen_schemas import KitchenBeforeAfterResponse
-from backend.tts_kitchen_service import run_tts_kitchen_before_after
-from fraud_guard.synthetic import PRESETS, PresetName, generate_preset
-from planner.cumulative_slope import build_baseline_plan, simulate
-from planner.cumulative_slope.plan_version import build_plan_version
-from planner.five_percent import plan_five_percent
-from planner.plan_store import PlanStore, default_plan_store_path
-from planner.tts import plan_tts
-from planner.tts_baseline import TtsKpiPresetName, generate_tts_kpi_panel
-from planner.tts_kpi_ap import TtsKpiSourceError
 
 _ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(_ROOT / ".env")
 
 logger = logging.getLogger(__name__)
 
+# Re-export for tests / callers that historically imported from main.
 API_PREFIX = "/api/v1"
-
-
-def _cors_origins() -> list[str]:
-    raw = os.environ.get(
-        "API_CORS_ORIGINS",
-        "http://localhost:5173,http://localhost:4201",
-    )
-    return [origin.strip() for origin in raw.split(",") if origin.strip()]
-
-
-def _complete_echo_config(config: PipelineConfig) -> PipelineConfig:
-    """Return the full effective PipelineConfig (all SPEC fields, defaults filled)."""
-    return PipelineConfig.model_validate(config.model_dump())
-
-
-def _as_sanitization_response(
-    result: SanitizationResponse,
-    *,
-    meta_extra: dict | None = None,
-) -> SanitizationResponse:
-    """Re-validate pipeline output as the exact SPEC Section 2 response contract."""
-    payload = result.model_dump(mode="python")
-    payload["echo_config"] = _complete_echo_config(
-        PipelineConfig.model_validate(payload["echo_config"])
-    ).model_dump(mode="python")
-    if meta_extra:
-        payload["meta"] = {**(payload.get("meta") or {}), **meta_extra}
-    return SanitizationResponse.model_validate(payload)
-
-
-def _plan_store() -> PlanStore:
-    """SQLite Baseline Plan versions (PLAN_STORE_PATH or data/plan_store.sqlite)."""
-    return PlanStore(default_plan_store_path(_ROOT))
-
-
-def _docs_enabled() -> bool:
-    """``ENABLE_DOCS`` default: on outside Docker, off in Docker/prod."""
-    raw = os.environ.get("ENABLE_DOCS", "").strip().lower()
-    if raw in ("1", "true", "yes", "on"):
-        return True
-    if raw in ("0", "false", "no", "off"):
-        return False
-    # Default: disable docs when running in a container (Wave 6 / S-10).
-    return not Path("/.dockerenv").exists() and os.environ.get(
-        "RUNNING_IN_DOCKER", ""
-    ).strip() not in ("1", "true", "yes")
 
 
 def _startup_log_fields() -> dict:
     """Safe startup diagnostics (no paths, credentials, or env dumps)."""
     ready = evaluate_readiness()
+    settings = get_app_settings()
     from fraud_guard.pii import pii_hmac_key
 
     return {
         "sanitization_source": get_sanitization_source(),
-        "tts_kpi_source": os.environ.get("TTS_KPI_SOURCE", "synthetic").strip()
-        or "synthetic",
+        "tts_kpi_source": settings.tts_kpi_source,
         "schema_version_expected": SCHEMA_VERSION,
         "snapshot_present": ready.snapshot_present,
         "snapshot_schema_version": ready.schema_version,
@@ -162,7 +58,7 @@ def _startup_log_fields() -> dict:
         "ready": ready.ok,
         "ready_reasons": ready.reasons,
         "auth_enabled": auth_enabled(),
-        "docs_enabled": _docs_enabled(),
+        "docs_enabled": settings.enable_docs,
         "pii_hmac_configured": pii_hmac_key() is not None,
     }
 
@@ -177,12 +73,16 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        dispose_engines()
         log_shutdown()
 
 
 def create_app() -> FastAPI:
     configure_logging()
-    docs_on = _docs_enabled()
+    # Re-read env each factory call (tests monkeypatch ENABLE_DOCS / CORS).
+    clear_app_settings_cache()
+    settings = get_app_settings()
+    docs_on = settings.enable_docs
     app = FastAPI(
         title="Fraud Guard Sanitization PoC",
         version=app_version(),
@@ -200,7 +100,7 @@ def create_app() -> FastAPI:
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=_cors_origins(),
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -219,575 +119,7 @@ def create_app() -> FastAPI:
             errors.append(item)
         return JSONResponse(status_code=422, content={"detail": errors})
 
-    @app.get("/health", response_model=HealthResponse, tags=["health"])
-    def health() -> HealthResponse:
-        return HealthResponse(version=app_version())
-
-    @app.get(
-        "/ready",
-        response_model=ReadyResponse,
-        tags=["health"],
-        responses={
-            503: {
-                "description": "Snapshot missing, stale, empty, or schema mismatch",
-                "model": ReadyResponse,
-            }
-        },
-    )
-    def ready() -> JSONResponse:
-        """Data readiness (not liveness). Docker HEALTHCHECK stays on ``/health``."""
-        result = evaluate_readiness()
-        payload = ReadyResponse.model_validate(
-            result.to_dict(version=app_version())
-        ).model_dump(mode="json")
-        return JSONResponse(
-            status_code=200 if result.ok else 503,
-            content=payload,
-        )
-
-    _PRESET_DESCRIPTIONS: dict[PresetName, str] = {
-        "small": "2 stores × 2 months from 2026-01 — quick chart demo with Tier 1/2 signals",
-        "medium": "10 stores × 6 months from 2026-01 — realistic demo (~3k+ rows)",
-        "stress": "20 stores × 12 months from 2026-01 — performance / volume test",
-    }
-
-    # Register /sample/db before /sample/{preset} so "db" is not parsed as a preset.
-    @app.get(
-        f"{API_PREFIX}/sample/db",
-        response_model=SampleResponse,
-        tags=["sample"],
-        responses={
-            422: {"description": "Validation error"},
-            503: {"description": "Database unavailable or DATABASE_URL missing"},
-        },
-    )
-    def sample_db(
-        store: float | None = Query(default=None, description="Optional PrintStore filter"),
-        year: int | None = Query(default=None, ge=2000, le=2100),
-        month: int | None = Query(default=None, ge=1, le=12),
-    ) -> SampleResponse:
-        try:
-            return load_db_sample_meta_from_settings(
-                DbSampleQuery(
-                    store=store,
-                    year=year,
-                    month=month,
-                    from_date=DEFAULT_FROM_DATE,
-                )
-            )
-        except DbSampleError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.get(
-        f"{API_PREFIX}/sample/tts-kpi/{{preset}}",
-        response_model=TtsKpiPanelResponse,
-        tags=["sample-tts-kpi"],
-        responses={404: {"description": "Unknown TTS KPI preset"}},
-    )
-    def sample_tts_kpi(preset: TtsKpiPresetName) -> TtsKpiPanelResponse:
-        """Synthetic monthly TTS minutes for the planner. No database read or write."""
-        panel = generate_tts_kpi_panel(preset)
-        return TtsKpiPanelResponse(
-            preset=panel.preset,
-            period_start=panel.period_start,
-            period_end=panel.period_end,
-            reference_year=panel.reference_year,
-            reference_month=panel.reference_month,
-            row_count=panel.row_count,
-            rows=[
-                TtsKpiPanelRowOut(
-                    store_id=row.store_id,
-                    year=row.year,
-                    month=row.month,
-                    tts=row.tts,
-                )
-                for row in panel.rows
-            ],
-        )
-
-    @app.get(
-        f"{API_PREFIX}/tts-kpi/ap",
-        response_model=TtsKpiApPanelResponse,
-        tags=["tts-kpi"],
-        responses={
-            404: {"description": "AP returned no avg_serve_time_minutes rows"},
-            422: {"description": "AP rows are not a usable TTS panel"},
-            503: {
-                "description": "TTS_KPI_SOURCE is synthetic, snapshot missing, or AP unreachable"
-            },
-        },
-    )
-    def tts_kpi_from_ap() -> TtsKpiApPanelResponse:
-        """Read-only TTS minutes from AP, snapshot, or reject synthetic.
-
-        Synthetic presets stay on ``/sample/tts-kpi``. Docker uses
-        ``TTS_KPI_SOURCE=snapshot`` after ``refresh_tts_kpi_snapshot.py``.
-        """
-        try:
-            panel = load_ap_tts_kpi_panel()
-        except TtsKpiSourceError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-        return TtsKpiApPanelResponse(
-            period_start=panel.period_start,
-            period_end=panel.period_end,
-            reference_year=panel.reference_year,
-            reference_month=panel.reference_month,
-            row_count=panel.row_count,
-            rows=[
-                TtsKpiPanelRowOut(
-                    store_id=row.store_id,
-                    year=row.year,
-                    month=row.month,
-                    tts=row.tts,
-                )
-                for row in panel.rows
-            ],
-        )
-
-    @app.get(
-        f"{API_PREFIX}/sample/{{preset}}",
-        response_model=SampleResponse,
-        tags=["sample"],
-        responses={404: {"description": "Unknown preset"}},
-    )
-    def sample(preset: PresetName) -> SampleResponse:
-        raw_rows = generate_preset(preset)
-        rows = [SurveyAnswerRow.model_validate(r) for r in raw_rows]
-        stores = {r.PrintStore for r in rows if r.PrintStore is not None}
-        months = {(r.Year, r.Month) for r in rows if r.Year and r.Month}
-        return SampleResponse(
-            preset=preset,
-            rows=rows,
-            meta=SamplePresetMeta(
-                preset=preset,
-                row_count=len(rows),
-                store_count=len(stores),
-                month_count=len(months),
-                description=_PRESET_DESCRIPTIONS[preset],
-            ),
-        )
-
-    @app.post(
-        f"{API_PREFIX}/process",
-        response_model=SanitizationResponse,
-        response_model_exclude_unset=False,
-        response_model_exclude_none=False,
-        tags=["process"],
-        responses={
-            422: {"description": "Validation error"},
-            500: {"description": "Pipeline execution error"},
-            503: {"description": "Database unavailable when source=db"},
-        },
-    )
-    def process(body: ProcessRequest) -> SanitizationResponse:
-        """Run sanitization and return SPEC Section 2 ``SanitizationResponse``."""
-        try:
-            with profile_block() as profile:
-                db_query_a_time_ms: float | None = None
-                db_query_b_time_ms: float | None = None
-                if body.source == "db":
-                    src = resolve_process_source()
-                    requested_start = body.from_date or DEFAULT_FROM_DATE
-                    requested_end = body.to_date
-                    period_start = requested_start
-                    period_end = requested_end
-                    period_normalized = False
-                    if src.sanitization_source == "snapshot":
-                        period_start, period_end, period_normalized = (
-                            normalize_snapshot_period(requested_start, requested_end)
-                        )
-                    db_query = DbSampleQuery(
-                        from_date=period_start,
-                        to_date=period_end,
-                    )
-
-                    # Query A — aggregated actual baseline (no raw rows).
-                    t_a = time.perf_counter()
-                    actual_baseline = load_actual_baseline_from_settings(
-                        period_start=db_query.from_date,
-                        period_end=db_query.to_date,
-                        engine=src.engine,
-                        dialect=src.dialect,
-                    )
-                    db_query_a_time_ms = round(
-                        (time.perf_counter() - t_a) * 1000.0, 3
-                    )
-                    if actual_baseline.total_responses <= 0:
-                        end_label = (
-                            period_end.isoformat() if period_end is not None else "latest"
-                        )
-                        raise HTTPException(
-                            status_code=422,
-                            detail=(
-                                f"No Q10012 rows from {period_start.isoformat()} "
-                                f"to {end_label}"
-                            ),
-                        )
-
-                    # Query B — Tier 1 candidate rows only (not full period).
-                    t_b = time.perf_counter()
-                    sample = load_tier_candidates_from_settings(
-                        period_start=db_query.from_date,
-                        period_end=db_query.to_date,
-                        config=body.config,
-                        engine=src.engine,
-                        dialect=src.dialect,
-                    )
-                    db_query_b_time_ms = round(
-                        (time.perf_counter() - t_b) * 1000.0, 3
-                    )
-                    result = run_pipeline_pushdown(
-                        actual_baseline,
-                        sample.rows,
-                        body.config,
-                        query_b_mode=src.query_b_mode,
-                    )
-                    rows_scanned = len(sample.rows)
-                    meta_extra = {
-                        "source": "db",
-                        "sample": sample.meta.model_dump(),
-                        "query_a_store_periods": len(
-                            actual_baseline.by_store_period
-                        ),
-                        "query_a_total_responses": actual_baseline.total_responses,
-                        "query_b_candidate_rows": len(sample.rows),
-                        "period_start": period_start.isoformat(),
-                        "period_end": (
-                            period_end.isoformat() if period_end is not None else None
-                        ),
-                        "period_requested_start": requested_start.isoformat(),
-                        "period_requested_end": (
-                            requested_end.isoformat()
-                            if requested_end is not None
-                            else None
-                        ),
-                        "period_normalized_to_months": period_normalized,
-                        **process_source_meta_extra(src),
-                    }
-                else:
-                    result = run_pipeline(body)
-                    rows_scanned = int(
-                        result.meta.get("input_rows", len(body.rows))
-                    )
-                    meta_extra = {}
-
-            meta_extra.update(
-                profiling_meta(
-                    execution_time_ms=float(profile["execution_time_ms"]),
-                    peak_memory_mb=float(profile["peak_memory_mb"]),
-                    rows_scanned=rows_scanned,
-                    db_query_a_time_ms=db_query_a_time_ms,
-                    db_query_b_time_ms=db_query_b_time_ms,
-                )
-            )
-            response = _as_sanitization_response(result, meta_extra=meta_extra)
-            log_event(
-                "process_done",
-                source=str(meta_extra.get("source") or body.source),
-                sanitization_source=meta_extra.get("sanitization_source"),
-                query_b_mode=meta_extra.get("query_b_mode")
-                or response.meta.get("query_b_mode"),
-                period_start=meta_extra.get("period_start"),
-                period_end=meta_extra.get("period_end"),
-                rows_scanned=rows_scanned,
-                query_a_total_responses=meta_extra.get("query_a_total_responses"),
-                db_query_a_time_ms=db_query_a_time_ms,
-                db_query_b_time_ms=db_query_b_time_ms,
-                execution_time_ms=float(profile["execution_time_ms"]),
-                snapshot_loaded_at=meta_extra.get("snapshot_loaded_at"),
-                snapshot_age_s=meta_extra.get("snapshot_age_s"),
-                enabled_tiers={
-                    "tier1_blacklist": body.config.tier1_blacklist_enabled,
-                    "tier2_freq": body.config.tier2_freq_enabled,
-                    "tier3_always_five": body.config.tier3_always_five_enabled,
-                    "tier4": body.config.tier4_enabled,
-                },
-            )
-            return response
-        except HTTPException:
-            raise
-        except DbSampleError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        except Exception as exc:
-            logger.exception("pipeline failed")
-            raise HTTPException(status_code=500, detail="Pipeline execution failed") from exc
-
-    @app.post(
-        f"{API_PREFIX}/plans",
-        response_model=PlanResponse,
-        tags=["plans"],
-        responses={
-            422: {"description": "Validation error"},
-        },
-    )
-    def create_plan(body: PlanRequest) -> PlanResponse:
-        """Allocate five_percent store×month projections from a cleansed baseline."""
-        try:
-            baseline = {row.store_id: row.five_percent for row in body.baseline_rows}
-            result = plan_five_percent(
-                baseline=baseline,
-                target=body.target,
-                n_months=body.horizon,
-                max_monthly_improve=body.params.max_monthly_improve,
-                priority_power=body.params.priority_power,
-                trajectory=body.params.trajectory,
-                trajectory_power=body.params.trajectory_power,
-                growth_factor=body.params.growth_factor,
-                reference_year=body.reference_year,
-                reference_month=body.reference_month,
-            )
-            metric = FivePercentPlanOut(
-                target=result.target,
-                current_chain=result.current_chain,
-                required_change=result.required_change,
-                final_chain=result.final_chain,
-                feasible=result.feasible,
-                chain_trajectory=[
-                    MonthScoreOut(year=m.year, month=m.month, score=m.score)
-                    for m in result.chain_trajectory
-                ],
-                projections=[
-                    StoreProjectionOut(
-                        store_id=p.store_id,
-                        months=[
-                            MonthScoreOut(year=m.year, month=m.month, score=m.score)
-                            for m in p.months
-                        ],
-                    )
-                    for p in result.projections
-                ],
-            )
-            return PlanResponse(metrics={"five_percent": metric})
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.post(
-        f"{API_PREFIX}/plans-tts",
-        response_model=TtsPlanResponse,
-        tags=["plans-tts"],
-        responses={
-            422: {"description": "Validation error"},
-        },
-    )
-    def create_tts_plan(body: TtsPlanRequest) -> TtsPlanResponse:
-        """Allocate TTS store×month minute reductions from a KPI baseline snapshot."""
-        try:
-            baseline = {row.store_id: row.tts for row in body.baseline_rows}
-            result = plan_tts(
-                baseline=baseline,
-                target=body.target,
-                n_months=body.horizon,
-                max_monthly_improve=body.params.max_monthly_improve,
-                priority_power=body.params.priority_power,
-                trajectory=body.params.trajectory,
-                trajectory_power=body.params.trajectory_power,
-                growth_factor=body.params.growth_factor,
-                reference_year=body.reference_year,
-                reference_month=body.reference_month,
-            )
-            metric = TtsPlanOut(
-                target=result.target,
-                current_chain=result.current_chain,
-                required_change=result.required_change,
-                final_chain=result.final_chain,
-                feasible=result.feasible,
-                chain_trajectory=[
-                    MonthScoreOut(year=m.year, month=m.month, score=m.score)
-                    for m in result.chain_trajectory
-                ],
-                projections=[
-                    StoreProjectionOut(
-                        store_id=p.store_id,
-                        months=[
-                            MonthScoreOut(year=m.year, month=m.month, score=m.score)
-                            for m in p.months
-                        ],
-                    )
-                    for p in result.projections
-                ],
-            )
-            return TtsPlanResponse(metrics={"tts": metric})
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.post(
-        f"{API_PREFIX}/plan-versions",
-        response_model=PlanVersionOut,
-        status_code=201,
-        tags=["plan-versions"],
-        responses={422: {"description": "Validation error"}},
-    )
-    def create_plan_version(body: PlanVersionCreateRequest) -> PlanVersionOut:
-        """Compute and persist an immutable Baseline Plan version."""
-        try:
-            params = body.params.to_domain()
-            cumulative_start = body.cumulative_start.to_domain()
-            result = build_baseline_plan(
-                facts=[f.to_domain() for f in body.facts],
-                network_target=body.network_target,
-                as_of=body.as_of.to_domain(),
-                planning_year=body.planning_year,
-                cumulative_start=cumulative_start,
-                params=params,
-            )
-            version = build_plan_version(
-                result,
-                cumulative_start=cumulative_start,
-                params=params,
-                label=body.label,
-            )
-            saved = _plan_store().insert(version)
-            return plan_version_to_out(saved)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.get(
-        f"{API_PREFIX}/plan-versions",
-        response_model=PlanVersionListOut,
-        tags=["plan-versions"],
-    )
-    def list_plan_versions(
-        limit: int = Query(default=50, ge=1, le=200),
-        metric_id: str = Query(default="five_percent"),
-    ) -> PlanVersionListOut:
-        items = _plan_store().list_versions(limit=limit, metric_id=metric_id)
-        return PlanVersionListOut(items=[list_item_to_out(i) for i in items])
-
-    @app.get(
-        f"{API_PREFIX}/plan-versions/{{version_id}}",
-        response_model=PlanVersionOut,
-        tags=["plan-versions"],
-        responses={404: {"description": "Unknown plan version"}},
-    )
-    def get_plan_version(version_id: str) -> PlanVersionOut:
-        version = _plan_store().get(version_id)
-        if version is None:
-            raise HTTPException(status_code=404, detail="Plan version not found")
-        return plan_version_to_out(version)
-
-    @app.post(
-        f"{API_PREFIX}/simulation",
-        response_model=SimulationOut,
-        tags=["simulation"],
-        responses={
-            404: {"description": "Unknown active plan version"},
-            422: {"description": "Validation error"},
-        },
-    )
-    def run_simulation(body: SimulationRequest) -> SimulationOut:
-        """Live simulation from facts; optional frozen blue overlay from a plan version."""
-        store = _plan_store()
-        frozen = None
-        if body.active_plan_version_id:
-            frozen = store.get(body.active_plan_version_id)
-            if frozen is None:
-                raise HTTPException(status_code=404, detail="Plan version not found")
-        try:
-            result = simulate(
-                facts=[f.to_domain() for f in body.facts],
-                network_target=body.network_target,
-                as_of=body.as_of.to_domain(),
-                planning_year=body.planning_year,
-                cumulative_start=body.cumulative_start.to_domain(),
-                params=body.params.to_domain(),
-            )
-            result = maybe_overlay(result, frozen)
-            return simulation_to_out(
-                result, active_plan_version_id=body.active_plan_version_id
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.post(
-        f"{API_PREFIX}/simulation/adjust",
-        response_model=SimulationOut,
-        tags=["simulation"],
-        responses={
-            404: {"description": "Unknown active plan version"},
-            422: {"description": "Validation error"},
-        },
-    )
-    def run_simulation_adjust(body: SimulationAdjustRequest) -> SimulationOut:
-        """Re-simulate with limited store implied-target overrides (does not Save)."""
-        store = _plan_store()
-        frozen = None
-        if body.active_plan_version_id:
-            frozen = store.get(body.active_plan_version_id)
-            if frozen is None:
-                raise HTTPException(status_code=404, detail="Plan version not found")
-        overrides = {a.store_id: a.new_implied_target for a in body.adjustments}
-        try:
-            result = simulate(
-                facts=[f.to_domain() for f in body.facts],
-                network_target=body.network_target,
-                as_of=body.as_of.to_domain(),
-                planning_year=body.planning_year,
-                cumulative_start=body.cumulative_start.to_domain(),
-                params=body.params.to_domain(),
-                implied_target_overrides=overrides,
-            )
-            result = maybe_overlay(result, frozen)
-            return simulation_to_out(
-                result, active_plan_version_id=body.active_plan_version_id
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.post(
-        f"{API_PREFIX}/reports/excel",
-        tags=["reports"],
-        responses={
-            200: {"content": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {}}},
-            422: {"description": "Validation error"},
-        },
-    )
-    def create_excel_report(body: ExcelReportRequest) -> Response:
-        """Pack a finished sanitization and plan into an Excel file."""
-        from excel_report.workbook import build_excel_report
-
-        try:
-            payload = build_excel_report(to_excel_report_document(body))
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        return Response(
-            content=payload,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": 'attachment; filename="sanitization-plan-report.xlsx"'},
-        )
-
-    @app.get(
-        f"{API_PREFIX}/tts-kitchen/before-after",
-        response_model=KitchenBeforeAfterResponse,
-        response_model_exclude_none=False,
-        tags=["tts-kitchen"],
-        responses={
-            503: {"description": "Kitchen view read failed"},
-            500: {"description": "Kitchen before/after fold failed"},
-        },
-    )
-    def tts_kitchen_before_after(
-        min_sec: int = Query(default=30, ge=0),
-    ) -> KitchenBeforeAfterResponse:
-        """Before/after for the fixed kitchen window. Read-only.
-
-        ``min_sec`` drops shorter positions. A position of exactly ``min_sec`` stays.
-        """
-        try:
-            return run_tts_kitchen_before_after(min_sec=min_sec)
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-        except KitchenReadError as exc:
-            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-        except Exception as exc:
-            logger.exception("Kitchen before/after read failed")
-            raise HTTPException(
-                status_code=500,
-                detail="Kitchen before/after read failed",
-            ) from exc
+    include_routers(app)
 
     if not docs_on:
         # Explicit 404 so SPA catch-all cannot serve index.html for API docs paths (S-10).

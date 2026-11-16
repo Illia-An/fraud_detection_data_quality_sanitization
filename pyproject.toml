@@ -35,9 +35,7 @@ packages = [
     "src/schemas",
     "src/planner",
     "src/excel_report",
-    "src/tts_guard",
     "src/tts_kitchen",
-    "src/tts_order_bump",
     "backend",
     "db",
 ]

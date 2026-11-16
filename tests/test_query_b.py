@@ -213,7 +213,7 @@ def test_process_db_uses_query_b_candidates(monkeypatch: pytest.MonkeyPatch) -> 
         ),
     )
     monkeypatch.setattr(
-        "backend.main.resolve_process_source",
+        "backend.service.resolve_process_source",
         lambda: ProcessSource(
             engine=MagicMock(),
             dialect="mssql",
@@ -222,15 +222,15 @@ def test_process_db_uses_query_b_candidates(monkeypatch: pytest.MonkeyPatch) -> 
         ),
     )
     monkeypatch.setattr(
-        "backend.main.load_actual_baseline_from_settings",
+        "backend.service.load_actual_baseline_from_settings",
         lambda **_k: baseline,
     )
     monkeypatch.setattr(
-        "backend.main.load_tier_candidates_from_settings",
+        "backend.service.load_tier_candidates_from_settings",
         lambda **_k: candidates,
     )
     monkeypatch.setattr(
-        "backend.main.process_source_meta_extra",
+        "backend.service.process_source_meta_extra",
         lambda _src=None: {
             "sanitization_source": "view",
             "source_warning": "SANITIZATION_SOURCE=view (dev only)",

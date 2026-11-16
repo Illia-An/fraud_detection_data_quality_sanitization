@@ -181,6 +181,10 @@ def test_get_actual_baseline_aggregates_maps_sql_rows() -> None:
 
 
 def test_process_db_uses_query_a_for_actual(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sqlalchemy import create_engine
+
+    from backend.db_sample import ProcessSource
+
     monkeypatch.setenv("SANITIZATION_SOURCE", "view")
     baseline = ActualBaseline(
         total_responses=3,
@@ -235,12 +239,19 @@ def test_process_db_uses_query_a_for_actual(monkeypatch: pytest.MonkeyPatch) -> 
             description="from db",
         ),
     )
+    stub = ProcessSource(
+        engine=create_engine("sqlite:///:memory:"),
+        dialect="mssql",
+        query_b_mode="blacklist_only",
+        sanitization_source="view",
+    )
+    monkeypatch.setattr("backend.service.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
-        "backend.main.load_actual_baseline_from_settings",
+        "backend.service.load_actual_baseline_from_settings",
         lambda **_kwargs: baseline,
     )
     monkeypatch.setattr(
-        "backend.main.load_tier_candidates_from_settings",
+        "backend.service.load_tier_candidates_from_settings",
         lambda **_kwargs: fake,
     )
     client = TestClient(create_app())
@@ -258,14 +269,25 @@ def test_process_db_uses_query_a_for_actual(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_process_db_empty_query_a(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sqlalchemy import create_engine
+
+    from backend.db_sample import ProcessSource
+
     empty = ActualBaseline(
         total_responses=0,
         top_box_count=0,
         top_box_pct=0.0,
         by_store_period=(),
     )
+    stub = ProcessSource(
+        engine=create_engine("sqlite:///:memory:"),
+        dialect="mssql",
+        query_b_mode="blacklist_only",
+        sanitization_source="view",
+    )
+    monkeypatch.setattr("backend.service.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
-        "backend.main.load_actual_baseline_from_settings",
+        "backend.service.load_actual_baseline_from_settings",
         lambda **_kwargs: empty,
     )
     client = TestClient(create_app())

@@ -22,11 +22,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from backend.db_sample import (
+from backend.data_access import (
     DEFAULT_FROM_DATE,
     QUESTION_ID,
     VIEW_NAME,
-    _engine_from_settings,
+    engine_from_settings,
 )
 from backend.snapshot import (
     DEFAULT_SNAPSHOT_PATH,
@@ -132,7 +132,7 @@ def refresh_snapshot(*, from_date: date, out_path: Path) -> dict[str, object]:
 
     t0 = time.perf_counter()
     previous = _previous_row_count(out_path)
-    src = _engine_from_settings()
+    src = engine_from_settings()
     loaded_at = utc_now_iso()
     sql, params = _pull_sql(from_date)
     logger.info("Pulling from %s (AnswerTime >= %s)…", VIEW_NAME, from_date.isoformat())

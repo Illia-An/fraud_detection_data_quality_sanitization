@@ -162,7 +162,8 @@ class HealthResponse(BaseModel):
     """GET /health payload (liveness only)."""
 
     status: str = "ok"
-    version: str = "0.1.0"
+    # Callers must pass ``app_version()``; no hardcoded package default (Wave 7 / M-12).
+    version: str
 
 
 class ReadyResponse(BaseModel):
