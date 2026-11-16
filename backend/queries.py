@@ -452,7 +452,13 @@ def get_tier_candidate_rows(
         logger.exception("Query B (tier candidate rows) failed")
         raise DbSampleError("Database query failed") from exc
 
-    redacted = [_normalize_candidate_row(redact_row(r)) for r in raw_rows]
+    already_hashed = False
+    if dialect == "sqlite":
+        already_hashed = bool(read_meta(engine).pii_hashed_at_rest)
+    redacted = [
+        _normalize_candidate_row(redact_row(r, already_hashed=already_hashed))
+        for r in raw_rows
+    ]
     rows = [SurveyAnswerRow.model_validate(r) for r in redacted]
     stores = {r.PrintStore for r in rows if r.PrintStore is not None}
     months = {

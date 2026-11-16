@@ -24,6 +24,8 @@ docker run -d --name "$NAME" \
   -e TTS_KPI_SNAPSHOT_URL=sqlite:///data/tts_kpi_snapshot.sqlite \
   -e SNAPSHOT_MAX_AGE_DAYS="${SNAPSHOT_MAX_AGE_DAYS:-36500}" \
   -e APP_VERSION="${APP_VERSION:-smoke}" \
+  -e ENABLE_DOCS=0 \
+  ${API_KEY:+-e API_KEY="$API_KEY"} \
   -v "${FIXTURES}:/app/data:ro" \
   "$IMAGE_REF"
 

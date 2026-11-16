@@ -76,9 +76,19 @@ class DbSampleError(Exception):
         self.status_code = status_code
 
 
-def redact_row(row: dict[str, Any]) -> dict[str, Any]:
-    """Hash entity PII fields; leave other selected columns unchanged."""
+def redact_row(
+    row: dict[str, Any],
+    *,
+    already_hashed: bool = False,
+) -> dict[str, Any]:
+    """Hash entity PII fields; leave other selected columns unchanged.
+
+    When ``already_hashed`` is True (snapshot written with PII hashed at refresh),
+    values are passed through to avoid double-hashing entity keys.
+    """
     out = dict(row)
+    if already_hashed:
+        return out
     for col in _HASH_PII_COLUMNS:
         if col in out:
             out[col] = hash_pii_value(out[col])
@@ -220,7 +230,12 @@ def fetch_db_sample(engine: Engine, query: DbSampleQuery | None = None) -> Sampl
         logger.exception("db sample query failed")
         raise DbSampleError("Database query failed") from exc
 
-    redacted = [redact_row(r) for r in raw_rows]
+    already_hashed = False
+    if "sqlite" in str(engine.url):
+        from backend.snapshot import read_meta
+
+        already_hashed = bool(read_meta(engine).pii_hashed_at_rest)
+    redacted = [redact_row(r, already_hashed=already_hashed) for r in raw_rows]
     rows = [SurveyAnswerRow.model_validate(r) for r in redacted]
     stores = {r.PrintStore for r in rows if r.PrintStore is not None}
     months = {(r.Year, r.Month) for r in rows if r.Year is not None and r.Month is not None}

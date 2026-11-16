@@ -82,6 +82,8 @@ class SnapshotMeta:
     source_view: str | None
     from_date: str | None
     schema_version: str | None = None
+    # Wave 6 / S-04: "1" when UserContact/PhoneFromLog were hashed before write.
+    pii_hashed_at_rest: bool = False
 
 
 def running_in_docker() -> bool:
@@ -201,6 +203,7 @@ def read_meta(engine: Engine) -> SnapshotMeta:
             source_view=None,
             from_date=None,
             schema_version=None,
+            pii_hashed_at_rest=False,
         )
     kv = {str(k): str(v) for k, v in rows}
 
@@ -210,6 +213,7 @@ def read_meta(engine: Engine) -> SnapshotMeta:
         except ValueError:
             return 0
 
+    pii_flag = (kv.get("pii_hashed_at_rest") or "").strip().lower()
     return SnapshotMeta(
         loaded_at=kv.get("loaded_at"),
         row_count=_int("row_count"),
@@ -217,6 +221,7 @@ def read_meta(engine: Engine) -> SnapshotMeta:
         source_view=kv.get("source_view"),
         from_date=kv.get("from_date"),
         schema_version=kv.get("schema_version"),
+        pii_hashed_at_rest=pii_flag in ("1", "true", "yes"),
     )
 
 
@@ -229,6 +234,7 @@ def meta_as_dict(meta: SnapshotMeta) -> dict[str, Any]:
         "snapshot_store_month_count": meta.store_month_count,
         "snapshot_from_date": meta.from_date,
         "snapshot_schema_version": meta.schema_version,
+        "snapshot_pii_hashed_at_rest": meta.pii_hashed_at_rest,
     }
 
 

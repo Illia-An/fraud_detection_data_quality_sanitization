@@ -28,8 +28,8 @@ Where the owner has not signed, status is `PENDING` and the “Audit recommendat
 |----|----------|------------|----------------------|--------|------------------|-------|
 | **G-1** | Production data source | A001, A009 O-1, A012 | **Prod = snapshot-only; VIEW = dev only** | `SIGNED` | Owner / 2026-11-11 | Confirmed: prod always snapshot; VIEW only for local/dev |
 | **FRESH** | Snapshot freshness SLA | A002 O-1, A009 O-2 | Threshold for `GET /ready` age gate | `PROPOSED` | Agent / 2026-11-16 | **14 days** engineering default for Wave 4 (`SNAPSHOT_MAX_AGE_DAYS`, default `14`). Owner may SIGN a different number later without code redesign. |
-| **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `DOCUMENTED` | Agent / 2026-11-16 | Procedure below; formal owner ACK still welcome before external exposure |
-| **PII** | Snapshot PII at rest | A003 S-04/S-05, A009 O-5 | **Either** keyed hash at refresh **or** signed disk-encryption / access waiver | `PENDING` | — | Choose one path before Wave 6; no implementation in this branch |
+| **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `DOCUMENTED` | Agent / 2026-11-16 | Keep network lock even with API key; AuthN is stop-gap not public exposure |
+| **PII** | Snapshot PII at rest | A003 S-04/S-05, A009 O-5 | **Either** keyed hash at refresh **or** signed disk-encryption / access waiver | `PROPOSED` | Agent / 2026-11-16 | **Keyed HMAC at refresh** (`PII_HMAC_KEY`); meta `pii_hashed_at_rest=1`. Without pepper, refresh still SHA-256-hashes contacts (better than plaintext). Owner may SIGN or choose disk-encryption waiver instead. |
 | **ALERT** | Alert channel | A005 G-5, A009 O-3 | Where freshness / process failures page (email / Teams / other) | `PENDING` | — | Needed for Wave 4–5 ops; placeholder |
 | **REG** | Image registry | A006 O-1, A009 O-4 | Private GHCR or internal registry + publish rights | `PROPOSED` | Agent / 2026-11-16 | **`ghcr.io/<owner>/fraud-dq-sanitization`** (CI push on `main` / `v*` tags). Owner may SIGN a different registry later. |
 | **HOST** | Deploy / refresh host | A006, A011 O-1, A002 O-2 | Named host + who may edit `.env.docker` / run refresh | `PENDING` | — | Named in `docs/ops/*`; second-operator slot open |
@@ -51,7 +51,8 @@ These are product/engineering choices that shape Wave 1 implementation. Recorded
 
 ## 3. Network lock procedure (Wave 3 / S-02 P0)
 
-Until Wave 6 AuthN is live, the API port must not be reachable from untrusted networks.
+Wave 6 adds API-key AuthN, but the API port must still not be reachable from untrusted networks
+(SPA-baked keys are a LAN stop-gap, not a public control).
 
 1. Bind publish only on a trusted host / internal interface (prefer not exposing `0.0.0.0` on a public NIC).
 2. Docker: map `${API_PORT:-8000}:8000` only on LAN; do not put the host in a DMZ without a reverse-proxy ACL.
@@ -82,3 +83,4 @@ This is an **ops control**, not enforced by application code.
 | 2026-11-16 | Agent (Wave 3) | **NET** procedure documented; S-01 history = no rewrite (strip outputs only) |
 | 2026-11-16 | Agent (Wave 4) | **FRESH** → `PROPOSED` 14 days (`SNAPSHOT_MAX_AGE_DAYS`); used by `/ready` until owner SIGNED |
 | 2026-11-16 | Agent (Wave 5) | **REG** → `PROPOSED` GHCR `fraud-dq-sanitization`; deploy/refresh runbooks added |
+| 2026-11-16 | Agent (Wave 6) | **PII** → `PROPOSED` keyed HMAC at refresh; API key AuthN + docs off in Docker |

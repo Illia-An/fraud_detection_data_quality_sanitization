@@ -47,6 +47,21 @@ $env:IMAGE_TAG = "local"
 docker compose up -d
 ```
 
+## TLS at the proxy (Wave 6 / S-09)
+
+The app container speaks **HTTP** on port 8000. Terminate TLS at a reverse proxy
+(nginx / Traefik / IIS / corporate gateway) on the LAN edge:
+
+1. Publish only `https://<internal-host>/` to clients.
+2. Proxy to `http://127.0.0.1:8000` (or the compose service) on the host loopback / Docker network.
+3. Do not map host `0.0.0.0:8000` to the public NIC without the proxy ACL (see Wave 0 **NET**).
+4. Prefer HSTS on the proxy once the hostname is stable.
+
+## AuthN (Wave 6)
+
+Set `API_KEY` (and matching `VITE_API_KEY` at image build) so `/api/v1/*` returns 401
+without the key. `/health` and `/ready` stay open for probes.
+
 ## Branch protection (G-05)
 
 GitHub Settings → Branches → Protect `main`:

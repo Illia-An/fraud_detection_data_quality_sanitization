@@ -191,6 +191,9 @@ def test_sample_db_endpoint_503(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SANITIZATION_SOURCE", "view")
+    from sqlalchemy import create_engine
+
+    from backend.db_sample import ProcessSource
     from backend.queries import ActualBaseline, StorePeriodAggregate
 
     baseline = ActualBaseline(
@@ -222,6 +225,13 @@ def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> No
             description="from db",
         ),
     )
+    stub = ProcessSource(
+        engine=create_engine("sqlite:///:memory:"),
+        dialect="mssql",
+        query_b_mode="blacklist_only",
+        sanitization_source="view",
+    )
+    monkeypatch.setattr("backend.main.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
         "backend.main.load_actual_baseline_from_settings",
         lambda **_kwargs: baseline,
@@ -241,6 +251,9 @@ def test_process_db_source_runs_on_server(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_process_db_source_empty_period(monkeypatch: pytest.MonkeyPatch) -> None:
+    from sqlalchemy import create_engine
+
+    from backend.db_sample import ProcessSource
     from backend.queries import ActualBaseline
 
     empty = ActualBaseline(
@@ -249,6 +262,13 @@ def test_process_db_source_empty_period(monkeypatch: pytest.MonkeyPatch) -> None
         top_box_pct=0.0,
         by_store_period=(),
     )
+    stub = ProcessSource(
+        engine=create_engine("sqlite:///:memory:"),
+        dialect="mssql",
+        query_b_mode="blacklist_only",
+        sanitization_source="view",
+    )
+    monkeypatch.setattr("backend.main.resolve_process_source", lambda: stub)
     monkeypatch.setattr(
         "backend.main.load_actual_baseline_from_settings",
         lambda **_kwargs: empty,

@@ -1,6 +1,6 @@
 import { z, type ZodTypeAny } from 'zod';
 
-import { API_BASE_URL, API_PREFIX } from './config';
+import { API_BASE_URL, API_PREFIX, resolveApiKey } from './config';
 import {
   healthResponseSchema,
   pipelineConfigSchema,
@@ -63,6 +63,11 @@ export class ApiError extends Error {
   }
 }
 
+function apiAuthHeaders(): Record<string, string> {
+  const key = resolveApiKey();
+  return key ? { 'X-API-Key': key } : {};
+}
+
 async function fetchJson<T extends ZodTypeAny>(
   url: string,
   schema: T,
@@ -73,6 +78,7 @@ async function fetchJson<T extends ZodTypeAny>(
     headers: {
       Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...apiAuthHeaders(),
       ...init?.headers,
     },
   });
