@@ -55,7 +55,10 @@ USER appuser
 
 EXPOSE 8000
 
+# Liveness only — stale/missing snapshot must not mark the container unhealthy (A009 / Wave 4.2).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-CMD ["sh", "-c", "uv run uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# uvicorn as PID 1 so Docker SIGTERM reaches the worker (A009 #1 / Wave 4.8).
+# PORT is fixed at 8000 in this image; override via compose port mapping.
+CMD ["/app/.venv/bin/uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

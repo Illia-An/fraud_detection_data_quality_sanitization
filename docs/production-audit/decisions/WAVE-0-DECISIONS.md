@@ -27,7 +27,7 @@ Where the owner has not signed, status is `PENDING` and the “Audit recommendat
 | ID | Decision | Audit refs | Audit recommendation | Status | Signed by / date | Notes |
 |----|----------|------------|----------------------|--------|------------------|-------|
 | **G-1** | Production data source | A001, A009 O-1, A012 | **Prod = snapshot-only; VIEW = dev only** | `SIGNED` | Owner / 2026-11-11 | Confirmed: prod always snapshot; VIEW only for local/dev |
-| **FRESH** | Snapshot freshness SLA | A002 O-1, A009 O-2 | Threshold for later `GET /ready` (Wave 4); value TBD (e.g. 7d / 14d / 30d) | `PENDING` | — | Placeholder until product/ops pick a number |
+| **FRESH** | Snapshot freshness SLA | A002 O-1, A009 O-2 | Threshold for `GET /ready` age gate | `PROPOSED` | Agent / 2026-11-16 | **14 days** engineering default for Wave 4 (`SNAPSHOT_MAX_AGE_DAYS`, default `14`). Owner may SIGN a different number later without code redesign. |
 | **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `DOCUMENTED` | Agent / 2026-11-16 | Procedure below; formal owner ACK still welcome before external exposure |
 | **PII** | Snapshot PII at rest | A003 S-04/S-05, A009 O-5 | **Either** keyed hash at refresh **or** signed disk-encryption / access waiver | `PENDING` | — | Choose one path before Wave 6; no implementation in this branch |
 | **ALERT** | Alert channel | A005 G-5, A009 O-3 | Where freshness / process failures page (email / Teams / other) | `PENDING` | — | Needed for Wave 4–5 ops; placeholder |
@@ -80,3 +80,4 @@ This is an **ops control**, not enforced by application code.
 | 2026-11-11 | Agent (Wave 0) | Register created; all rows `PENDING`; audit recommendations copied, not assumed signed |
 | 2026-11-11 | Owner | **G-1 / W1-SRC** yes (prod snapshot-only); **W1-MID** (A) month normalize; **W1-VIEW** (B) allow + UI flag |
 | 2026-11-16 | Agent (Wave 3) | **NET** procedure documented; S-01 history = no rewrite (strip outputs only) |
+| 2026-11-16 | Agent (Wave 4) | **FRESH** → `PROPOSED` 14 days (`SNAPSHOT_MAX_AGE_DAYS`); used by `/ready` until owner SIGNED |

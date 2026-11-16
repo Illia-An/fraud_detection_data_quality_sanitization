@@ -503,6 +503,7 @@ def load_tier_candidates_from_settings(
 
 def process_source_meta_extra(source: ProcessSource | None = None) -> dict[str, Any]:
     """Optional meta keys for the resolved sanitization source."""
+    from backend.readiness import snapshot_freshness_fields
     from backend.snapshot import view_source_dev_warning
 
     src = source or resolve_process_source()
@@ -513,6 +514,10 @@ def process_source_meta_extra(source: ProcessSource | None = None) -> dict[str, 
             extra["source_warning"] = warning
         return extra
     try:
-        return meta_as_dict(read_meta(src.engine))
+        meta = read_meta(src.engine)
+        return {
+            **meta_as_dict(meta),
+            **snapshot_freshness_fields(meta.loaded_at),
+        }
     except DbSampleError:
         return {"sanitization_source": "snapshot"}

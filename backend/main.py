@@ -6,7 +6,9 @@ from __future__ import annotations
 import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import AsyncIterator
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -21,8 +23,17 @@ from backend.db_sample import (
     load_db_sample_meta_from_settings,
     resolve_process_source,
 )
+from backend.observability import (
+    RequestIdMiddleware,
+    app_version,
+    configure_logging,
+    log_event,
+    log_shutdown,
+    log_startup,
+)
 from backend.period_bounds import normalize_snapshot_period
 from backend.profiler import profile_block, profiling_meta
+from backend.readiness import evaluate_readiness, snapshot_max_age_days
 from backend.report_schemas import ExcelReportRequest, to_excel_report_document
 from backend.queries import (
     load_actual_baseline_from_settings,
@@ -30,11 +41,12 @@ from backend.queries import (
     process_source_meta_extra,
 )
 from backend.request_limits import BodySizeLimitMiddleware
-from backend.snapshot import view_source_dev_warning
+from backend.snapshot import SCHEMA_VERSION, get_sanitization_source, view_source_dev_warning
 from backend.schemas import (
     HealthResponse,
     PipelineConfig,
     ProcessRequest,
+    ReadyResponse,
     SanitizationResponse,
     SampleResponse,
     SamplePresetMeta,
@@ -117,25 +129,57 @@ def _plan_store() -> PlanStore:
     return PlanStore(default_plan_store_path(_ROOT))
 
 
-def create_app() -> FastAPI:
-    app = FastAPI(
-        title="Fraud Guard Sanitization PoC",
-        version="0.1.0",
-        description="Tier 1/2 survey sanitization pipeline",
-    )
+def _startup_log_fields() -> dict:
+    """Safe startup diagnostics (no paths, credentials, or env dumps)."""
+    ready = evaluate_readiness()
+    return {
+        "sanitization_source": get_sanitization_source(),
+        "tts_kpi_source": os.environ.get("TTS_KPI_SOURCE", "synthetic").strip()
+        or "synthetic",
+        "schema_version_expected": SCHEMA_VERSION,
+        "snapshot_present": ready.snapshot_present,
+        "snapshot_schema_version": ready.schema_version,
+        "snapshot_row_count": ready.snapshot_row_count,
+        "snapshot_loaded_at": ready.snapshot_loaded_at,
+        "snapshot_age_s": ready.snapshot_age_s,
+        "snapshot_max_age_days": snapshot_max_age_days(),
+        "ready": ready.ok,
+        "ready_reasons": ready.reasons,
+    }
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    configure_logging()
     warning = view_source_dev_warning()
     if warning:
-        logger.warning(warning)
+        log_event("source_warning", level=logging.WARNING, message=warning)
+    log_startup(sources=_startup_log_fields())
+    try:
+        yield
+    finally:
+        log_shutdown()
 
-    # Outer middleware runs first for incoming requests (body size before CORS).
+
+def create_app() -> FastAPI:
+    configure_logging()
+    app = FastAPI(
+        title="Fraud Guard Sanitization PoC",
+        version=app_version(),
+        description="Tier 1/2 survey sanitization pipeline",
+        lifespan=_lifespan,
+    )
+
+    # Outer middleware runs first for incoming requests (body size → request id → CORS).
     app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(RequestIdMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Request-ID"],
     )
 
     @app.exception_handler(RequestValidationError)
@@ -151,7 +195,29 @@ def create_app() -> FastAPI:
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
-        return HealthResponse()
+        return HealthResponse(version=app_version())
+
+    @app.get(
+        "/ready",
+        response_model=ReadyResponse,
+        tags=["health"],
+        responses={
+            503: {
+                "description": "Snapshot missing, stale, empty, or schema mismatch",
+                "model": ReadyResponse,
+            }
+        },
+    )
+    def ready() -> JSONResponse:
+        """Data readiness (not liveness). Docker HEALTHCHECK stays on ``/health``."""
+        result = evaluate_readiness()
+        payload = ReadyResponse.model_validate(
+            result.to_dict(version=app_version())
+        ).model_dump(mode="json")
+        return JSONResponse(
+            status_code=200 if result.ok else 503,
+            content=payload,
+        )
 
     _PRESET_DESCRIPTIONS: dict[PresetName, str] = {
         "small": "2 stores × 2 months from 2026-01 — quick chart demo with Tier 1/2 signals",
@@ -390,7 +456,30 @@ def create_app() -> FastAPI:
                     db_query_b_time_ms=db_query_b_time_ms,
                 )
             )
-            return _as_sanitization_response(result, meta_extra=meta_extra)
+            response = _as_sanitization_response(result, meta_extra=meta_extra)
+            log_event(
+                "process_done",
+                source=str(meta_extra.get("source") or body.source),
+                sanitization_source=meta_extra.get("sanitization_source"),
+                query_b_mode=meta_extra.get("query_b_mode")
+                or response.meta.get("query_b_mode"),
+                period_start=meta_extra.get("period_start"),
+                period_end=meta_extra.get("period_end"),
+                rows_scanned=rows_scanned,
+                query_a_total_responses=meta_extra.get("query_a_total_responses"),
+                db_query_a_time_ms=db_query_a_time_ms,
+                db_query_b_time_ms=db_query_b_time_ms,
+                execution_time_ms=float(profile["execution_time_ms"]),
+                snapshot_loaded_at=meta_extra.get("snapshot_loaded_at"),
+                snapshot_age_s=meta_extra.get("snapshot_age_s"),
+                enabled_tiers={
+                    "tier1_blacklist": body.config.tier1_blacklist_enabled,
+                    "tier2_freq": body.config.tier2_freq_enabled,
+                    "tier3_always_five": body.config.tier3_always_five_enabled,
+                    "tier4": body.config.tier4_enabled,
+                },
+            )
+            return response
         except HTTPException:
             raise
         except DbSampleError as exc:
