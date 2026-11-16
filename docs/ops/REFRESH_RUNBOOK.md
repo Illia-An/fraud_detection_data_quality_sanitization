@@ -13,6 +13,18 @@
 3. `uv` + project deps on the **host** (refresh does not run inside the read-only container mount).
 4. Know how to page the **ALERT** channel (Wave 0 still PENDING — record who to call).
 
+## Pre-Wave-2 file (schema_version missing)
+
+If `/process` or the UI says `schema_version mismatch (found=None, expected='1')`
+and a full pull is not possible yet (`DATABASE_URL` / VPN unavailable), stamp meta only:
+
+```powershell
+uv run python scripts/stamp_snapshot_schema.py
+```
+
+This does **not** re-download rows and does **not** hash PII. Run a full refresh when
+the source DB is reachable.
+
 ## Q10012 refresh
 
 ```powershell
