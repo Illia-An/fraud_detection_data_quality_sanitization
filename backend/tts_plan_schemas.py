@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from backend.plan_schemas import MonthScoreOut, StoreProjectionOut
+from backend.request_limits import max_plan_baseline_rows
 from planner.tts_bounds import (
     TTS_CEILING_MIN,
     TTS_DEFAULT_MAX_MONTHLY_IMPROVE,
@@ -79,6 +80,9 @@ class TtsPlanRequest(BaseModel):
 
     @model_validator(mode="after")
     def _target_must_improve(self) -> TtsPlanRequest:
+        limit = max_plan_baseline_rows()
+        if len(self.baseline_rows) > limit:
+            raise ValueError(f"baseline_rows exceeds limit of {limit}")
         scores = [row.tts for row in self.baseline_rows]
         current = sum(scores) / len(scores)
         if self.target > current + 1e-9:

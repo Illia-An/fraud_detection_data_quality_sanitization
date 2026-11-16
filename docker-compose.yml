@@ -25,6 +25,10 @@ services:
       API_KEY: ${API_KEY:-}
       PII_HMAC_KEY: ${PII_HMAC_KEY:-}
       ENABLE_DOCS: ${ENABLE_DOCS:-0}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      PROCESS_ALLOW_INLINE: ${PROCESS_ALLOW_INLINE:-1}
+      PROFILE_TRACEMALLOC: ${PROFILE_TRACEMALLOC:-0}
+      PROCESS_RESULT_CACHE: ${PROCESS_RESULT_CACHE:-1}
     logging:
       driver: json-file
       options:

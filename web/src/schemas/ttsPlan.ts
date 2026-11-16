@@ -51,7 +51,7 @@ export const ttsPlanRequestSchema = z.object({
     .max(TTS_PLAN_TARGET_MAX)
     .default(TTS_PLAN_DEFAULT_TARGET),
   params: ttsPlanParamsSchema.default({}),
-  baseline_rows: z.array(ttsPlanBaselineRowSchema).min(1),
+  baseline_rows: z.array(ttsPlanBaselineRowSchema).min(1).max(2_000),
 });
 
 export type TtsPlanRequest = z.output<typeof ttsPlanRequestSchema>;

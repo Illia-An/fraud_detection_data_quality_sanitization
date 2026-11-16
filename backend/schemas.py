@@ -18,6 +18,11 @@ from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.request_limits import (
+    HARD_MAX_PROCESS_ROWS,
+    inline_allowed,
+    max_process_rows,
+)
 from schemas import PipelineConfig, SanitizationResponse, StepMetric
 
 
@@ -67,9 +72,9 @@ __all__ = [
 
 
 class SurveyAnswerRow(BaseModel):
-    """One answered survey row. Extra columns are preserved for downstream mapping."""
+    """One answered survey row. Unknown client fields are ignored (Wave 9 / P-05)."""
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     ParticipateNumber: str | None = None
     Question_ID: int = Field(default=10012, ge=1)
@@ -99,8 +104,10 @@ class ProcessRequest(BaseModel):
     """
 
     source: Literal["inline", "db"] = "inline"
-    # Wave 3 / S-06 baseline: lower than research 500k; override via PROCESS_MAX_ROWS.
-    rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=50_000)
+    # Hard OpenAPI ceiling; operational default 15k via max_process_rows() (Wave 9).
+    rows: list[SurveyAnswerRow] = Field(
+        default_factory=list, max_length=HARD_MAX_PROCESS_ROWS
+    )
     config: PipelineConfig = Field(default_factory=PipelineConfig)
     from_date: date | None = Field(
         default=None,
@@ -113,8 +120,13 @@ class ProcessRequest(BaseModel):
 
     @model_validator(mode="after")
     def require_rows_for_inline(self) -> ProcessRequest:
+        if self.source == "inline" and not inline_allowed():
+            raise ValueError("inline source is disabled (PROCESS_ALLOW_INLINE=0)")
         if self.source == "inline" and not self.rows:
             raise ValueError("rows must not be empty")
+        limit = max_process_rows()
+        if len(self.rows) > limit:
+            raise ValueError(f"rows exceeds limit of {limit}")
         if (
             self.from_date is not None
             and self.to_date is not None

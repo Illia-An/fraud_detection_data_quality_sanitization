@@ -42,12 +42,14 @@ ENV PYTHONUNBUFFERED=1 \
     PLAN_STORE_PATH=/app/data/plan_store/plans.sqlite \
     API_CORS_ORIGINS=http://localhost:8000 \
     ENABLE_DOCS=0 \
-    PORT=8000
+    PORT=8000 \
+    UVICORN_WORKERS=1
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY backend ./backend
 COPY db ./db
+COPY scripts/docker_entrypoint.py /app/scripts/docker_entrypoint.py
 RUN uv sync --frozen --no-dev
 
 COPY --from=frontend /web/dist ./web/dist
@@ -63,6 +65,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-# uvicorn as PID 1 so Docker SIGTERM reaches the worker (A009 #1 / Wave 4.8).
+# Entrypoint stays PID 1 (SIGTERM → uvicorn). UVICORN_WORKERS=2..4 for scale (Wave 9).
 # PORT is fixed at 8000 in this image; override via compose port mapping.
-CMD ["/app/.venv/bin/uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["python", "/app/scripts/docker_entrypoint.py"]

@@ -35,6 +35,11 @@ from fraud_guard.tier2 import (
 from backend.db_sample import DEFAULT_FROM_DATE, DbSampleQuery
 from backend.data_access import resolve_process_source
 from backend.period_bounds import normalize_snapshot_period
+from backend.process_cache import (
+    get_process_result_cache,
+    make_process_cache_key,
+    process_result_cache_enabled,
+)
 from backend.profiler import profile_block, profiling_meta
 from backend.queries import (
     ActualBaseline,
@@ -772,7 +777,7 @@ class ProcessOutcome:
     db_query_a_time_ms: float | None
     db_query_b_time_ms: float | None
     execution_time_ms: float
-    peak_memory_mb: float
+    peak_memory_mb: float | None
 
 
 def run_process_db(body: ProcessRequest) -> tuple[SanitizationResponse, dict, int, float | None, float | None]:
@@ -843,8 +848,83 @@ def run_process_db(body: ProcessRequest) -> tuple[SanitizationResponse, dict, in
     return result, meta_extra, len(sample.rows), db_query_a_time_ms, db_query_b_time_ms
 
 
+_CACHE_META_SKIP = frozenset(
+    {
+        "execution_time_ms",
+        "peak_memory_mb",
+        "rows_scanned",
+        "db_query_a_time_ms",
+        "db_query_b_time_ms",
+        "result_cache",
+    }
+)
+
+
+def _outcome_from_profile(
+    *,
+    result: SanitizationResponse,
+    meta_extra: dict,
+    rows_scanned: int,
+    db_query_a_time_ms: float | None,
+    db_query_b_time_ms: float | None,
+    profile: dict,
+    result_cache: str,
+) -> ProcessOutcome:
+    peak_raw = profile.get("peak_memory_mb")
+    peak_memory_mb = float(peak_raw) if peak_raw is not None else None
+    meta_extra = {
+        **meta_extra,
+        **profiling_meta(
+            execution_time_ms=float(profile["execution_time_ms"]),
+            peak_memory_mb=peak_memory_mb,
+            rows_scanned=rows_scanned,
+            db_query_a_time_ms=db_query_a_time_ms,
+            db_query_b_time_ms=db_query_b_time_ms,
+        ),
+        "result_cache": result_cache,
+    }
+    return ProcessOutcome(
+        result=result,
+        meta_extra=meta_extra,
+        rows_scanned=rows_scanned,
+        db_query_a_time_ms=db_query_a_time_ms,
+        db_query_b_time_ms=db_query_b_time_ms,
+        execution_time_ms=float(profile["execution_time_ms"]),
+        peak_memory_mb=peak_memory_mb,
+    )
+
+
 def run_process(body: ProcessRequest) -> ProcessOutcome:
-    """Orchestrate inline or db sanitization without FastAPI (Wave 7 / A-07)."""
+    """Orchestrate inline or db sanitization without FastAPI (Wave 7 / A-07).
+
+    Wave 9 / P-04: optional LRU cache for snapshot ``source=db`` results.
+    """
+    cache_key: str | None = None
+    if body.source == "db" and process_result_cache_enabled():
+        src = resolve_process_source()
+        if src.sanitization_source == "snapshot":
+            from backend.snapshot import read_meta
+
+            loaded_at = read_meta(src.engine).loaded_at
+            cache_key = make_process_cache_key(
+                body, snapshot_loaded_at=loaded_at
+            )
+            cached = get_process_result_cache().get(cache_key)
+            if cached is not None:
+                result, meta_extra = cached
+                with profile_block() as profile:
+                    pass
+                rows_scanned = int(meta_extra.get("query_b_candidate_rows") or 0)
+                return _outcome_from_profile(
+                    result=result,
+                    meta_extra=meta_extra,
+                    rows_scanned=rows_scanned,
+                    db_query_a_time_ms=meta_extra.get("db_query_a_time_ms"),
+                    db_query_b_time_ms=meta_extra.get("db_query_b_time_ms"),
+                    profile=profile,
+                    result_cache="hit",
+                )
+
     with profile_block() as profile:
         db_query_a_time_ms: float | None = None
         db_query_b_time_ms: float | None = None
@@ -857,21 +937,24 @@ def run_process(body: ProcessRequest) -> ProcessOutcome:
             rows_scanned = int(result.meta.get("input_rows", len(body.rows)))
             meta_extra = {}
 
-    meta_extra.update(
-        profiling_meta(
-            execution_time_ms=float(profile["execution_time_ms"]),
-            peak_memory_mb=float(profile["peak_memory_mb"]),
-            rows_scanned=rows_scanned,
-            db_query_a_time_ms=db_query_a_time_ms,
-            db_query_b_time_ms=db_query_b_time_ms,
-        )
-    )
-    return ProcessOutcome(
+    outcome = _outcome_from_profile(
         result=result,
         meta_extra=meta_extra,
         rows_scanned=rows_scanned,
         db_query_a_time_ms=db_query_a_time_ms,
         db_query_b_time_ms=db_query_b_time_ms,
-        execution_time_ms=float(profile["execution_time_ms"]),
-        peak_memory_mb=float(profile["peak_memory_mb"]),
+        profile=profile,
+        result_cache="miss" if cache_key else "bypass",
     )
+    if cache_key is not None and outcome.meta_extra.get("sanitization_source") == "snapshot":
+        to_store = {
+            k: v for k, v in outcome.meta_extra.items() if k not in _CACHE_META_SKIP
+        }
+        # Keep original query timings on subsequent hits for process_done clarity.
+        if db_query_a_time_ms is not None:
+            to_store["db_query_a_time_ms"] = db_query_a_time_ms
+        if db_query_b_time_ms is not None:
+            to_store["db_query_b_time_ms"] = db_query_b_time_ms
+        to_store["query_b_candidate_rows"] = rows_scanned
+        get_process_result_cache().put(cache_key, outcome.result, to_store)
+    return outcome
