@@ -131,6 +131,16 @@ export function PipelineRunPanel({
         </Alert>
       )}
 
+      {showResults && displayResult?.meta?.tiers_23_skipped === true ? (
+        <Alert
+          severity="warning"
+          data-testid="sanitization-tiers23-skipped"
+          sx={{ py: 0.5, flexShrink: 0 }}
+        >
+          {t('sanitization.tiers23Skipped')}
+        </Alert>
+      ) : null}
+
       {showScenarioChrome || (showResults && displayResult) ? (
         <Box
           data-testid="sanitization-glance-row"

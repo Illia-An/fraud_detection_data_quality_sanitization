@@ -144,4 +144,22 @@ describe('PipelineRunPanel', () => {
     renderPanel(makeRunner({ isPending: true, displayResult: null }));
     expect(screen.getByText('Running scenario…')).toBeInTheDocument();
   });
+
+  it('shows VIEW tiers 2–3 skipped warning from meta', () => {
+    renderPanel(
+      makeRunner({
+        displayResult: {
+          ...processResult,
+          meta: {
+            ...processResult.meta,
+            tiers_23_skipped: true,
+            tiers_23_skip_reason: 'view_blacklist_only',
+          },
+        },
+      }),
+    );
+    expect(screen.getByTestId('sanitization-tiers23-skipped')).toHaveTextContent(
+      /Tiers 2–3 were not applied/i,
+    );
+  });
 });

@@ -80,12 +80,34 @@ class SnapshotMeta:
     from_date: str | None
 
 
+def running_in_docker() -> bool:
+    """Best-effort Docker detection for G-1 / Wave 1.4 warnings."""
+    if os.environ.get("RUNNING_IN_DOCKER", "").strip() in ("1", "true", "yes"):
+        return True
+    return Path("/.dockerenv").exists()
+
+
 def get_sanitization_source() -> SanitizationSource:
-    """Resolve ``SANITIZATION_SOURCE`` (default ``view``)."""
-    raw = os.environ.get("SANITIZATION_SOURCE", "view").strip().lower()
+    """Resolve ``SANITIZATION_SOURCE`` (default ``snapshot`` per G-1)."""
+    raw = os.environ.get("SANITIZATION_SOURCE", "snapshot").strip().lower()
     if raw in ("snapshot", "sqlite"):
         return "snapshot"
     return "view"
+
+
+def view_source_dev_warning() -> str | None:
+    """Warn when VIEW is used outside Docker (dev-only per G-1)."""
+    if get_sanitization_source() != "view":
+        return None
+    if running_in_docker():
+        return (
+            "SANITIZATION_SOURCE=view inside Docker; production policy (G-1) is "
+            "snapshot-only"
+        )
+    return (
+        "SANITIZATION_SOURCE=view (dev only per G-1); production uses snapshot. "
+        "Tiers 2–3 are not applied on VIEW."
+    )
 
 
 def resolve_snapshot_url() -> str:

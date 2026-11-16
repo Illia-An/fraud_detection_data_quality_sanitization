@@ -15,16 +15,17 @@ from backend.db_sample import (
     VIEW_NAME,
     DbSampleError,
     DbSampleQuery,
+    ProcessSource,
     SqlDialect,
     _period_params,
     _process_engine,
     redact_row,
+    resolve_process_source,
 )
 from backend.schemas import PipelineConfig, SamplePresetMeta, SampleResponse, SurveyAnswerRow
 from backend.snapshot import (
     ANSWERS_TABLE,
     STORE_MONTH_TABLE,
-    get_sanitization_source,
     meta_as_dict,
     read_meta,
 )
@@ -245,9 +246,13 @@ def load_actual_baseline_from_settings(
     period_start: date = DEFAULT_FROM_DATE,
     period_end: date | None = None,
     store_ids: Sequence[int | float] | None = None,
+    *,
+    engine: Engine | None = None,
+    dialect: SqlDialect | None = None,
 ) -> ActualBaseline:
     """Query A via VIEW or snapshot engine from settings."""
-    engine, dialect = _process_engine()
+    if engine is None or dialect is None:
+        engine, dialect = _process_engine()
     return get_actual_baseline_aggregates(
         engine,
         period_start,
@@ -479,9 +484,13 @@ def load_tier_candidates_from_settings(
     period_end: date | None = None,
     config: PipelineConfig | None = None,
     store_ids: Sequence[int | float] | None = None,
+    *,
+    engine: Engine | None = None,
+    dialect: SqlDialect | None = None,
 ) -> SampleResponse:
     """Query B via VIEW or snapshot engine from settings."""
-    engine, dialect = _process_engine()
+    if engine is None or dialect is None:
+        engine, dialect = _process_engine()
     return get_tier_candidate_rows(
         engine,
         period_start,
@@ -492,14 +501,18 @@ def load_tier_candidates_from_settings(
     )
 
 
-def process_source_meta_extra() -> dict[str, Any]:
-    """Optional meta keys when ``SANITIZATION_SOURCE=snapshot``."""
-    if get_sanitization_source() != "snapshot":
-        return {"sanitization_source": "view"}
-    try:
-        from backend.snapshot import require_snapshot_engine
+def process_source_meta_extra(source: ProcessSource | None = None) -> dict[str, Any]:
+    """Optional meta keys for the resolved sanitization source."""
+    from backend.snapshot import view_source_dev_warning
 
-        engine = require_snapshot_engine()
-        return meta_as_dict(read_meta(engine))
+    src = source or resolve_process_source()
+    if src.sanitization_source != "snapshot":
+        extra: dict[str, Any] = {"sanitization_source": "view"}
+        warning = view_source_dev_warning()
+        if warning:
+            extra["source_warning"] = warning
+        return extra
+    try:
+        return meta_as_dict(read_meta(src.engine))
     except DbSampleError:
         return {"sanitization_source": "snapshot"}
