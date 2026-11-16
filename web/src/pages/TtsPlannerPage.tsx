@@ -1,5 +1,3 @@
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import UndoRoundedIcon from '@mui/icons-material/UndoRounded';
@@ -16,7 +14,6 @@ import {
   Chip,
   CircularProgress,
   FormControl,
-  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -26,19 +23,11 @@ import {
   Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useTheme } from '@mui/material/styles';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { postExcelReport } from '../api/client';
 import { useLoadTtsKpiFromAp, useTtsPlan } from '../api/hooks';
-import {
-  activeAnswerLabelKey,
-  type ActiveAnswer,
-} from '../components/planner/activeAnswer';
-import {
-  createAnswerUndoSnapshot,
-  type AnswerUndoSnapshot,
-} from '../components/planner/answerUndo';
+import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
@@ -52,7 +41,6 @@ import {
   ttsPlannerRunBlockReason,
 } from '../components/ttsPlanner/ttsPlannerRunGuards';
 import { useT } from '../i18n';
-import { useOnboardingStore } from '../onboarding';
 import { periodLabel } from '../schemas/plan';
 import { buildPlanMonitoringInsights, defaultAsOf } from '../schemas/planMonitoring';
 import { getScenarioPack, type ScenarioPackId } from '../schemas/scenarioPacks';
@@ -71,21 +59,20 @@ import {
   TTS_PLAN_TARGET_MIN,
 } from '../schemas/ttsPlan';
 import {
-  PLANNER_RAIL_COLLAPSED_PX,
-  PLANNER_RAIL_WIDTH_PX,
+  PLANNER_AT_RISK_GAP_PX,
+  PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
 } from '../components/planner/plannerShell';
+import { PlannerAtRiskDock } from '../components/planner/PlannerAtRiskDock';
+import { PlannerPageShell } from '../components/planner/PlannerPageShell';
+import { useAnswerShell } from '../components/planner/useAnswerShell';
+import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
+import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { useTtsPlannerScenarioStore } from '../store/ttsPlannerScenarioStore';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 
 const TTS_FLOOR = TTS_PLAN_TARGET_MIN;
 const TTS_CEILING = TTS_PLAN_TARGET_MAX;
 const TTS_MONITOR_BAND_MIN = 0.05;
-/** Default Plan controls month when the loaded panel contains it. */
-const PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;
-const AT_RISK_SUMMARY_RESERVE_PX = 80;
-const AT_RISK_GAP_PX = 12;
-const AT_RISK_OVERLAY_MAX_HEIGHT = '45vh';
-
 function clampTarget(raw: string, fallback: number): number {
   const n = Number(raw);
   if (!Number.isFinite(n)) {
@@ -136,7 +123,6 @@ function meanMinutes(rows: { tts: number }[]): number | null {
 
 export function TtsPlannerPage() {
   const t = useT();
-  const theme = useTheme();
   const loadAp = useLoadTtsKpiFromAp();
   const planMutation = useTtsPlan();
   const draftPlan = useTtsPlannerScenarioStore((state) => state.draftPlan);
@@ -156,8 +142,6 @@ export function TtsPlannerPage() {
     CONTROLS_RAIL_ROUTE.ttsPlanner,
   );
   const apLoadStarted = useRef(false);
-  const [referenceYear, setReferenceYear] = useState<number | null>(null);
-  const [referenceMonth, setReferenceMonth] = useState<number | null>(null);
   const [target, setTarget] = useState(TTS_PLAN_DEFAULT_TARGET);
   const [targetText, setTargetText] = useState(String(TTS_PLAN_DEFAULT_TARGET));
   const [horizon, setHorizon] = useState(12);
@@ -167,57 +151,29 @@ export function TtsPlannerPage() {
   const [trajectory, setTrajectory] = useState<'uniform' | 'front_loaded' | 'accelerated'>(
     'uniform',
   );
-  const [pendingPackId, setPendingPackId] = useState<ScenarioPackId | null>(null);
-  const [pendingMixId, setPendingMixId] = useState<StoreMixQuestionId | null>(null);
-  const [activeAnswer, setActiveAnswer] = useState<ActiveAnswer | null>(null);
-  const [mixNote, setMixNote] = useState<string | null>(null);
-  const [answerUndo, setAnswerUndo] = useState<AnswerUndoSnapshot<TtsPlan, TtsPlanParams> | null>(
-    null,
-  );
+  const {
+    pendingPackId,
+    setPendingPackId,
+    pendingMixId,
+    setPendingMixId,
+    activeAnswer,
+    setActiveAnswer,
+    mixNote,
+    setMixNote,
+    answerUndo,
+    resetAnswerState,
+    captureUndo,
+    clearUndo,
+    consumeUndo,
+  } = useAnswerShell<TtsPlan, TtsPlanParams>();
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
   const [excelExporting, setExcelExporting] = useState(false);
   const [excelExportError, setExcelExportError] = useState(false);
 
-  const onboardingStatus = useOnboardingStore((s) => s.status);
-  const onboardingStepId = useOnboardingStore((s) => s.stepId);
-
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
-  useEffect(() => {
-    if (onboardingStatus !== 'active') {
-      return;
-    }
-    if (onboardingStepId === 'tts-planner-levers') {
-      setControlsOpen(true);
-      setAtRiskExpanded(false);
-      return;
-    }
-    if (onboardingStepId === 'tts-planner-hero') {
-      setAtRiskExpanded(false);
-      const timerId = window.setTimeout(() => {
-        document
-          .querySelector<HTMLElement>('[data-onboarding="tts-planner-hero"]')
-          ?.scrollIntoView({ block: 'center', behavior: 'auto' });
-      }, 80);
-      return () => window.clearTimeout(timerId);
-    }
-    if (onboardingStepId === 'tts-planner-at-risk' || onboardingStepId === 'tts-planner-inspect') {
-      setAtRiskExpanded(true);
-      // After Accordion opens, bring the sheet into view for spotlight.
-      const timerId = window.setTimeout(() => {
-        document
-          .querySelector<HTMLElement>('[data-onboarding="tts-planner-at-risk"]')
-          ?.scrollIntoView({ block: 'end', behavior: 'smooth' });
-        if (onboardingStepId === 'tts-planner-inspect') {
-          document
-            .querySelector<HTMLElement>('[data-onboarding="tts-planner-inspect"]')
-            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
-      }, 80);
-      return () => window.clearTimeout(timerId);
-    }
-  }, [onboardingStatus, onboardingStepId, setControlsOpen]);
+  usePlannerOnboardingShell({ prefix: 'tts-planner', setControlsOpen, setAtRiskExpanded });
 
   const params: TtsPlanParams = {
     trajectory,
@@ -229,24 +185,8 @@ export function TtsPlannerPage() {
 
   const refs = useMemo(() => (panel ? referencesOf(panel) : []), [panel]);
 
-  useEffect(() => {
-    if (refs.length === 0) {
-      return;
-    }
-    const selectionOk =
-      referenceYear != null &&
-      referenceMonth != null &&
-      refs.some((ref) => ref.year === referenceYear && ref.month === referenceMonth);
-    if (selectionOk) {
-      return;
-    }
-    const preferred = refs.find(
-      (ref) => ref.year === PREFERRED_REFERENCE.year && ref.month === PREFERRED_REFERENCE.month,
-    );
-    const next = preferred ?? refs[refs.length - 1];
-    setReferenceYear(next.year);
-    setReferenceMonth(next.month);
-  }, [refs, referenceYear, referenceMonth]);
+  const { referenceYear, referenceMonth, setReferenceYear, setReferenceMonth } =
+    useReferenceSelection(refs);
 
   const effectiveYear = referenceYear ?? panel?.reference_year ?? null;
   const effectiveMonth = referenceMonth ?? panel?.reference_month ?? null;
@@ -256,8 +196,6 @@ export function TtsPlannerPage() {
       : [];
   const currentChain = meanMinutes(baselineRows);
   const baselineReady = panel != null && panel.row_count > 0;
-  const railWidth = controlsOpen ? PLANNER_RAIL_WIDTH_PX : PLANNER_RAIL_COLLAPSED_PX;
-
   const directionKey =
     currentChain == null
       ? null
@@ -287,13 +225,11 @@ export function TtsPlannerPage() {
     (next: TtsKpiPanel) => {
       clearAll();
       setPanel(next);
-      setActiveAnswer(null);
-      setMixNote(null);
-      setAnswerUndo(null);
+      resetAnswerState();
       setAsOfYear(null);
       setAsOfMonth(null);
     },
-    [clearAll, setPanel],
+    [clearAll, setPanel, resetAnswerState],
   );
 
   useEffect(() => {
@@ -304,25 +240,13 @@ export function TtsPlannerPage() {
     loadAp.mutate(undefined, { onSuccess: applyLoadedPanel });
   }, [panel, loadAp, applyLoadedPanel]);
 
-  const captureAnswerUndo = (): AnswerUndoSnapshot<TtsPlan, TtsPlanParams> => {
-    const snap = createAnswerUndoSnapshot({
-      plan: draftPlan,
-      activeAnswer,
-      params,
-      mixNote,
-    });
-    setAnswerUndo(snap);
-    return snap;
-  };
+  const captureAnswerUndo = () => captureUndo({ plan: draftPlan, params });
 
   const handleUndoAnswer = () => {
-    if (!answerUndo) {
+    const snap = consumeUndo();
+    if (!snap) {
       return;
     }
-    const snap = answerUndo;
-    setAnswerUndo(null);
-    setActiveAnswer(snap.activeAnswer);
-    setMixNote(snap.mixNote);
     setTrajectory(snap.params.trajectory);
     setPriorityPower(snap.params.priority_power);
     setMaxMonthly(snap.params.max_monthly_improve);
@@ -401,7 +325,7 @@ export function TtsPlannerPage() {
           setTrajectory(undoSnap.params.trajectory);
           setPriorityPower(undoSnap.params.priority_power);
           setMaxMonthly(undoSnap.params.max_monthly_improve);
-          setAnswerUndo(null);
+          clearUndo();
         },
       },
     );
@@ -461,7 +385,7 @@ export function TtsPlannerPage() {
           setTrajectory(undoSnap.params.trajectory);
           setPriorityPower(undoSnap.params.priority_power);
           setMaxMonthly(undoSnap.params.max_monthly_improve);
-          setAnswerUndo(null);
+          clearUndo();
         },
       },
     );
@@ -533,78 +457,12 @@ export function TtsPlannerPage() {
   };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: { xs: 'column', md: 'row' },
-        flex: 1,
-        minHeight: 0,
-        height: { xs: 'auto', md: '100%' },
-        overflow: { xs: 'auto', md: 'hidden' },
-        gap: { xs: 2, md: 0 },
-      }}
-    >
-      <Box
-        component="aside"
-        data-testid="tts-controls-rail"
-        sx={{
-          width: { xs: '100%', md: railWidth },
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          minHeight: { md: 0 },
-          overflow: { md: 'hidden' },
-          borderRight: { md: 1 },
-          borderColor: { md: 'divider' },
-          pr: { md: controlsOpen ? 2 : 0.5 },
-          mr: { md: controlsOpen ? 2 : 1 },
-          transition: theme.transitions.create(['width', 'padding', 'margin'], {
-            easing: theme.transitions.easing.sharp,
-            duration: theme.transitions.duration.enteringScreen,
-          }),
-        }}
-      >
-        <Box
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            justifyContent: controlsOpen ? 'flex-end' : 'center',
-            flexShrink: 0,
-            pb: 0.5,
-          }}
-        >
-          <Tooltip
-            title={controlsOpen ? t('common.collapseControls') : t('common.expandControls')}
-            placement="right"
-          >
-            <IconButton
-              size="small"
-              onClick={() => setControlsOpen((open) => !open)}
-              aria-label={
-                controlsOpen ? t('common.collapseControls') : t('common.expandControls')
-              }
-              aria-expanded={controlsOpen}
-            >
-              {controlsOpen ? (
-                <ChevronLeftIcon fontSize="small" />
-              ) : (
-                <ChevronRightIcon fontSize="small" />
-              )}
-            </IconButton>
-          </Tooltip>
-        </Box>
-
-        <Box
-          sx={{
-            display: { xs: 'flex', md: controlsOpen ? 'flex' : 'none' },
-            flexDirection: 'column',
-            flex: { md: 1 },
-            minHeight: { md: 0 },
-            overflowY: { xs: 'visible', md: 'hidden' },
-            overflowX: 'hidden',
-            gap: 1.5,
-            pb: 1,
-          }}
-        >
+    <PlannerPageShell
+      controlsOpen={controlsOpen}
+      onToggleControls={() => setControlsOpen((open) => !open)}
+      railTestId="tts-controls-rail"
+      rail={
+        <>
           {!baselineReady && (
             <Alert severity="info" data-testid="tts-planner-need-baseline">
               {t('ttsPlanner.needBaseline')}
@@ -907,22 +765,9 @@ export function TtsPlannerPage() {
               </Stack>
             </CardContent>
           </Card>
-        </Box>
-      </Box>
-
-      <Box
-        component="main"
-        sx={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          overflow: { xs: 'auto', md: 'hidden' },
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 1.5,
-          pb: { xs: 2, md: 0 },
-        }}
-      >
+        </>
+      }
+    >
         {!baselineReady && (
           <Alert severity="info" sx={{ flexShrink: 0 }}>
             {t('ttsPlanner.emptyWaiting')}
@@ -1036,7 +881,7 @@ export function TtsPlannerPage() {
                   overflow: 'hidden',
                   pb:
                     monitoring != null
-                      ? { md: `${AT_RISK_SUMMARY_RESERVE_PX + AT_RISK_GAP_PX}px` }
+                      ? { md: `${PLANNER_AT_RISK_SUMMARY_RESERVE_PX + PLANNER_AT_RISK_GAP_PX}px` }
                       : 0,
                 }}
               >
@@ -1101,63 +946,14 @@ export function TtsPlannerPage() {
               </Box>
 
               {monitoring && (
-                <Box
-                  data-testid="tts-planner-at-risk"
-                  data-onboarding="tts-planner-at-risk"
-                  sx={{
-                    position: { xs: 'relative', md: 'absolute' },
-                    left: { md: 0 },
-                    right: { md: 0 },
-                    bottom: { md: AT_RISK_GAP_PX },
-                    zIndex: { md: 3 },
-                    flexShrink: 0,
-                    maxHeight: { md: AT_RISK_OVERLAY_MAX_HEIGHT },
-                    overflow: { md: 'auto' },
-                    mt: { xs: `${AT_RISK_GAP_PX}px`, md: 0 },
-                    bgcolor: 'background.paper',
-                    border: 1,
-                    borderColor: 'divider',
-                    borderRadius: 1,
-                    boxShadow: { md: atRiskExpanded ? 8 : 2 },
-                  }}
+                <PlannerAtRiskDock
+                  testId="tts-planner-at-risk"
+                  onboardingId="tts-planner-at-risk"
+                  expanded={atRiskExpanded}
+                  onExpandedChange={setAtRiskExpanded}
+                  behindCount={monitoring.summary.behind}
+                  aheadCount={monitoring.summary.ahead}
                 >
-                  <Accordion
-                    disableGutters
-                    expanded={atRiskExpanded}
-                    onChange={(_event, expanded) => setAtRiskExpanded(expanded)}
-                    sx={{
-                      '&:before': { display: 'none' },
-                      boxShadow: 'none',
-                      bgcolor: 'transparent',
-                    }}
-                  >
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 48, py: 0.5 }}>
-                      <Box sx={{ minWidth: 0, pr: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {t('planner.atRiskTitle')}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap display="block">
-                          {t('planner.atRisk.behindChip', { count: monitoring.summary.behind })}
-                          {' · '}
-                          {t('planner.atRisk.aheadChip', { count: monitoring.summary.ahead })}
-                        </Typography>
-                      </Box>
-                    </AccordionSummary>
-                    <AccordionDetails
-                      sx={{
-                        px: 1.5,
-                        pt: 0,
-                        pb: 1,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        minHeight: 0,
-                        maxHeight: {
-                          xs: '46vh',
-                          md: `calc(${AT_RISK_OVERLAY_MAX_HEIGHT} - ${AT_RISK_SUMMARY_RESERVE_PX}px)`,
-                        },
-                        overflow: 'auto',
-                      }}
-                    >
                       <AtRiskDeltaTable
                         plan={draftPlan}
                         approvedPlan={approvedPlan}
@@ -1178,9 +974,7 @@ export function TtsPlannerPage() {
                         onInspect={(storeId) => selectStore(storeId)}
                         inspectOnboardingId="tts-planner-inspect"
                       />
-                    </AccordionDetails>
-                  </Accordion>
-                </Box>
+                </PlannerAtRiskDock>
               )}
             </Box>
           </Box>
@@ -1232,8 +1026,7 @@ export function TtsPlannerPage() {
             tickSuffix=" min"
           />
         )}
-      </Box>
-    </Box>
+    </PlannerPageShell>
   );
 }
 
