@@ -55,6 +55,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Production npm audit (critical gate)
+        run: npm run audit:prod
+
       - name: Lint
         run: npm run lint
 

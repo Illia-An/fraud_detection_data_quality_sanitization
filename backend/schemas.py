@@ -97,7 +97,8 @@ class ProcessRequest(BaseModel):
     """
 
     source: Literal["inline", "db"] = "inline"
-    rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=500_000)
+    # Wave 3 / S-06 baseline: lower than research 500k; override via PROCESS_MAX_ROWS.
+    rows: list[SurveyAnswerRow] = Field(default_factory=list, max_length=50_000)
     config: PipelineConfig = Field(default_factory=PipelineConfig)
     from_date: date | None = Field(
         default=None,
