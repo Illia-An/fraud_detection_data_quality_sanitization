@@ -131,6 +131,7 @@ describe('processResponseSchema / SanitizationResponse', () => {
 
   it('allows meta without peak_memory_mb (PROFILE_TRACEMALLOC off)', () => {
     const { peak_memory_mb: _peak, ...metaNoPeak } = processApiResponse.meta;
+    void _peak;
     const parsed = processResponseSchema.parse({
       ...processApiResponse,
       meta: metaNoPeak,

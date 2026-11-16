@@ -1,0 +1,14 @@
+# Wave 6 / CI — allow documented placeholder env examples (no real secrets).
+title = "fraud-dq-sanitization"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example env files with commented KEY= placeholders"
+paths = [
+  '''\.env\.docker\.example$''',
+  '''\.env\.example$''',
+  '''web/\.env\.example$''',
+  '''web/\.env\.docker$''',
+]

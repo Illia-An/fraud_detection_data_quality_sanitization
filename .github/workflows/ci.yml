@@ -51,7 +51,8 @@ jobs:
         run: uv run mypy src/planner
 
       - name: OpenAPI ↔ Zod critical keys (Wave 10 / C-01)
-        run: uv run python -m pytest tests/test_openapi_zod_contract.py -v
+        # --no-cov: addopts enables fail-under=80; this file alone covers ~40%.
+        run: uv run python -m pytest tests/test_openapi_zod_contract.py -v --no-cov
 
       - name: Run pytest (+ coverage gate T-08)
         run: uv run python -m pytest tests/ -v
