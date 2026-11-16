@@ -44,6 +44,12 @@ jobs:
       - name: pip-audit (Wave 6 / S-13)
         run: uvx pip-audit --progress-spinner off
 
+      - name: Ruff (Wave 8 / M-14)
+        run: uv run ruff check src backend db tests
+
+      - name: Mypy planner package (Wave 8 / M-14)
+        run: uv run mypy src/planner
+
       - name: Run pytest
         run: uv run python -m pytest tests/ -v
 

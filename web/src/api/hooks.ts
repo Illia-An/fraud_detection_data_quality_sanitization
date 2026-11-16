@@ -7,6 +7,7 @@ import {
   fetchTtsKpiFromAp,
   fetchTtsKpiPanel,
   fetchKitchenBeforeAfter,
+  fetchTtsPlanBounds,
   postPlan,
   postPlanVersion,
   postProcess,
@@ -103,6 +104,14 @@ export function useAdjustSimulation() {
 export function useTtsPlan() {
   return useMutation({
     mutationFn: (request: TtsPlanRequest) => postTtsPlan(request),
+  });
+}
+
+export function useTtsPlanBounds() {
+  return useQuery({
+    queryKey: ['tts-plan-bounds'],
+    queryFn: () => fetchTtsPlanBounds(),
+    staleTime: Infinity,
   });
 }
 

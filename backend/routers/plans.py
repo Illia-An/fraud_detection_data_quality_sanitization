@@ -24,13 +24,29 @@ from backend.plan_schemas import (
     PlanResponse,
     StoreProjectionOut,
 )
-from backend.tts_plan_schemas import TtsPlanOut, TtsPlanRequest, TtsPlanResponse
+from backend.tts_plan_schemas import (
+    TtsPlanBoundsOut,
+    TtsPlanOut,
+    TtsPlanRequest,
+    TtsPlanResponse,
+)
 from planner.cumulative_slope import build_baseline_plan, simulate
 from planner.cumulative_slope.plan_version import build_plan_version
 from planner.five_percent import plan_five_percent
 from planner.tts import plan_tts
+from planner.tts_bounds import tts_bounds_payload
 
 router = APIRouter(prefix=API_PREFIX)
+
+
+@router.get(
+    "/plans-tts/bounds",
+    response_model=TtsPlanBoundsOut,
+    tags=["plans-tts"],
+)
+def tts_plan_bounds() -> TtsPlanBoundsOut:
+    """Working TTS planner bounds (single backend source for FE / clients)."""
+    return TtsPlanBoundsOut.model_validate(tts_bounds_payload())
 
 
 @router.post(

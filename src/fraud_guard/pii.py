@@ -50,8 +50,11 @@ def ensure_pii_hashed(
 ) -> pd.DataFrame:
     """Return a copy with UserContact / PhoneFromLog hashed before grouping.
 
-    Idempotent for nulls; non-null values are always re-hashed (call once at
-    pipeline entry so entity keys stay stable within a run).
+    Call once at pipeline / tier-chain entry (Wave 8 / M-10). Subsequent tier
+    steps must not call this again on already-hashed columns — ``tier1``
+    ``_prepare_tier_frame`` skips re-hash when ``ENTITY_COL`` is present.
+    Idempotent for nulls only; hashing an already-hashed digest yields a new
+    digest and must be avoided mid-run.
     """
     out = df.copy()
     for col in (mapping.entity_key, mapping.phone_from_log):
