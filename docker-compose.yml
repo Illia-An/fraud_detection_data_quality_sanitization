@@ -19,9 +19,9 @@ services:
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:8000}
       FRONTEND_DIST_DIR: /app/web/dist
     volumes:
-      # Host snapshots (gitignored). Refresh via scripts/refresh_*_snapshot.py
-      - ./data/q10012_snapshot.sqlite:/app/data/q10012_snapshot.sqlite:ro
-      - ./data/tts_kpi_snapshot.sqlite:/app/data/tts_kpi_snapshot.sqlite:ro
-      # Baseline Plan versions (SPEC-P001) — read/write, separate from snapshots
+      # Mount data/ dir (Wave 2 / D-02) so atomic *.tmp → replace + *.prev work on host.
+      # Snapshots stay read-only in the container; refresh runs on the host.
+      - ./data:/app/data:ro
+      # Baseline Plan versions (SPEC-P001) — read/write overlay on the data mount
       - ./data/plan_store:/app/data/plan_store
     restart: unless-stopped
