@@ -167,6 +167,10 @@ def test_pushdown_kpi_parity_blacklist_only_four_decimals() -> None:
 
 
 def test_process_db_uses_query_b_candidates(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import MagicMock
+
+    from backend.db_sample import ProcessSource
+
     monkeypatch.setenv("SANITIZATION_SOURCE", "view")
     baseline = ActualBaseline(
         total_responses=4,
@@ -209,12 +213,28 @@ def test_process_db_uses_query_b_candidates(monkeypatch: pytest.MonkeyPatch) -> 
         ),
     )
     monkeypatch.setattr(
+        "backend.main.resolve_process_source",
+        lambda: ProcessSource(
+            engine=MagicMock(),
+            dialect="mssql",
+            query_b_mode="blacklist_only",
+            sanitization_source="view",
+        ),
+    )
+    monkeypatch.setattr(
         "backend.main.load_actual_baseline_from_settings",
         lambda **_k: baseline,
     )
     monkeypatch.setattr(
         "backend.main.load_tier_candidates_from_settings",
         lambda **_k: candidates,
+    )
+    monkeypatch.setattr(
+        "backend.main.process_source_meta_extra",
+        lambda _src=None: {
+            "sanitization_source": "view",
+            "source_warning": "SANITIZATION_SOURCE=view (dev only)",
+        },
     )
     client = TestClient(create_app())
     res = client.post("/api/v1/process", json={"source": "db", "config": {}})
@@ -228,3 +248,7 @@ def test_process_db_uses_query_b_candidates(monkeypatch: pytest.MonkeyPatch) -> 
     assert body["baseline_top_box_pct"] == 75.0
     assert body["final_top_box_pct"] == 50.0
     assert body["meta"]["query_b_mode"] == "blacklist_only"
+    # W1-VIEW B / T-06: tiers 2–3 requested by default but not applied on VIEW.
+    assert body["meta"]["tiers_23_skipped"] is True
+    assert body["meta"]["tiers_23_skip_reason"] == "view_blacklist_only"
+    assert body["meta"]["tiers_23_applied"] is False

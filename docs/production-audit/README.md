@@ -2,6 +2,13 @@
 
 Specs live in `specs/`. Implementation reports live in `reports/`.
 
+Production wave track (from [`PRODUCTION_PLAN.md`](../../PRODUCTION_PLAN.md)):
+
+| Kind | Path | Notes |
+|------|------|-------|
+| Decisions / runbook | [`decisions/WAVE-0-DECISIONS.md`](./decisions/WAVE-0-DECISIONS.md) | Owner sign-off; no silent G-1 |
+| Wave close-out reports | [`wave-reports/`](./wave-reports/) | What changed after each wave |
+
 ## Naming
 
 | Kind   | Pattern                | Example                          |

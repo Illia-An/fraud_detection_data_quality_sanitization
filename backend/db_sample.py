@@ -251,13 +251,39 @@ def _engine_from_settings() -> Engine:
         raise DbSampleError("Database is not available") from exc
 
 
-def _process_engine() -> tuple[Engine, SqlDialect]:
-    """Engine for ``source=db``: VIEW (mssql) or local snapshot (sqlite)."""
+@dataclass(frozen=True)
+class ProcessSource:
+    """Single resolution of sanitization source for one ``/process`` request."""
+
+    engine: Engine
+    dialect: SqlDialect
+    query_b_mode: str
+    sanitization_source: Literal["view", "snapshot"]
+
+
+def resolve_process_source() -> ProcessSource:
+    """One path for engine, dialect, and Query B mode (A-04 / Wave 1.1)."""
     from backend.snapshot import get_sanitization_source, require_snapshot_engine
 
     if get_sanitization_source() == "snapshot":
-        return require_snapshot_engine(), "sqlite"
-    return _engine_from_settings(), "mssql"
+        return ProcessSource(
+            engine=require_snapshot_engine(),
+            dialect="sqlite",
+            query_b_mode="tier1_full",
+            sanitization_source="snapshot",
+        )
+    return ProcessSource(
+        engine=_engine_from_settings(),
+        dialect="mssql",
+        query_b_mode="blacklist_only",
+        sanitization_source="view",
+    )
+
+
+def _process_engine() -> tuple[Engine, SqlDialect]:
+    """Engine for ``source=db``: VIEW (mssql) or local snapshot (sqlite)."""
+    src = resolve_process_source()
+    return src.engine, src.dialect
 
 
 def load_db_sample_meta_from_settings(query: DbSampleQuery | None = None) -> SampleResponse:

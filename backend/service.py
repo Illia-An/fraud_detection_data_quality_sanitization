@@ -473,6 +473,9 @@ def run_pipeline_pushdown(
     answered = filter_answered_metric_rows(raw) if not raw.empty else raw
 
     tiers_23_on_candidates = query_b_mode == "tier1_full"
+    tiers_23_requested = bool(
+        config.tier2_freq_enabled or config.tier3_always_five_enabled
+    )
     reconciliation = (
         "query_a_minus_tiers_1_3_candidate_drops_then_tier4_on_aggregates"
         if tiers_23_on_candidates
@@ -588,6 +591,15 @@ def run_pipeline_pushdown(
             "actual_total_responses": actual_baseline.total_responses,
             "actual_top_box_count": actual_baseline.top_box_count,
             "tiers_123_dropped_rows": tiers_123_dropped,
+            "tiers_23_applied": tiers_23_on_candidates and tiers_23_requested,
+            **(
+                {
+                    "tiers_23_skipped": True,
+                    "tiers_23_skip_reason": "view_blacklist_only",
+                }
+                if tiers_23_requested and not tiers_23_on_candidates
+                else {}
+            ),
         },
     )
 

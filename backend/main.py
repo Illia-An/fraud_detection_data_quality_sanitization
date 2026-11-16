@@ -19,16 +19,17 @@ from backend.db_sample import (
     DbSampleError,
     DbSampleQuery,
     load_db_sample_meta_from_settings,
+    resolve_process_source,
 )
+from backend.period_bounds import normalize_snapshot_period
 from backend.profiler import profile_block, profiling_meta
 from backend.report_schemas import ExcelReportRequest, to_excel_report_document
 from backend.queries import (
     load_actual_baseline_from_settings,
     load_tier_candidates_from_settings,
     process_source_meta_extra,
-    query_b_mode_for_dialect,
 )
-from backend.snapshot import get_sanitization_source
+from backend.snapshot import view_source_dev_warning
 from backend.schemas import (
     HealthResponse,
     PipelineConfig,
@@ -121,6 +122,10 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description="Tier 1/2 survey sanitization pipeline",
     )
+
+    warning = view_source_dev_warning()
+    if warning:
+        logger.warning(warning)
 
     app.add_middleware(
         CORSMiddleware,
@@ -288,8 +293,16 @@ def create_app() -> FastAPI:
                 db_query_a_time_ms: float | None = None
                 db_query_b_time_ms: float | None = None
                 if body.source == "db":
-                    period_start = body.from_date or DEFAULT_FROM_DATE
-                    period_end = body.to_date
+                    src = resolve_process_source()
+                    requested_start = body.from_date or DEFAULT_FROM_DATE
+                    requested_end = body.to_date
+                    period_start = requested_start
+                    period_end = requested_end
+                    period_normalized = False
+                    if src.sanitization_source == "snapshot":
+                        period_start, period_end, period_normalized = (
+                            normalize_snapshot_period(requested_start, requested_end)
+                        )
                     db_query = DbSampleQuery(
                         from_date=period_start,
                         to_date=period_end,
@@ -300,6 +313,8 @@ def create_app() -> FastAPI:
                     actual_baseline = load_actual_baseline_from_settings(
                         period_start=db_query.from_date,
                         period_end=db_query.to_date,
+                        engine=src.engine,
+                        dialect=src.dialect,
                     )
                     db_query_a_time_ms = round(
                         (time.perf_counter() - t_a) * 1000.0, 3
@@ -322,21 +337,17 @@ def create_app() -> FastAPI:
                         period_start=db_query.from_date,
                         period_end=db_query.to_date,
                         config=body.config,
+                        engine=src.engine,
+                        dialect=src.dialect,
                     )
                     db_query_b_time_ms = round(
                         (time.perf_counter() - t_b) * 1000.0, 3
-                    )
-                    # Snapshot → phase 2 full Tier1; VIEW → v1 blacklist-only.
-                    q_mode = query_b_mode_for_dialect(
-                        "sqlite"
-                        if get_sanitization_source() == "snapshot"
-                        else "mssql"
                     )
                     result = run_pipeline_pushdown(
                         actual_baseline,
                         sample.rows,
                         body.config,
-                        query_b_mode=q_mode,
+                        query_b_mode=src.query_b_mode,
                     )
                     rows_scanned = len(sample.rows)
                     meta_extra = {
@@ -351,7 +362,14 @@ def create_app() -> FastAPI:
                         "period_end": (
                             period_end.isoformat() if period_end is not None else None
                         ),
-                        **process_source_meta_extra(),
+                        "period_requested_start": requested_start.isoformat(),
+                        "period_requested_end": (
+                            requested_end.isoformat()
+                            if requested_end is not None
+                            else None
+                        ),
+                        "period_normalized_to_months": period_normalized,
+                        **process_source_meta_extra(src),
                     }
                 else:
                     result = run_pipeline(body)
