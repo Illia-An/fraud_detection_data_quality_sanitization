@@ -203,7 +203,7 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
 
   useEffect(() => {
     if (open && originalLast != null) {
-      setInputValue(formatScore(originalLast));
+      setInputValue(originalLast.toFixed(scoreDigits));
       setAppliedDraft(null);
       setPreview(null);
       setError(null);

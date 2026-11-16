@@ -18,6 +18,9 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
 # Same-origin API calls inside the monolith (web/.env.docker → empty VITE_API_BASE_URL).
+# Optional Wave 6 stop-gap: bake the same value as runtime API_KEY into the SPA.
+ARG VITE_API_KEY=
+ENV VITE_API_KEY=$VITE_API_KEY
 RUN npm run build -- --mode docker
 
 # ---- runtime ----
@@ -38,20 +41,30 @@ ENV PYTHONUNBUFFERED=1 \
     TTS_KPI_SNAPSHOT_URL=sqlite:///data/tts_kpi_snapshot.sqlite \
     PLAN_STORE_PATH=/app/data/plan_store/plans.sqlite \
     API_CORS_ORIGINS=http://localhost:8000 \
-    PORT=8000
+    ENABLE_DOCS=0 \
+    PORT=8000 \
+    UVICORN_WORKERS=1
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY backend ./backend
 COPY db ./db
+COPY scripts/docker_entrypoint.py /app/scripts/docker_entrypoint.py
 RUN uv sync --frozen --no-dev
 
 COPY --from=frontend /web/dist ./web/dist
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/data/plan_store \
+    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 
+# Liveness only — stale/missing snapshot must not mark the container unhealthy (A009 / Wave 4.2).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-CMD ["sh", "-c", "uv run uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Entrypoint stays PID 1 (SIGTERM → uvicorn). UVICORN_WORKERS=2..4 for scale (Wave 9).
+# PORT is fixed at 8000 in this image; override via compose port mapping.
+ENTRYPOINT ["python", "/app/scripts/docker_entrypoint.py"]

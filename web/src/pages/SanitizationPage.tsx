@@ -86,7 +86,7 @@ export function SanitizationPage() {
       }, 50);
       return () => window.clearTimeout(timerId);
     }
-  }, [onboardingStatus, onboardingStepId]);
+  }, [onboardingStatus, onboardingStepId, setControlsOpen]);
   const pendingRunConfigRef = useRef<PipelineConfig | null>(null);
   const pendingPackAnswerRef = useRef<SanitizationScenarioPackId | null>(null);
   const packsPanelRef = useRef<HTMLDivElement | null>(null);

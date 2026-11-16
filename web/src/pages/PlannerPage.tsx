@@ -97,10 +97,12 @@ import {
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
 import { useOnboardingStore } from '../onboarding';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
+import {
+  PLANNER_RAIL_COLLAPSED_PX,
+  PLANNER_RAIL_WIDTH_PX,
+} from '../components/planner/plannerShell';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
 
-const RAIL_WIDTH_PX = 320;
-const RAIL_COLLAPSED_PX = 40;
 /** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
 const COLLAPSED_PLAY_REVEAL_MS = 250;
 /** Collapsed At-risk summary height reserved so Hero is not covered on md. */
@@ -252,7 +254,7 @@ export function PlannerPage() {
       }, 80);
       return () => window.clearTimeout(timerId);
     }
-  }, [onboardingStatus, onboardingStepId]);
+  }, [onboardingStatus, onboardingStepId, setControlsOpen]);
 
   const panel = useMemo(() => {
     if (!processResult) {
@@ -283,7 +285,7 @@ export function PlannerPage() {
   const [activeAnswer, setActiveAnswer] = useState<ActiveAnswer | null>(null);
   const [answerUndo, setAnswerUndo] = useState<AnswerUndoSnapshot | null>(null);
 
-  const railWidth = controlsOpen ? RAIL_WIDTH_PX : RAIL_COLLAPSED_PX;
+  const railWidth = controlsOpen ? PLANNER_RAIL_WIDTH_PX : PLANNER_RAIL_COLLAPSED_PX;
 
   useEffect(() => {
     if (controlsOpen) {

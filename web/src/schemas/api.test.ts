@@ -101,7 +101,11 @@ describe('sampleResponseSchema', () => {
     const parsed = sampleResponseSchema.parse(sampleApiResponse);
     expect(parsed.preset).toBe('small');
     expect(parsed.meta.row_count).toBe(1);
-    expect(parsed.rows[0].ContactType).toBe('SMS');
+    expect(parsed.rows[0].ParticipateNumber).toBe('p-1');
+    // Wave 9 / P-05: unknown fields stripped (no passthrough).
+    expect(
+      (parsed.rows[0] as { ContactType?: string }).ContactType,
+    ).toBeUndefined();
   });
 
   it('rejects sample response missing meta fields', () => {
@@ -123,6 +127,17 @@ describe('processResponseSchema / SanitizationResponse', () => {
     expect(parsed.meta.peak_memory_mb).toBe(1.2);
     expect(parsed.meta.rows_scanned).toBe(100);
     expect(parsed.steps[0].top_box_pct).toBe(84.0);
+  });
+
+  it('allows meta without peak_memory_mb (PROFILE_TRACEMALLOC off)', () => {
+    const { peak_memory_mb: _peak, ...metaNoPeak } = processApiResponse.meta;
+    void _peak;
+    const parsed = processResponseSchema.parse({
+      ...processApiResponse,
+      meta: metaNoPeak,
+    });
+    expect(parsed.meta.execution_time_ms).toBe(12.5);
+    expect(parsed.meta.peak_memory_mb).toBeUndefined();
   });
 
   it('rejects missing echo_config', () => {

@@ -205,7 +205,17 @@ def _prepare_tier_frame(
     df: pd.DataFrame,
     mapping: ColumnMapping = RATE_GET_ANSWERS_MAPPING,
 ) -> pd.DataFrame:
-    """Hash PII and attach entity keys before any tier rule (Invariant 1)."""
+    """Attach entity keys before any tier rule (Invariant 1).
+
+    Hash PII once at first entry into the tier chain (Wave 8 / M-10). Later
+    steps that already carry ``ENTITY_COL`` reuse hashed contacts — do not
+    re-hash (would rotate entity keys mid-pipeline).
+    """
+    if ENTITY_COL in df.columns:
+        out = df.copy()
+        out[FLAG_COL] = False
+        out[REASON_COL] = ""
+        return out
     out = ensure_pii_hashed(df, mapping)
     out[FLAG_COL] = False
     out[REASON_COL] = ""

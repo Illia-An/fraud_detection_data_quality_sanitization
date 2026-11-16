@@ -6,7 +6,8 @@ Usage (repo root):
   uv run python scripts/refresh_q10012_snapshot.py --out data/q10012_snapshot.sqlite
 
 Requires DATABASE_URL (SQL Server VIEW). Writes local SQLite (may contain PII —
-never commit). Idempotent full rebuild of answers + store_month + snapshot_meta.
+never commit). Wave 2: build ``*.tmp``, run gates, write meta, ``os.replace``,
+keep ``*.prev`` copies. Idempotent full rebuild of answers + store_month + meta.
 """
 
 from __future__ import annotations
@@ -21,23 +22,22 @@ from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import text
 
-from backend.db_sample import (
+from backend.data_access import (
     DEFAULT_FROM_DATE,
     QUESTION_ID,
     VIEW_NAME,
-    _engine_from_settings,
+    engine_from_settings,
 )
-from backend.queries import TOP_BOX_VALUE
 from backend.snapshot import (
-    ANSWERS_TABLE,
     DEFAULT_SNAPSHOT_PATH,
-    STORE_MONTH_TABLE,
-    get_snapshot_engine,
-    init_snapshot_schema,
+    get_snapshot_engine_at,
+    read_meta,
     resolve_snapshot_path,
-    set_meta,
     utc_now_iso,
 )
+from backend.snapshot_gates import SnapshotGateError, validate_snapshot_gates
+from backend.snapshot_publish import publish_snapshot_atomic, snapshot_tmp_path
+from backend.snapshot_refresh import write_snapshot_from_rows
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env")
@@ -112,123 +112,94 @@ def _as_iso(value: object) -> str | None:
     return str(value)
 
 
-def refresh_snapshot(*, from_date: date, out_path: Path) -> dict[str, object]:
-    """Pull VIEW → SQLite full reload. Returns summary stats."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    # Force file path for this run (SNAPSHOT_URL may point elsewhere).
-    import os
+def _previous_row_count(out_path: Path) -> int | None:
+    if not out_path.is_file():
+        return None
+    engine = get_snapshot_engine_at(out_path, create_schema=False)
+    try:
+        return read_meta(engine).row_count
+    finally:
+        engine.dispose()
 
-    os.environ["SNAPSHOT_URL"] = f"sqlite:///{out_path.resolve().as_posix()}"
+
+def refresh_snapshot(*, from_date: date, out_path: Path) -> dict[str, object]:
+    """Pull VIEW → tmp SQLite → gates → atomic publish. Returns summary stats."""
+    out_path = out_path.resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = snapshot_tmp_path(out_path)
+    if tmp_path.exists():
+        tmp_path.unlink()
 
     t0 = time.perf_counter()
-    src = _engine_from_settings()
-    snap = get_snapshot_engine(create_schema=True)
-    init_snapshot_schema(snap)
+    previous = _previous_row_count(out_path)
+    src = engine_from_settings()
     loaded_at = utc_now_iso()
-
     sql, params = _pull_sql(from_date)
     logger.info("Pulling from %s (AnswerTime >= %s)…", VIEW_NAME, from_date.isoformat())
 
-    insert_sql = text(
-        f"""
-INSERT INTO {ANSWERS_TABLE} (
-    ParticipateNumber, Question_ID, Answer_Value, BlackList,
-    UserContact, PhoneFromLog, ext_user_id, PrintStore,
-    AnswerTime, Year, Month, LoadedAt
-) VALUES (
-    :ParticipateNumber, :Question_ID, :Answer_Value, :BlackList,
-    :UserContact, :PhoneFromLog, :ext_user_id, :PrintStore,
-    :AnswerTime, :Year, :Month, :LoadedAt
-)
-"""
+    rows: list[dict[str, object]] = []
+    try:
+        with src.connect() as src_conn:
+            result = src_conn.execute(text(sql), params)
+            for mapping in result.mappings():
+                row = dict(mapping)
+                pn = row.get("ParticipateNumber")
+                av = row.get("Answer_Value")
+                rows.append(
+                    {
+                        "ParticipateNumber": None if pn is None else str(pn),
+                        "Question_ID": row.get("Question_ID"),
+                        "Answer_Value": int(av) if av is not None else None,
+                        "BlackList": row.get("BlackList"),
+                        "UserContact": row.get("UserContact"),
+                        "PhoneFromLog": row.get("PhoneFromLog"),
+                        "ext_user_id": row.get("ext_user_id"),
+                        "PrintStore": row.get("PrintStore"),
+                        "AnswerTime": _as_iso(row.get("AnswerTime")),
+                        "Year": row.get("Year"),
+                        "Month": row.get("Month"),
+                        "LoadedAt": loaded_at,
+                    }
+                )
+                if len(rows) % _BATCH == 0:
+                    logger.info("  …pulled %s rows", len(rows))
+    finally:
+        src.dispose()
+
+    logger.info("Pulled %s rows; writing tmp %s", len(rows), tmp_path)
+    summary = write_snapshot_from_rows(
+        out_path=tmp_path,
+        rows=rows,
+        from_date=from_date,
+        loaded_at=loaded_at,
+        source_view=VIEW_NAME,
     )
 
-    row_count = 0
-    with src.connect() as src_conn, snap.begin() as dst:
-        dst.execute(text(f"DELETE FROM {ANSWERS_TABLE}"))
-        dst.execute(text(f"DELETE FROM {STORE_MONTH_TABLE}"))
-
-        result = src_conn.execute(text(sql), params)
-        batch: list[dict] = []
-        for mapping in result.mappings():
-            row = dict(mapping)
-            pn = row.get("ParticipateNumber")
-            av = row.get("Answer_Value")
-            batch.append(
-                {
-                    "ParticipateNumber": None if pn is None else str(pn),
-                    "Question_ID": row.get("Question_ID"),
-                    "Answer_Value": int(av) if av is not None else None,
-                    "BlackList": row.get("BlackList"),
-                    "UserContact": row.get("UserContact"),
-                    "PhoneFromLog": row.get("PhoneFromLog"),
-                    "ext_user_id": row.get("ext_user_id"),
-                    "PrintStore": row.get("PrintStore"),
-                    "AnswerTime": _as_iso(row.get("AnswerTime")),
-                    "Year": row.get("Year"),
-                    "Month": row.get("Month"),
-                    "LoadedAt": loaded_at,
-                }
-            )
-            if len(batch) >= _BATCH:
-                dst.execute(insert_sql, batch)
-                row_count += len(batch)
-                logger.info("  …inserted %s rows", row_count)
-                batch = []
-        if batch:
-            dst.execute(insert_sql, batch)
-            row_count += len(batch)
-
-        # Pre-aggregate store×month for Query A.
-        dst.execute(
-            text(
-                f"""
-INSERT INTO {STORE_MONTH_TABLE} (
-    PrintStore, Year, Month, total_count, top_box_count
-)
-SELECT
-    PrintStore,
-    Year,
-    Month,
-    COUNT(*) AS total_count,
-    SUM(CASE WHEN Answer_Value = :top_box THEN 1 ELSE 0 END) AS top_box_count
-FROM {ANSWERS_TABLE}
-WHERE PrintStore IS NOT NULL
-  AND Year IS NOT NULL
-  AND Month IS NOT NULL
-GROUP BY PrintStore, Year, Month
-"""
-            ),
-            {"top_box": TOP_BOX_VALUE},
+    tmp_engine = get_snapshot_engine_at(tmp_path, create_schema=False)
+    try:
+        gates = validate_snapshot_gates(
+            tmp_engine, previous_row_count=previous if previous else None
         )
-        store_month_count = int(
-            dst.execute(text(f"SELECT COUNT(*) FROM {STORE_MONTH_TABLE}")).scalar() or 0
-        )
+        summary["duplicate_participate_count"] = gates.duplicate_participate_count
+        summary["answers_keyed_count"] = gates.answers_keyed_count
+    except SnapshotGateError:
+        tmp_engine.dispose()
+        if tmp_path.is_file():
+            tmp_path.unlink()
+        raise
+    else:
+        tmp_engine.dispose()
 
-    set_meta(
-        snap,
-        {
-            "loaded_at": loaded_at,
-            "row_count": str(row_count),
-            "store_month_count": str(store_month_count),
-            "source_view": VIEW_NAME,
-            "from_date": from_date.isoformat(),
-        },
-    )
+    publish_snapshot_atomic(tmp_path, out_path)
 
     elapsed = round(time.perf_counter() - t0, 2)
-    summary = {
-        "path": str(out_path.resolve()),
-        "row_count": row_count,
-        "store_month_count": store_month_count,
-        "loaded_at": loaded_at,
-        "from_date": from_date.isoformat(),
-        "elapsed_s": elapsed,
-    }
+    summary["path"] = str(out_path)
+    summary["elapsed_s"] = elapsed
+    summary["previous_row_count"] = previous
     logger.info(
         "Snapshot ready: %s rows, %s store×month cells → %s (%.1fs)",
-        row_count,
-        store_month_count,
+        summary["row_count"],
+        summary["store_month_count"],
         out_path,
         elapsed,
     )
@@ -240,6 +211,9 @@ def main() -> int:
     out = args.out or resolve_snapshot_path()
     try:
         refresh_snapshot(from_date=args.from_date, out_path=out)
+    except SnapshotGateError as exc:
+        logger.error("Snapshot refresh blocked by gate: %s", exc)
+        return 2
     except Exception:
         logger.exception("Snapshot refresh failed")
         return 1

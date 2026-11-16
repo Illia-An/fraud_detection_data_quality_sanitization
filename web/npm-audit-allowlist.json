@@ -1,0 +1,11 @@
+{
+  "critical": [
+    {
+      "id": "GHSA-jrc7-96c5-q579",
+      "package": "maplibre-gl",
+      "via": "plotly.js@3 (geo/map path)",
+      "reason": "App charts do not expose MapLibre DOM.sanitize surfaces; plotly@4 upgrade tracked as follow-up (breaking).",
+      "owner": "pending Wave 3 close / product ack"
+    }
+  ]
+}

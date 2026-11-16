@@ -131,6 +131,11 @@ export const en = {
     'Waiting for survey data (database sample or synthetic preset).',
   'sanitization.runFailed': 'Pipeline execution failed',
   'sanitization.runningAlert': 'Running scenario…',
+  'sanitization.tiers23Skipped':
+    'Tiers 2–3 were not applied (VIEW / blacklist-only source). KPI is not full sanitization.',
+  'sanitization.snapshotLoaded': 'Snapshot loaded at {loadedAt}.',
+  'sanitization.snapshotStale':
+    'Snapshot may be stale (loaded at {loadedAt}; freshness SLA {maxDays} days). KPI may not reflect current survey data.',
   'sanitization.stepsTitle': 'Pipeline steps funnel',
   'sanitization.stepsHint': 'Row counts, top-box %, and Δ vs previous stage',
   'sanitization.largestDelta': 'Largest Δ vs prev: {hint}',

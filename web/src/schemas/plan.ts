@@ -58,7 +58,7 @@ export const planRequestSchema = z.object({
     .default(12),
   target: z.number().min(PLAN_TARGET_MIN).max(PLAN_TARGET_MAX).default(75),
   params: planParamsSchema.default({}),
-  baseline_rows: z.array(planBaselineRowSchema).min(1),
+  baseline_rows: z.array(planBaselineRowSchema).min(1).max(2_000),
 });
 
 export type PlanRequest = z.output<typeof planRequestSchema>;

@@ -20,6 +20,7 @@ from backend.queries import (
 from backend.schemas import PipelineConfig, ProcessRequest
 from backend.snapshot import (
     ANSWERS_TABLE,
+    SCHEMA_VERSION,
     STORE_MONTH_TABLE,
     get_sanitization_source,
     init_snapshot_schema,
@@ -34,7 +35,7 @@ from fraud_guard.pii import hash_pii_value
 
 def test_get_sanitization_source_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("SANITIZATION_SOURCE", raising=False)
-    assert get_sanitization_source() == "view"
+    assert get_sanitization_source() == "snapshot"
 
 
 def test_get_sanitization_source_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -128,6 +129,7 @@ VALUES
             "store_month_count": "2",
             "source_view": "dbo.TargetsByMetrics_RateGetAnswers",
             "from_date": "2026-01-01",
+            "schema_version": SCHEMA_VERSION,
         },
     )
 
@@ -168,9 +170,11 @@ def test_read_meta_and_as_dict(tmp_path: Path) -> None:
     assert meta.row_count == 3
     assert meta.store_month_count == 2
     assert meta.from_date == "2026-01-01"
+    assert meta.schema_version == SCHEMA_VERSION
     d = meta_as_dict(meta)
     assert d["sanitization_source"] == "snapshot"
     assert d["snapshot_row_count"] == 3
+    assert d["snapshot_schema_version"] == SCHEMA_VERSION
 
 
 def test_process_db_uses_snapshot(
@@ -239,3 +243,79 @@ def test_process_snapshot_missing_file(monkeypatch: pytest.MonkeyPatch, tmp_path
         json={"source": "db", "config": {}},
     )
     assert resp.status_code == 503
+
+
+def _seed_mid_month_snapshot(path: Path) -> None:
+    """Feb has answers on day 5 and day 20; store_month totals both."""
+    engine = create_engine(f"sqlite:///{path.as_posix()}")
+    init_snapshot_schema(engine)
+    loaded = utc_now_iso()
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                f"""
+INSERT INTO {ANSWERS_TABLE} (
+    ParticipateNumber, Question_ID, Answer_Value, BlackList,
+    UserContact, PhoneFromLog, ext_user_id, PrintStore,
+    AnswerTime, Year, Month, LoadedAt
+) VALUES
+    ('1', 10012, 5, NULL, 'early@x', NULL, NULL, 10,
+     '2026-02-05 10:00:00', 2026, 2, :loaded),
+    ('2', 10012, 4, NULL, 'late@x', NULL, NULL, 10,
+     '2026-02-20 11:00:00', 2026, 2, :loaded)
+"""
+            ),
+            {"loaded": loaded},
+        )
+        conn.execute(
+            text(
+                f"""
+INSERT INTO {STORE_MONTH_TABLE}
+    (PrintStore, Year, Month, total_count, top_box_count)
+VALUES
+    (10, 2026, 2, 2, 1)
+"""
+            )
+        )
+    set_meta(
+        engine,
+        {
+            "loaded_at": loaded,
+            "row_count": "2",
+            "store_month_count": "1",
+            "source_view": "dbo.TargetsByMetrics_RateGetAnswers",
+            "from_date": "2026-02-01",
+            "schema_version": SCHEMA_VERSION,
+        },
+    )
+
+
+def test_process_db_normalizes_mid_month_period(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """W1-MID A / T-02: mid-month request snaps to month bounds so A/B agree."""
+    db_path = tmp_path / "mid.sqlite"
+    _seed_mid_month_snapshot(db_path)
+    monkeypatch.setenv("SANITIZATION_SOURCE", "snapshot")
+    monkeypatch.setenv("SNAPSHOT_URL", f"sqlite:///{db_path.as_posix()}")
+
+    client = TestClient(create_app())
+    resp = client.post(
+        "/api/v1/process",
+        json={
+            "source": "db",
+            "config": {},
+            "from_date": "2026-02-15",
+            "to_date": "2026-02-20",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["meta"]["period_requested_start"] == "2026-02-15"
+    assert body["meta"]["period_requested_end"] == "2026-02-20"
+    assert body["meta"]["period_normalized_to_months"] is True
+    assert body["meta"]["period_start"] == "2026-02-01"
+    assert body["meta"]["period_end"] == "2026-02-28"
+    # Full February cell — not only the half-month AnswerTime window.
+    assert body["meta"]["query_a_total_responses"] == 2
+    assert body["baseline_top_box_pct"] == 50.0
