@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=7.1.0",
     "jupyter>=1.1.1",
     "ipykernel>=6.29.0",
     "matplotlib>=3.8.0",
@@ -44,6 +45,18 @@ packages = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Wave 10 / T-08 — floor below measured ~89% on backend+src (leave headroom).
+addopts = "--cov=backend --cov=src --cov-report=term-missing:skip-covered --cov-fail-under=80"
+
+[tool.coverage.run]
+branch = false
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+skip_empty = true
 
 # Wave 8 / M-14 — start with a focused rule set; expand later.
 [tool.ruff]
@@ -59,3 +72,4 @@ python_version = "3.12"
 ignore_missing_imports = true
 follow_imports = "silent"
 files = ["src/planner"]
+
