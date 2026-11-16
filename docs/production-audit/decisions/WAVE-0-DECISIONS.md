@@ -16,6 +16,7 @@ Where the owner has not signed, status is `PENDING` and the “Audit recommendat
 |--------|---------|
 | `PENDING` | Not signed; do not treat as production policy |
 | `PROPOSED` | Engineering default for the next wave *if* owner confirms |
+| `DOCUMENTED` | Ops/procedure written; still needs living enforcement / ACK |
 | `SIGNED` | Owner confirmed; safe to implement / operate against |
 | `WAIVED` | Explicit written waiver with owner + date |
 
@@ -27,7 +28,7 @@ Where the owner has not signed, status is `PENDING` and the “Audit recommendat
 |----|----------|------------|----------------------|--------|------------------|-------|
 | **G-1** | Production data source | A001, A009 O-1, A012 | **Prod = snapshot-only; VIEW = dev only** | `SIGNED` | Owner / 2026-11-11 | Confirmed: prod always snapshot; VIEW only for local/dev |
 | **FRESH** | Snapshot freshness SLA | A002 O-1, A009 O-2 | Threshold for later `GET /ready` (Wave 4); value TBD (e.g. 7d / 14d / 30d) | `PENDING` | — | Placeholder until product/ops pick a number |
-| **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `PENDING` | — | Ops control, not app code in Wave 0–1 |
+| **NET** | Network lock until auth | A003 S-02 P0, A009 O-5 | Port reachable only on trusted LAN / internal bind until AuthN (Wave 6) | `DOCUMENTED` | Agent / 2026-11-16 | Procedure below; formal owner ACK still welcome before external exposure |
 | **PII** | Snapshot PII at rest | A003 S-04/S-05, A009 O-5 | **Either** keyed hash at refresh **or** signed disk-encryption / access waiver | `PENDING` | — | Choose one path before Wave 6; no implementation in this branch |
 | **ALERT** | Alert channel | A005 G-5, A009 O-3 | Where freshness / process failures page (email / Teams / other) | `PENDING` | — | Needed for Wave 4–5 ops; placeholder |
 | **REG** | Image registry | A006 O-1, A009 O-4 | Private GHCR or internal registry + publish rights | `PENDING` | — | Wave 5 |
@@ -48,15 +49,34 @@ These are product/engineering choices that shape Wave 1 implementation. Recorded
 
 ---
 
-## 3. Explicitly deferred (out of this branch)
+## 3. Network lock procedure (Wave 3 / S-02 P0)
 
-Per `PRODUCTION_PLAN.md` and handoff: Wave 2+ (atomic refresh, `schema_version`, `/ready`, auth, routers, planner twins, Celery, security P0 beyond recording network lock) are **out of scope** for `feat/prod-source-truth`.
+Until Wave 6 AuthN is live, the API port must not be reachable from untrusted networks.
+
+1. Bind publish only on a trusted host / internal interface (prefer not exposing `0.0.0.0` on a public NIC).
+2. Docker: map `${API_PORT:-8000}:8000` only on LAN; do not put the host in a DMZ without a reverse-proxy ACL.
+3. Firewall / NSG: allow clients on the office/VPN CIDR only; deny world.
+4. Do not open `/docs` or `/api/v1/*` through a public ingress until AuthN exists.
+5. Record who owns the host firewall rule (fill **HOST** when known).
+
+This is an **ops control**, not enforced by application code.
 
 ---
 
-## 4. Sign-off log
+## 4. Notebook PII / git history (Wave 3 / S-01)
+
+| Item | Decision |
+|------|----------|
+| Tracked notebook **outputs** | **Strip** (done in Wave 3). Regression: `tests/test_notebooks_no_outputs.py` |
+| **History rewrite** (purge past PII from git) | **Deferred — do not rewrite** unless security/legal requires it. Current tip has clean outputs; clones of old commits may still contain outputs. |
+| Repo visibility | Confirm private + limited clone list with owner (O-3 from A003) — still open |
+
+---
+
+## 5. Sign-off log
 
 | Date | Who | What changed |
 |------|-----|--------------|
 | 2026-11-11 | Agent (Wave 0) | Register created; all rows `PENDING`; audit recommendations copied, not assumed signed |
 | 2026-11-11 | Owner | **G-1 / W1-SRC** yes (prod snapshot-only); **W1-MID** (A) month normalize; **W1-VIEW** (B) allow + UI flag |
+| 2026-11-16 | Agent (Wave 3) | **NET** procedure documented; S-01 history = no rewrite (strip outputs only) |

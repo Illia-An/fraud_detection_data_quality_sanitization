@@ -87,7 +87,7 @@ export const defaultPipelineConfig: PipelineConfig = pipelineConfigSchema.parse(
 export const processRequestSchema = z
   .object({
     source: z.enum(['inline', 'db']).default('inline'),
-    rows: z.array(surveyAnswerRowSchema).max(500_000).default([]),
+    rows: z.array(surveyAnswerRowSchema).max(50_000).default([]),
     config: pipelineConfigSchema.default({}),
     from_date: z
       .string()

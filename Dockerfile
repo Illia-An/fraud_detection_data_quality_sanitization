@@ -47,7 +47,11 @@ COPY db ./db
 RUN uv sync --frozen --no-dev
 
 COPY --from=frontend /web/dist ./web/dist
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/data/plan_store \
+    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 8000
 

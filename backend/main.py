@@ -29,6 +29,7 @@ from backend.queries import (
     load_tier_candidates_from_settings,
     process_source_meta_extra,
 )
+from backend.request_limits import BodySizeLimitMiddleware
 from backend.snapshot import view_source_dev_warning
 from backend.schemas import (
     HealthResponse,
@@ -127,6 +128,8 @@ def create_app() -> FastAPI:
     if warning:
         logger.warning(warning)
 
+    # Outer middleware runs first for incoming requests (body size before CORS).
+    app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(),
