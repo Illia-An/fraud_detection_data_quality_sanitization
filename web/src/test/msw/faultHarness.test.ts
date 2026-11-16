@@ -4,6 +4,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { ApiError, fetchHealth, postProcess } from '../../api/client';
+import { defaultPipelineConfig } from '../../schemas/api';
 import { latencyOk, processFault, unavailableFault, validationFault } from './faults';
 import { healthOk } from './handlers';
 import { mswServer } from './server';
@@ -42,7 +43,7 @@ describe('MSW fault harness', () => {
       postProcess({
         source: 'db',
         rows: [],
-        config: {},
+        config: defaultPipelineConfig,
         from_date: '2025-01-01',
       }),
     ).rejects.toMatchObject({

@@ -1,7 +1,7 @@
 /**
  * Shared MSW fault catalog (Wave 10 / C-02): 422, 503, latency — not per-screen.
  */
-import { http, HttpResponse, delay } from 'msw';
+import { http, HttpResponse, delay, type JsonBodyType } from 'msw';
 
 import { API_BASE_URL, API_PREFIX } from '../../api/config';
 
@@ -51,7 +51,7 @@ export function unavailableFault(
 export function latencyOk(
   method: 'get' | 'post',
   path: string,
-  body: unknown,
+  body: JsonBodyType,
   latencyMs = 50,
 ) {
   const run = async () => {
