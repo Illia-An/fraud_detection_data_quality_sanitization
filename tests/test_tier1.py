@@ -6,7 +6,7 @@ import pandas as pd
 
 from fraud_guard.pii import ensure_pii_hashed, hash_pii_value
 from fraud_guard.stats import filter_stats, network_delta_pp, tier1_drop_reason_counts
-from fraud_guard.tier1 import (
+from fraud_guard.pipeline_row_rules import (
     CUSTOMER_BLACKLIST_VALUE,
     ENTITY_COL,
     FLAG_COL,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fraud_guard.tier2 import (
+from fraud_guard.pipeline_store_month import (
     FLAG_COL,
     REASON_HIGH_STORE_MONTH,
     Tier2Config,
