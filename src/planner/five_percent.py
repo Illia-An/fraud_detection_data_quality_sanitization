@@ -8,44 +8,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from planner.allocate import allocate_plan
+from planner.plan_types import MonthScore, StoreProjection
+from planner.schedule import add_calendar_months, trajectory_weights
 
-def trajectory_weights(
-    n_months: int,
-    mode: str = "uniform",
-    power: float = 2.0,
-) -> list[float]:
-    if n_months < 1:
-        raise ValueError("n_months must be >= 1")
-    months = list(range(1, n_months + 1))
-    if mode == "uniform":
-        raw = [1.0] * n_months
-    elif mode == "front_loaded":
-        raw = [float((n_months - m + 1) ** power) for m in months]
-    elif mode == "accelerated":
-        raw = [float(m**power) for m in months]
-    else:
-        raise ValueError("mode must be uniform|front_loaded|accelerated")
-    total = sum(raw)
-    return [w / total for w in raw]
-
-
-def add_calendar_months(year: int, month: int, offset: int) -> tuple[int, int]:
-    """Return (year, month) offset months after the given calendar month (1-based)."""
-    idx = year * 12 + (month - 1) + offset
-    return idx // 12, idx % 12 + 1
-
-
-@dataclass(frozen=True)
-class MonthScore:
-    year: int
-    month: int
-    score: float
-
-
-@dataclass(frozen=True)
-class StoreProjection:
-    store_id: int
-    months: tuple[MonthScore, ...]
+# Old import paths (MonthScore, StoreProjection, trajectory_weights,
+# add_calendar_months) stay valid via these re-exports.
+__all__ = [
+    "FivePercentPlanResult",
+    "MonthScore",
+    "StoreProjection",
+    "add_calendar_months",
+    "plan_five_percent",
+    "trajectory_weights",
+]
 
 
 @dataclass(frozen=True)
@@ -82,8 +58,6 @@ def plan_five_percent(
     Baseline values are cleansed five_percent at the reference month.
     Equal store weights (product lock: no volume influence yet).
     """
-    from planner.allocate import allocate_plan
-
     result = allocate_plan(
         baseline=baseline,
         target=target,

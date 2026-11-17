@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from planner.five_percent import MonthScore, StoreProjection
+from planner.allocate import allocate_plan
+from planner.plan_types import MonthScore, StoreProjection
 from planner.tts_bounds import (
     TTS_CEILING_MIN,
     TTS_DEFAULT_MAX_MONTHLY_IMPROVE,
@@ -52,8 +53,6 @@ def plan_tts(
     ceiling: float = TTS_CEILING_MIN,
 ) -> TtsPlanResult:
     """Allocate store×month minute reductions toward a chain target."""
-    from planner.allocate import allocate_plan
-
     result = allocate_plan(
         baseline=baseline,
         target=target,
