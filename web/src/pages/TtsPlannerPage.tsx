@@ -25,7 +25,6 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { postExcelReport } from '../api/client';
 import { useLoadTtsKpiFromAp, useTtsPlan } from '../api/hooks';
 import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
 import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
@@ -67,59 +66,26 @@ import { PlannerPageShell } from '../components/planner/PlannerPageShell';
 import { useAnswerShell } from '../components/planner/useAnswerShell';
 import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
 import { useReferenceSelection } from '../components/planner/useReferenceSelection';
+import {
+  availablePeriodReferences,
+  baselineRowsAtReference,
+  equalWeightMeanBy,
+} from '../components/planner/plannerBaseline';
+import { downloadPlanProjectionCsv } from '../components/planner/plannerCsv';
+import {
+  ttsGoalClamps,
+  usePlannerGoalDrafts,
+} from '../components/planner/usePlannerGoalDrafts';
+import {
+  canExportPlanExcel,
+  usePlannerExcelExport,
+} from '../components/planner/usePlannerExcelExport';
 import { useTtsPlannerScenarioStore } from '../store/ttsPlannerScenarioStore';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen } from '../store/uiStore';
 
 const TTS_FLOOR = TTS_PLAN_TARGET_MIN;
 const TTS_CEILING = TTS_PLAN_TARGET_MAX;
 const TTS_MONITOR_BAND_MIN = 0.05;
-function clampTarget(raw: string, fallback: number): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.min(TTS_CEILING, Math.max(TTS_FLOOR, n));
-}
-
-function clampHorizon(raw: string, fallback: number): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) {
-    return fallback;
-  }
-  return Math.min(12, Math.max(1, Math.round(n)));
-}
-
-function referencesOf(panel: TtsKpiPanel): { year: number; month: number }[] {
-  const keys = new Set<string>();
-  const out: { year: number; month: number }[] = [];
-  for (const row of panel.rows) {
-    const key = periodLabel(row.year, row.month);
-    if (keys.has(key)) {
-      continue;
-    }
-    keys.add(key);
-    out.push({ year: row.year, month: row.month });
-  }
-  out.sort((a, b) => a.year - b.year || a.month - b.month);
-  return out;
-}
-
-function baselineAt(
-  panel: TtsKpiPanel,
-  year: number,
-  month: number,
-): { store_id: number; tts: number }[] {
-  return panel.rows
-    .filter((row) => row.year === year && row.month === month)
-    .map((row) => ({ store_id: row.store_id, tts: row.tts }));
-}
-
-function meanMinutes(rows: { tts: number }[]): number | null {
-  if (rows.length === 0) {
-    return null;
-  }
-  return rows.reduce((sum, row) => sum + row.tts, 0) / rows.length;
-}
 
 export function TtsPlannerPage() {
   const t = useT();
@@ -142,10 +108,21 @@ export function TtsPlannerPage() {
     CONTROLS_RAIL_ROUTE.ttsPlanner,
   );
   const apLoadStarted = useRef(false);
-  const [target, setTarget] = useState(TTS_PLAN_DEFAULT_TARGET);
-  const [targetText, setTargetText] = useState(String(TTS_PLAN_DEFAULT_TARGET));
-  const [horizon, setHorizon] = useState(12);
-  const [horizonText, setHorizonText] = useState('12');
+  const {
+    target,
+    horizon,
+    targetText,
+    horizonText,
+    commitGoalDrafts,
+    onTargetChange,
+    onHorizonChange,
+    onTargetBlur,
+    onHorizonBlur,
+  } = usePlannerGoalDrafts({
+    initialTarget: TTS_PLAN_DEFAULT_TARGET,
+    initialHorizon: 12,
+    ...ttsGoalClamps,
+  });
   const [maxMonthly, setMaxMonthly] = useState(TTS_PLAN_DEFAULT_MAX_MONTHLY);
   const [priorityPower, setPriorityPower] = useState(1);
   const [trajectory, setTrajectory] = useState<'uniform' | 'front_loaded' | 'accelerated'>(
@@ -169,8 +146,7 @@ export function TtsPlannerPage() {
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
-  const [excelExporting, setExcelExporting] = useState(false);
-  const [excelExportError, setExcelExportError] = useState(false);
+  const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
 
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
   usePlannerOnboardingShell({ prefix: 'tts-planner', setControlsOpen, setAtRiskExpanded });
@@ -183,7 +159,10 @@ export function TtsPlannerPage() {
     growth_factor: 0.5,
   };
 
-  const refs = useMemo(() => (panel ? referencesOf(panel) : []), [panel]);
+  const refs = useMemo(
+    () => (panel ? availablePeriodReferences(panel.rows) : []),
+    [panel],
+  );
 
   const { referenceYear, referenceMonth, setReferenceYear, setReferenceMonth } =
     useReferenceSelection(refs);
@@ -192,9 +171,12 @@ export function TtsPlannerPage() {
   const effectiveMonth = referenceMonth ?? panel?.reference_month ?? null;
   const baselineRows =
     panel && effectiveYear != null && effectiveMonth != null
-      ? baselineAt(panel, effectiveYear, effectiveMonth)
+      ? baselineRowsAtReference(panel.rows, effectiveYear, effectiveMonth, (row) => ({
+          store_id: row.store_id,
+          tts: row.tts,
+        }))
       : [];
-  const currentChain = meanMinutes(baselineRows);
+  const currentChain = equalWeightMeanBy(baselineRows, (row) => row.tts);
   const baselineReady = panel != null && panel.row_count > 0;
   const directionKey =
     currentChain == null
@@ -279,18 +261,13 @@ export function TtsPlannerPage() {
   const runTip = runBlock ? t(TTS_PLANNER_RUN_BLOCK_MESSAGE_KEYS[runBlock]) : '';
 
   const handleRun = () => {
-    const nextTarget = clampTarget(targetText, target);
-    const nextHorizon = clampHorizon(horizonText, horizon);
-    setTarget(nextTarget);
-    setTargetText(String(nextTarget));
-    setHorizon(nextHorizon);
-    setHorizonText(String(nextHorizon));
+    const goal = commitGoalDrafts();
     const block = ttsPlannerRunBlockReason({
       baselineReady,
       storeCount: baselineRows.length,
       currentChain,
-      target: nextTarget,
-      horizon: nextHorizon,
+      target: goal.target,
+      horizon: goal.horizon,
       maxMonthlyImprove: maxMonthly,
       isPending: planMutation.isPending,
     });
@@ -302,8 +279,8 @@ export function TtsPlannerPage() {
       {
         reference_year: effectiveYear,
         reference_month: effectiveMonth,
-        horizon: nextHorizon,
-        target: nextTarget,
+        horizon: goal.horizon,
+        target: goal.target,
         params: {
           trajectory,
           trajectory_power: 2,
@@ -332,18 +309,13 @@ export function TtsPlannerPage() {
   };
 
   const handleApplyScenarioPack = (packId: ScenarioPackId) => {
-    const nextTarget = clampTarget(targetText, target);
-    const nextHorizon = clampHorizon(horizonText, horizon);
-    setTarget(nextTarget);
-    setTargetText(String(nextTarget));
-    setHorizon(nextHorizon);
-    setHorizonText(String(nextHorizon));
+    const goal = commitGoalDrafts();
     const block = ttsPlannerRunBlockReason({
       baselineReady,
       storeCount: baselineRows.length,
       currentChain,
-      target: nextTarget,
-      horizon: nextHorizon,
+      target: goal.target,
+      horizon: goal.horizon,
       maxMonthlyImprove: maxMonthly,
       isPending: planMutation.isPending,
     });
@@ -366,8 +338,8 @@ export function TtsPlannerPage() {
       {
         reference_year: effectiveYear,
         reference_month: effectiveMonth,
-        horizon: nextHorizon,
-        target: nextTarget,
+        horizon: goal.horizon,
+        target: goal.target,
         params: packParams,
         baseline_rows: baselineRows,
       },
@@ -426,34 +398,21 @@ export function TtsPlannerPage() {
     if (!draftPlan) {
       return;
     }
-    downloadTtsPlanCsv(draftPlan);
+    downloadPlanProjectionCsv(draftPlan, 'plan_tts_projections.csv');
     acceptDraftAsApproved();
   };
 
-  const canExportExcel = draftPlan != null && panel != null && panel.rows.length > 0;
+  const canExportExcel = canExportPlanExcel(draftPlan, panel);
 
   const handleExportExcel = () => {
-    if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
+    if (!draftPlan || !panel) {
       return;
     }
-    setExcelExportError(false);
-    setExcelExporting(true);
-    const request = buildTtsExcelReportRequest(panel, draftPlan);
-    void postExcelReport(request)
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'tts-plan-report.xlsx';
-        anchor.click();
-        URL.revokeObjectURL(url);
-      })
-      .catch(() => {
-        setExcelExportError(true);
-      })
-      .finally(() => {
-        setExcelExporting(false);
-      });
+    exportExcel({
+      canExport: canExportExcel,
+      filename: 'tts-plan-report.xlsx',
+      buildRequest: () => buildTtsExcelReportRequest(panel, draftPlan),
+    });
   };
 
   return (
@@ -515,21 +474,8 @@ export function TtsPlannerPage() {
                   size="small"
                   value={targetText}
                   disabled={!baselineReady}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) {
-                      return;
-                    }
-                    setTargetText(raw);
-                    if (raw !== '' && Number.isFinite(Number(raw))) {
-                      setTarget(Number(raw));
-                    }
-                  }}
-                  onBlur={() => {
-                    const next = clampTarget(targetText, target);
-                    setTarget(next);
-                    setTargetText(String(next));
-                  }}
+                  onChange={(event) => onTargetChange(event.target.value)}
+                  onBlur={onTargetBlur}
                   inputProps={{ inputMode: 'decimal', 'aria-label': t('ttsPlanner.target') }}
                   helperText={t('ttsPlanner.targetHint')}
                 />
@@ -538,21 +484,8 @@ export function TtsPlannerPage() {
                   size="small"
                   value={horizonText}
                   disabled={!baselineReady}
-                  onChange={(event) => {
-                    const raw = event.target.value;
-                    if (raw !== '' && !/^\d*$/.test(raw)) {
-                      return;
-                    }
-                    setHorizonText(raw);
-                    if (raw !== '' && Number.isFinite(Number(raw))) {
-                      setHorizon(Number(raw));
-                    }
-                  }}
-                  onBlur={() => {
-                    const next = clampHorizon(horizonText, horizon);
-                    setHorizon(next);
-                    setHorizonText(String(next));
-                  }}
+                  onChange={(event) => onHorizonChange(event.target.value)}
+                  onBlur={onHorizonBlur}
                   inputProps={{ inputMode: 'numeric', 'aria-label': t('ttsPlanner.horizon') }}
                   helperText={t('ttsPlanner.horizonHint')}
                 />
@@ -1028,34 +961,5 @@ export function TtsPlannerPage() {
         )}
     </PlannerPageShell>
   );
-}
-
-function downloadTtsPlanCsv(plan: TtsPlan): void {
-  const header = [
-    'store_id',
-    ...plan.chain_trajectory.map((point) => periodLabel(point.year, point.month)),
-  ];
-  const lines = [header.join(',')];
-  lines.push(['chain', ...plan.chain_trajectory.map((point) => String(point.score))].join(','));
-  for (const projection of plan.projections) {
-    lines.push(
-      [
-        String(projection.store_id),
-        ...plan.chain_trajectory.map((period) => {
-          const hit = projection.months.find(
-            (point) => point.year === period.year && point.month === period.month,
-          );
-          return hit ? String(hit.score) : '';
-        }),
-      ].join(','),
-    );
-  }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'plan_tts_projections.csv';
-  anchor.click();
-  URL.revokeObjectURL(url);
 }
 
