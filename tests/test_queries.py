@@ -27,7 +27,7 @@ from backend.schemas import (
     SurveyAnswerRow,
 )
 from backend.service import run_pipeline
-from fraud_guard.tier1 import filter_answered_metric_rows, top_box_rate
+from fraud_guard.pipeline_row_rules import filter_answered_metric_rows, top_box_rate
 
 
 def test_build_actual_baseline_sql_no_select_star() -> None:

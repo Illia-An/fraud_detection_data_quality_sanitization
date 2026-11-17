@@ -11,7 +11,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal
 
-from fraud_guard.tier1 import CUSTOMER_BLACKLIST_VALUE, SATISFACTION_QUESTION_ID
+from fraud_guard.pipeline_row_rules import (
+    CUSTOMER_BLACKLIST_VALUE,
+    SATISFACTION_QUESTION_ID,
+)
 
 PresetName = Literal["small", "medium", "stress"]
 

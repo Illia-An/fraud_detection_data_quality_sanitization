@@ -26,16 +26,16 @@ from backend.data_access import (
     engine_from_settings,
 )
 from backend.db_sample import _SELECT_COLUMNS
-from fraud_guard.tier1 import (
+from fraud_guard.pipeline_row_rules import (
     ENTITY_COL,
     FLAG_COL,
     RATE_GET_ANSWERS_MAPPING,
     REASON_ALWAYS_TOPBOX,
     REASON_COL,
     Tier1Config,
+    _flag_always_topbox,
     build_entity_key,
     filter_answered_metric_rows,
-    _flag_always_topbox,
 )
 
 ROOT = Path(__file__).resolve().parents[1]

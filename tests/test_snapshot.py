@@ -29,7 +29,7 @@ from backend.snapshot import (
     set_meta,
     utc_now_iso,
 )
-from fraud_guard.tier1 import CUSTOMER_BLACKLIST_VALUE
+from fraud_guard.pipeline_row_rules import CUSTOMER_BLACKLIST_VALUE
 from fraud_guard.pii import hash_pii_value
 
 

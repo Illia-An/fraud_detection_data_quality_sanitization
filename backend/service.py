@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from fraud_guard.stats import network_delta_pp, tier1_drop_reason_counts
-from fraud_guard.tier1 import (
+from fraud_guard.pipeline_row_rules import (
     CUSTOMER_BLACKLIST_VALUE,
     FLAG_COL as T1_FLAG,
     REASON_COL as T1_REASON,
@@ -22,7 +22,7 @@ from fraud_guard.tier1 import (
     keep_clean_rows as keep_tier1_clean,
     top_box_rate,
 )
-from fraud_guard.tier2 import (
+from fraud_guard.pipeline_store_month import (
     FLAG_COL as T2_FLAG,
     REASON_COL as T2_REASON,
     Tier2Config,
