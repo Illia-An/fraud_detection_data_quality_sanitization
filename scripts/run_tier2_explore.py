@@ -8,7 +8,7 @@ from db.config import get_settings
 
 get_settings.cache_clear()
 from db.connection import get_engine
-from fraud_guard.tier1 import (
+from fraud_guard.pipeline_row_rules import (
     Tier1Config,
     apply_tier1,
     filter_answered_metric_rows,

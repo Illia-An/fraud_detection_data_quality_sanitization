@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fraud_guard.tier1 import ENTITY_COL, build_entity_key
-from fraud_guard.tier3 import (
+from fraud_guard.pipeline_row_rules import ENTITY_COL, build_entity_key
+from fraud_guard.research_isolation_forest import (
     FLAG_COL,
     REASON_IF_ANOMALY,
     Tier3Config,

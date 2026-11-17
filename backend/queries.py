@@ -28,7 +28,7 @@ from backend.snapshot import (
     meta_as_dict,
     read_meta,
 )
-from fraud_guard.tier1 import CUSTOMER_BLACKLIST_VALUE
+from fraud_guard.pipeline_row_rules import CUSTOMER_BLACKLIST_VALUE
 
 logger = logging.getLogger(__name__)
 

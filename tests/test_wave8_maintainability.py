@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.main import create_app
-from fraud_guard.tier1 import (
+from fraud_guard.pipeline_row_rules import (
     ENTITY_COL,
     FLAG_COL,
     RATE_GET_ANSWERS_MAPPING,
