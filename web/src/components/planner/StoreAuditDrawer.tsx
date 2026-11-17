@@ -1,46 +1,24 @@
-import CloseIcon from '@mui/icons-material/Close';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import PolicyOutlinedIcon from '@mui/icons-material/PolicyOutlined';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
-  Autocomplete,
-  Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle,
-  IconButton,
-  Snackbar,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-  Tooltip,
   Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useT } from '../../i18n';
 import type { ProcessResponse } from '../../schemas/api';
-import { PIPELINE_STEP_LABELS, sortPipelineSteps } from '../../schemas/api';
+import { sortPipelineSteps } from '../../schemas/api';
 import type { DirectedPlan, MetricScorePanel } from '../../schemas/metricScore';
-import { periodLabel } from '../../schemas/plan';
 import {
   applyDraftLastMonthToTable,
   buildStorePlanActualDifferenceTable,
   lastEstimateIndex,
 } from '../../schemas/planActualGap';
 import type { PlanMonitoringInsights, StoreMonitorRow } from '../../schemas/planMonitoring';
-import { SIGNAL_COLORS, SIGNAL_LABELS } from '../../schemas/planMonitoring';
 import type { SanitizedPanel } from '../../schemas/sanitizedPanel';
 import {
   applySandboxEvenSplitToPlan,
@@ -55,24 +33,17 @@ import {
   buildStoreCumulativeSlopeLayers,
   type StoreBoostGlance,
 } from './cumulativeSlopeLayers';
-import { CumulativeSlopeHeroChart } from './CumulativeSlopeHeroChart';
-import { StoreHeroEvaluationChart } from './StoreHeroEvaluationChart';
 import { InspectStoreGlance } from './InspectStoreGlance';
 import { UnreachableRecommendationCard } from './UnreachableRecommendationCard';
 import type { StoreBaselineRow } from './atRiskRowMetrics';
-import { SLOPE_PANEL_MIN_HEIGHT_PX } from './slopeHeroShared';
-
-/** EXP: large Inspect dialog — room for store Hero + sandbox (~+13% vs 1400). */
-const INSPECT_DIALOG_PAPER_MAX_PX = 1580;
-/** Collapsed Estimate funnel strip reserved so Hero is not covered. */
-const SANDBOX_SUMMARY_RESERVE_PX = 56;
-const SANDBOX_OVERLAY_GAP_PX = 8;
-/** Expanded Estimate overlay cap — chart underneath keeps space. */
-const SANDBOX_OVERLAY_MAX_HEIGHT = '42vh';
-/** Min plot height when legacy chart fills remaining Inspect pane. */
-const STORE_HERO_IN_DIALOG_MIN_PX = 280;
-/** Dual Slope panels need roughly 2× panel min inside the dialog. */
-const STORE_SLOPE_IN_DIALOG_MIN_PX = SLOPE_PANEL_MIN_HEIGHT_PX * 2;
+import { StoreAuditDialogTitle } from './storeAudit/StoreAuditDialogTitle';
+import { StoreAuditHero } from './storeAudit/StoreAuditHero';
+import { StoreAuditSandboxPanel } from './storeAudit/StoreAuditSandboxPanel';
+import {
+  formatScore as formatScoreValue,
+  scoreDisplayForUnit,
+} from './storeAudit/storeAuditFormat';
+import { INSPECT_DIALOG_PAPER_MAX_PX } from './storeAudit/storeAuditLayout';
 
 type InspectPanel = MetricScorePanel & {
   echo_config?: SanitizedPanel['echo_config'];
@@ -106,11 +77,6 @@ interface StoreAuditDrawerProps<T extends DirectedPlan = DirectedPlan> {
   yAxisTitle?: string;
   /** Appended to store evaluation tick labels. Default `%`. */
   tickSuffix?: string;
-}
-
-function formatSigned(value: number, digits = 2): string {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${value.toFixed(digits)}`;
 }
 
 /**
@@ -172,10 +138,12 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
         )?.score ?? null
       : null;
 
-  const scoreDigits = plan.unit === 'min' ? 2 : 1;
-  const scoreFloor = 0;
-  const scoreCeiling = plan.unit === 'min' ? 30 : 100;
-  const formatScore = (value: number) => value.toFixed(scoreDigits);
+  const {
+    digits: scoreDigits,
+    floor: scoreFloor,
+    ceiling: scoreCeiling,
+  } = scoreDisplayForUnit(plan.unit);
+  const formatScore = (value: number) => formatScoreValue(value, scoreDigits);
   const bounds =
     originalLast == null
       ? { min: scoreFloor, max: scoreCeiling }
@@ -298,7 +266,6 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   };
 
   return (
-    <>
     <Dialog
       open={open}
       onClose={onClose}
@@ -318,168 +285,15 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
         },
       }}
     >
-      <DialogTitle
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0.75,
-          py: 1,
-          px: 2,
-          pr: 1,
-          minHeight: 0,
-        }}
-      >
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={0.75}
-          sx={{ flex: 1, minWidth: 0 }}
-        >
-          <Typography
-            component="span"
-            variant="subtitle1"
-            sx={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.3, flexShrink: 0 }}
-          >
-            {t('planner.inspect.titlePrefix')}
-          </Typography>
-          <Autocomplete
-            size="small"
-            options={storeIds}
-            value={storeId}
-            disableClearable
-            onChange={(_event, next) => {
-              if (next != null && next !== storeId) {
-                onStoreChange(next);
-              }
-            }}
-            getOptionLabel={(id) => t('common.storeN', { id })}
-            isOptionEqualToValue={(a, b) => a === b}
-            filterOptions={(options, state) => {
-              const q = state.inputValue.trim().toLowerCase();
-              if (!q) {
-                return options;
-              }
-              return options.filter((id) => {
-                const label = t('common.storeN', { id }).toLowerCase();
-                return String(id).includes(q) || label.includes(q);
-              });
-            }}
-            sx={{ width: { xs: 148, sm: 176 }, flexShrink: 0 }}
-            slotProps={{
-              listbox: { sx: { maxHeight: 280 } },
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                inputProps={{
-                  ...params.inputProps,
-                  'aria-label': t('planner.inspect.storeSelect'),
-                  'data-testid': 'inspect-store-select',
-                }}
-              />
-            )}
-            data-testid="inspect-store-autocomplete"
-          />
-        </Stack>
-        {monitorRow && (
-          <Chip
-            size="small"
-            label={SIGNAL_LABELS[monitorRow.signal]}
-            sx={{
-              bgcolor: SIGNAL_COLORS[monitorRow.signal],
-              color: '#fff',
-              height: 22,
-              fontSize: '0.7rem',
-              '& .MuiChip-label': { px: 0.75 },
-            }}
-          />
-        )}
-        <Tooltip
-          title={t('planner.inspect.sandboxWarn')}
-          arrow
-          enterDelay={200}
-          slotProps={{
-            tooltip: {
-              sx: { maxWidth: 320, fontSize: '0.75rem', lineHeight: 1.35 },
-            },
-          }}
-        >
-          <IconButton
-            size="small"
-            aria-label={t('planner.inspect.sandboxWarn')}
-            sx={{ p: 0.4, color: 'warning.main' }}
-            data-testid="inspect-sandbox-warn"
-          >
-            <WarningAmberIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <Tooltip
-          arrow
-          enterDelay={200}
-          slotProps={{
-            tooltip: {
-              sx: {
-                maxWidth: 340,
-                bgcolor: 'background.paper',
-                color: 'text.primary',
-                border: 1,
-                borderColor: 'divider',
-                boxShadow: 3,
-                p: 1.25,
-              },
-            },
-          }}
-          title={
-            <Stack spacing={0.75} data-testid="inspect-audit-tooltip">
-              <Typography variant="caption" fontWeight={700} display="block">
-                {t('planner.inspect.auditPanel')}
-              </Typography>
-              <Typography variant="caption" color="text.secondary" display="block">
-                {t('planner.inspect.auditHint')}
-              </Typography>
-              <Stack spacing={0.35}>
-                {echo ? (
-                  <>
-                    <Typography variant="caption">
-                      Tier2 freq ≥ {echo.tier2_freq_threshold}
-                      {echo.tier2_freq_enabled ? '' : ' (off)'}
-                    </Typography>
-                    <Typography variant="caption">
-                      Tier3 always-5{' '}
-                      {echo.tier3_always_five_enabled
-                        ? `min n ${echo.tier3_always_five_min_n}`
-                        : 'off'}
-                    </Typography>
-                    <Typography variant="caption">
-                      Tier4 store×month {echo.tier4_enabled ? 'on' : 'off'}
-                    </Typography>
-                  </>
-                ) : (
-                  <Typography variant="caption">{t('planner.baseline.noSteps')}</Typography>
-                )}
-                {steps.map((step) => (
-                  <Typography key={step.step_name} variant="caption" color="text.secondary">
-                    {PIPELINE_STEP_LABELS[step.step_name]} · drop {step.rows_dropped} ·{' '}
-                    {step.top_box_pct.toFixed(1)}%
-                  </Typography>
-                ))}
-              </Stack>
-            </Stack>
-          }
-        >
-          <IconButton
-            size="small"
-            aria-label={t('planner.inspect.auditPanel')}
-            sx={{ p: 0.4, color: 'text.secondary' }}
-            data-testid="inspect-audit-info"
-          >
-            <PolicyOutlinedIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
-        <IconButton aria-label={t('common.close')} onClick={onClose} size="small" sx={{ p: 0.5 }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
+      <StoreAuditDialogTitle
+        storeIds={storeIds}
+        storeId={storeId}
+        onStoreChange={onStoreChange}
+        onClose={onClose}
+        monitorRow={monitorRow}
+        echo={echo}
+        steps={steps}
+      />
 
       <DialogContent
         dividers
@@ -537,304 +351,40 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
             applyPending={unreachableApplyPending}
           />
         ) : null}
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: slopeLayers != null ? STORE_SLOPE_IN_DIALOG_MIN_PX : 0,
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            pb: {
-              xs: 0,
-              md: `${SANDBOX_SUMMARY_RESERVE_PX + SANDBOX_OVERLAY_GAP_PX}px`,
-            },
-          }}
-        >
-          {slopeLayers != null ? (
-            <Stack spacing={0.35} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
-              <Typography
-                sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
-              >
-                {t('planner.storeHero.title')}
-              </Typography>
-              <CumulativeSlopeHeroChart
-                layers={slopeLayers}
-                yAxisTitle={yAxisTitle ?? '5% Score'}
-              />
-            </Stack>
-          ) : (
-            <StoreHeroEvaluationChart
-              plan={plan}
-              storeId={storeId}
-              panel={panel}
-              insights={insights}
-              draftLast={appliedDraft}
-              plotHeightPx={STORE_HERO_IN_DIALOG_MIN_PX}
-              fillParent
-              yAxisTitle={yAxisTitle}
-              tickSuffix={tickSuffix}
-            />
-          )}
-        </Box>
+        <StoreAuditHero
+          plan={plan}
+          storeId={storeId}
+          panel={panel}
+          insights={insights}
+          draftLast={appliedDraft}
+          slopeLayers={slopeLayers}
+          yAxisTitle={yAxisTitle}
+          tickSuffix={tickSuffix}
+        />
 
-        <Box
-          data-testid="inspect-sandbox-overlay"
-          sx={{
-            position: { xs: 'relative', md: 'absolute' },
-            left: { md: 16 },
-            right: { md: 16 },
-            bottom: { md: SANDBOX_OVERLAY_GAP_PX },
-            zIndex: { md: 3 },
-            flexShrink: 0,
-            maxHeight: { md: SANDBOX_OVERLAY_MAX_HEIGHT },
-            overflow: { md: 'auto' },
-            mt: { xs: 1.5, md: 0 },
-            bgcolor: 'background.paper',
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 1,
-            boxShadow: { md: sandboxExpanded ? 8 : 2 },
-          }}
-        >
-          <Accordion
-            disableGutters
-            elevation={0}
-            expanded={sandboxExpanded}
-            onChange={(_, next) => setSandboxExpanded(next)}
-            sx={{
-              '&:before': { display: 'none' },
-              boxShadow: 'none',
-              bgcolor: 'transparent',
-            }}
-            data-testid="inspect-sandbox-panel"
-          >
-            <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 48, py: 0 }}>
-              <Stack
-                direction="row"
-                alignItems="baseline"
-                spacing={0.75}
-                flexWrap="wrap"
-                useFlexGap
-                sx={{ pr: 1, minWidth: 0, flex: 1 }}
-              >
-                <Typography
-                  component="span"
-                  sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2 }}
-                >
-                  {t('planner.inspect.sandboxPanel')}
-                </Typography>
-                <Typography
-                  component="span"
-                  color="text.secondary"
-                  sx={{ fontSize: '0.65rem', lineHeight: 1.2 }}
-                >
-                  {t('planner.inspect.sandboxPanelSub')}
-                </Typography>
-              </Stack>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ ml: 'auto', mr: 1 }}>
-                <Chip size="small" label={`Taken ${preview ? formatSigned(preview.taken) : '—'}`} />
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={`Dist ${preview ? formatScore(preview.distributed) : '—'}`}
-                />
-              </Stack>
-            </AccordionSummary>
-            <AccordionDetails
-              sx={{
-                pt: 0,
-                maxHeight: {
-                  md: `calc(${SANDBOX_OVERLAY_MAX_HEIGHT} - ${SANDBOX_SUMMARY_RESERVE_PX}px)`,
-                },
-                overflow: 'auto',
-              }}
-            >
-            <Stack spacing={1.5}>
-              {originalLast == null || !displayTable ? (
-                <Typography variant="body2" color="text.secondary">
-                  {t('planner.inspect.noProjection')}
-                </Typography>
-              ) : (
-                <Stack spacing={1}>
-                  <Box
-                    sx={{ overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}
-                  >
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell />
-                          {displayTable.columns.map((col, index) => (
-                            <TableCell
-                              key={col.label}
-                              align="center"
-                              sx={{
-                                fontWeight: index === editableCol || col.isAsOf ? 700 : 400,
-                              }}
-                            >
-                              {col.label}
-                              {col.isAsOf ? t('planner.inspect.asOfSuffix') : ''}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>
-                            {t('planner.inspect.estimate')}
-                          </TableCell>
-                          {displayTable.columns.map((col, index) => {
-                            const score = displayTable.estimate[index];
-                            const isLast = index === editableCol;
-                            return (
-                              <TableCell key={`e-${col.label}`} align="center">
-                                {isLast ? (
-                                  <TextField
-                                    size="small"
-                                    type="number"
-                                    value={inputValue}
-                                    onChange={(e) => setInputValue(e.target.value)}
-                                    error={Boolean(error)}
-                                    inputProps={{
-                                      min: bounds.min,
-                                      max: bounds.max,
-                                      step: 0.1,
-                                      'aria-label': `Last month estimate (${col.label})`,
-                                      style: { width: 72, textAlign: 'center' },
-                                    }}
-                                  />
-                                ) : score == null ? (
-                                  '—'
-                                ) : (
-                                  formatScore(score)
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>
-                            {t('planner.inspect.actual')}
-                          </TableCell>
-                          {displayTable.columns.map((col, index) => {
-                            const actual = displayTable.actual[index];
-                            return (
-                              <TableCell key={`a-${col.label}`} align="center">
-                                {actual == null ? '—' : formatScore(actual)}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>difference</TableCell>
-                          {displayTable.columns.map((col, index) => {
-                            const diff = displayTable.difference[index];
-                            return (
-                              <TableCell key={`d-${col.label}`} align="center">
-                                {diff == null ? '—' : formatSigned(diff, 1)}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </Box>
-                  {error && (
-                    <Typography color="error" variant="caption">
-                      {error}
-                    </Typography>
-                  )}
-                  <Typography variant="caption" color="text.secondary">
-                    Allowed {formatScore(bounds.min)}–{formatScore(bounds.max)}
-                    {lastPeriod
-                      ? ` · last ${periodLabel(lastPeriod.year, lastPeriod.month)}`
-                      : ''}
-                  </Typography>
-                </Stack>
-              )}
-
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                flexWrap="wrap"
-                useFlexGap
-                spacing={1.5}
-                sx={{ pt: originalLast == null || !displayTable ? 0 : 0.5 }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                  {originalLast != null && displayTable ? (
-                    <>
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={handleRecalculate}
-                        data-testid="inspect-recalculate"
-                      >
-                        {t('planner.inspect.recalculate')}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        disabled={preview == null}
-                        onClick={handleApply}
-                        data-testid="inspect-apply"
-                      >
-                        {t('planner.inspect.apply')}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="text"
-                        disabled={appliedDraft == null}
-                        onClick={handleReset}
-                        data-testid="inspect-reset"
-                      >
-                        {t('planner.inspect.reset')}
-                      </Button>
-                    </>
-                  ) : null}
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  alignItems="center"
-                  flexWrap="wrap"
-                  useFlexGap
-                  sx={{ fontVariantNumeric: 'tabular-nums' }}
-                >
-                  <Typography variant="caption" color="text.secondary" component="span">
-                    Taken{' '}
-                    <Box component="span" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
-                      {preview ? formatSigned(preview.taken) : '—'}
-                    </Box>
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" component="span">
-                    Distributed{' '}
-                    <Box component="span" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
-                      {preview ? preview.distributed.toFixed(2) : '—'}
-                    </Box>
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" component="span">
-                    Leftover{' '}
-                    <Box component="span" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.85rem' }}>
-                      {preview ? preview.leftover.toFixed(2) : '—'}
-                    </Box>
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="text"
-                    disabled={!preview || preview.pool.length === 0}
-                    onClick={() => setPoolDialogOpen(true)}
-                    data-testid="inspect-view-pool"
-                  >
-                    {t('planner.inspect.viewPool')}
-                    {preview ? ` (${preview.pool.length + 1})` : ''}
-                  </Button>
-                </Stack>
-              </Stack>
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
-        </Box>
+        <StoreAuditSandboxPanel
+          storeId={storeId}
+          scoreDigits={scoreDigits}
+          sandboxExpanded={sandboxExpanded}
+          onSandboxExpandedChange={setSandboxExpanded}
+          preview={preview}
+          originalLast={originalLast}
+          displayTable={displayTable}
+          editableCol={editableCol}
+          inputValue={inputValue}
+          onInputValueChange={setInputValue}
+          error={error}
+          bounds={bounds}
+          lastPeriod={lastPeriod}
+          appliedDraft={appliedDraft}
+          onRecalculate={handleRecalculate}
+          onApply={handleApply}
+          onReset={handleReset}
+          poolDialogOpen={poolDialogOpen}
+          onPoolDialogOpenChange={setPoolDialogOpen}
+          applyToastOpen={applyToastOpen}
+          onApplyToastClose={() => setApplyToastOpen(false)}
+        />
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 1.5 }}>
@@ -842,90 +392,6 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           {t('common.close')}
         </Button>
       </DialogActions>
-
-      <Dialog
-        open={poolDialogOpen && preview != null && preview.pool.length > 0}
-        onClose={() => setPoolDialogOpen(false)}
-        fullWidth
-        maxWidth="md"
-        data-testid="inspect-pool-dialog"
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', pr: 1, py: 1.25 }}>
-          <Typography component="span" variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
-            {t('planner.inspect.poolPanel')}
-            {preview ? ` (${preview.pool.length + 1})` : ''}
-          </Typography>
-          <IconButton
-            aria-label={t('common.close')}
-            onClick={() => setPoolDialogOpen(false)}
-            size="small"
-          >
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-            {t('planner.inspect.poolHint')}
-          </Typography>
-          {preview ? (
-            <Box sx={{ overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Store</TableCell>
-                    <TableCell>Signal</TableCell>
-                    <TableCell align="right">Original</TableCell>
-                    <TableCell align="right">Draft</TableCell>
-                    <TableCell align="right">Δ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>{storeId}</TableCell>
-                    <TableCell>selected</TableCell>
-                    <TableCell align="right">{formatScore(preview.original)}</TableCell>
-                    <TableCell align="right">{formatScore(preview.draft)}</TableCell>
-                    <TableCell align="right">{formatSigned(preview.taken)}</TableCell>
-                  </TableRow>
-                  {preview.pool.map((row) => (
-                    <TableRow key={row.store_id}>
-                      <TableCell>{row.store_id}</TableCell>
-                      <TableCell>
-                        {row.signal === 'selected'
-                          ? 'selected'
-                          : SIGNAL_LABELS[row.signal as keyof typeof SIGNAL_LABELS]}
-                      </TableCell>
-                      <TableCell align="right">{formatScore(row.original)}</TableCell>
-                      <TableCell align="right">{formatScore(row.draft)}</TableCell>
-                      <TableCell align="right">{formatSigned(row.applied_delta)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Box>
-          ) : null}
-        </DialogContent>
-        <DialogActions sx={{ px: 2, py: 1 }}>
-          <Button onClick={() => setPoolDialogOpen(false)}>{t('common.close')}</Button>
-        </DialogActions>
-      </Dialog>
     </Dialog>
-    <Snackbar
-      open={applyToastOpen}
-      autoHideDuration={4000}
-      onClose={() => setApplyToastOpen(false)}
-      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-    >
-      <Alert
-        severity="success"
-        variant="filled"
-        onClose={() => setApplyToastOpen(false)}
-        data-testid="inspect-apply-toast"
-        sx={{ width: '100%' }}
-      >
-        {t('planner.inspect.appliedToast')}
-      </Alert>
-    </Snackbar>
-    </>
   );
 }
