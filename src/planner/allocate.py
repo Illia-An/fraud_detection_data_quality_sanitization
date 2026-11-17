@@ -7,16 +7,9 @@ Shared core for ``plan_five_percent`` (higher is better) and ``plan_tts``
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
-from planner.five_percent import (
-    MonthScore,
-    StoreProjection,
-    add_calendar_months,
-    trajectory_weights,
-)
-
-Direction = Literal["higher_is_better", "lower_is_better"]
+from planner.plan_types import Direction, MonthScore, StoreProjection
+from planner.schedule import add_calendar_months, trajectory_weights
 
 
 @dataclass(frozen=True)
