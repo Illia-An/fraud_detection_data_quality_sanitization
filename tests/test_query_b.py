@@ -24,7 +24,10 @@ from backend.schemas import (
     SurveyAnswerRow,
 )
 from backend.service import run_pipeline_pushdown
-from fraud_guard.tier1 import CUSTOMER_BLACKLIST_VALUE, filter_answered_metric_rows
+from fraud_guard.pipeline_row_rules import (
+    CUSTOMER_BLACKLIST_VALUE,
+    filter_answered_metric_rows,
+)
 
 
 def test_build_tier_candidate_sql_blacklist_only_no_cte() -> None:

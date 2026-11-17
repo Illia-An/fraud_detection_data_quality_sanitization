@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from fraud_guard.contracts import FilterStats
-from fraud_guard.tier1 import FLAG_COL
+from fraud_guard.pipeline_row_rules import FLAG_COL
 
 
 def filter_stats(before: pd.DataFrame, after: pd.DataFrame) -> FilterStats:
