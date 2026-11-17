@@ -9,13 +9,15 @@ backend/             FastAPI API (port 8001; Docker serves SPA too)
 web/                 React 19 + Vite UI (port 5173)
 src/fraud_guard/     Pure fraud filter logic (pipeline tiers)
 src/planner/         Pure planner / TTS allocation math
-notebooks/           EDA → promote rules into fraud_guard
+docs/                Live ops + branching (+ pointer to archive)
 scripts/             One-off read-only DB helpers
 tests/               pytest (no live DB in CI)
 db/                  SQLAlchemy config / engine
 ```
 
 Angular PoC is preserved on git tag `poc/angular-concept` (`frontend/`).
+Historical SPECs, closed SDD tracks, notebooks, and research packs live in
+`C:\McDonalds\99_ARCHIVE\Fraud_Fetection_Data_Quality_Sanitization` (see `docs/README.md`).
 
 ## Environment
 
@@ -56,12 +58,6 @@ npm run test:e2e
 ```
 
 CI runs the same checks on push/PR via `.github/workflows/ci.yml` (pytest, web lint/unit/build, Playwright e2e). No live SQL Server in CI.
-
-Notebooks (from repo root):
-
-```powershell
-uv run jupyter notebook notebooks/
-```
 
 ## Docker (LAN monolith — UI + API)
 

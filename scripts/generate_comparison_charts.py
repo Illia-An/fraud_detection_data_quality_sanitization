@@ -1,4 +1,9 @@
-"""Generate before/after 5% comparison charts (saved to docs/charts/)."""
+"""Generate before/after 5% comparison charts (saved to docs/charts/).
+
+Historical PNGs were archived under
+``99_ARCHIVE/.../06_fraud_research/charts``; re-run this script to recreate
+``docs/charts/`` locally.
+"""
 
 from __future__ import annotations
 
