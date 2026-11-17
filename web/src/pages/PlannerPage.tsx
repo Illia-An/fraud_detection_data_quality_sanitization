@@ -31,7 +31,6 @@ import {
 import { useMemo, useState, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
-import { postExcelReport } from '../api/client';
 import {
   useAdjustSimulation,
   usePlan,
@@ -66,13 +65,8 @@ import {
   buildExcelReportRequest,
   buildExcelReportRequestFromSimulation,
 } from '../schemas/excelReport';
+import { buildSanitizedPanelFromProcess } from '../schemas/sanitizedPanel';
 import {
-  buildSanitizedPanelFromProcess,
-  type SanitizedPanel,
-} from '../schemas/sanitizedPanel';
-import {
-  clampPlanHorizon,
-  clampPlanTarget,
   DEFAULT_PLAN_PARAMS,
   periodLabel,
   type FivePercentPlan,
@@ -99,74 +93,22 @@ import { PlannerPageShell } from '../components/planner/PlannerPageShell';
 import { useCollapsedPlayReveal } from '../components/planner/useCollapsedPlayReveal';
 import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
 import { useAnswerShell } from '../components/planner/useAnswerShell';
+import {
+  fivePercentGoalClamps,
+  usePlannerGoalDrafts,
+} from '../components/planner/usePlannerGoalDrafts';
+import {
+  canExportPlanExcel,
+  usePlannerExcelExport,
+} from '../components/planner/usePlannerExcelExport';
 import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
-
-function baselineRowsAtReference(
-  panel: SanitizedPanel,
-  year: number,
-  month: number,
-): { store_id: number; five_percent: number }[] {
-  return panel.rows
-    .filter((row) => row.year === year && row.month === month)
-    .map((row) => ({ store_id: row.store_id, five_percent: row.five_percent }));
-}
-
-function availableReferences(panel: SanitizedPanel): { year: number; month: number }[] {
-  const keys = new Set<string>();
-  const out: { year: number; month: number }[] = [];
-  for (const row of panel.rows) {
-    const key = periodLabel(row.year, row.month);
-    if (keys.has(key)) {
-      continue;
-    }
-    keys.add(key);
-    out.push({ year: row.year, month: row.month });
-  }
-  out.sort((a, b) => a.year - b.year || a.month - b.month);
-  return out;
-}
-
-function meanChain(rows: { five_percent: number }[]): number | null {
-  // Product lock: equal-weight store mean at reference month (not volume / Final period).
-  if (rows.length === 0) {
-    return null;
-  }
-  return rows.reduce((sum, row) => sum + row.five_percent, 0) / rows.length;
-}
-
-function downloadPlanCsv(plan: FivePercentPlan): void {
-  const periods = plan.chain_trajectory;
-  const header = ['store_id', ...periods.map((p) => periodLabel(p.year, p.month))];
-  const lines = [header.join(',')];
-  lines.push(
-    [
-      'chain',
-      ...periods.map((p) => {
-        const hit = plan.chain_trajectory.find((m) => m.year === p.year && m.month === p.month);
-        return hit ? String(hit.score) : '';
-      }),
-    ].join(','),
-  );
-  for (const projection of plan.projections) {
-    lines.push(
-      [
-        String(projection.store_id),
-        ...periods.map((p) => {
-          const hit = projection.months.find((m) => m.year === p.year && m.month === p.month);
-          return hit ? String(hit.score) : '';
-        }),
-      ].join(','),
-    );
-  }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'plan_five_percent_projections.csv';
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
+import {
+  availablePeriodReferences,
+  baselineRowsAtReference,
+  equalWeightMeanBy,
+} from '../components/planner/plannerBaseline';
+import { downloadPlanProjectionCsv } from '../components/planner/plannerCsv';
 
 export function PlannerPage() {
   const t = useT();
@@ -193,8 +135,7 @@ export function PlannerPage() {
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const showCollapsedPlay = useCollapsedPlayReveal(controlsOpen);
   const [atRiskExpanded, setAtRiskExpanded] = useState(false);
-  const [excelExporting, setExcelExporting] = useState(false);
-  const [excelExportError, setExcelExportError] = useState(false);
+  const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
   const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
   /** Session overrides from Apply suggestion — sent together on each /simulation/adjust. */
   const [impliedAdjustments, setImpliedAdjustments] = useState<ImpliedAdjustment[]>([]);
@@ -218,15 +159,29 @@ export function PlannerPage() {
     }
   }, [processResult]);
 
-  const refs = useMemo(() => (panel ? availableReferences(panel) : []), [panel]);
+  const refs = useMemo(
+    () => (panel ? availablePeriodReferences(panel.rows) : []),
+    [panel],
+  );
   const suggested = refs.length ? refs[refs.length - 1] : null;
 
   const { referenceYear, referenceMonth, setReferenceYear, setReferenceMonth } =
     useReferenceSelection(refs, PLANNER_PREFERRED_REFERENCE);
-  const [target, setTarget] = useState(75);
-  const [horizon, setHorizon] = useState(12);
-  const [targetText, setTargetText] = useState('75');
-  const [horizonText, setHorizonText] = useState('12');
+  const {
+    target,
+    horizon,
+    targetText,
+    horizonText,
+    commitGoalDrafts,
+    onTargetChange,
+    onHorizonChange,
+    onTargetBlur,
+    onHorizonBlur,
+  } = usePlannerGoalDrafts({
+    initialTarget: 75,
+    initialHorizon: 12,
+    ...fivePercentGoalClamps,
+  });
   const [params, setParams] = useState<PlanParams>(DEFAULT_PLAN_PARAMS);
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
@@ -251,9 +206,13 @@ export function PlannerPage() {
 
   const baselineRows =
     panel && effectiveYear != null && effectiveMonth != null
-      ? baselineRowsAtReference(panel, effectiveYear, effectiveMonth)
+      ? baselineRowsAtReference(panel.rows, effectiveYear, effectiveMonth, (row) => ({
+          store_id: row.store_id,
+          five_percent: row.five_percent,
+        }))
       : [];
-  const currentChain = meanChain(baselineRows);
+  // Product lock: equal-weight store mean at reference month (not volume / Final period).
+  const currentChain = equalWeightMeanBy(baselineRows, (row) => row.five_percent);
   const baselineReady = panel != null && panel.row_count > 0;
   const runBlock = plannerRunBlockReason({
     baselineReady,
@@ -325,16 +284,6 @@ export function PlannerPage() {
       }),
     );
     setPendingMixId(null);
-  };
-
-  const commitGoalDrafts = (): { target: number; horizon: number } => {
-    const nextTarget = clampPlanTarget(targetText, target);
-    const nextHorizon = clampPlanHorizon(horizonText, horizon);
-    setTarget(nextTarget);
-    setTargetText(String(nextTarget));
-    setHorizon(nextHorizon);
-    setHorizonText(String(nextHorizon));
-    return { target: nextTarget, horizon: nextHorizon };
   };
 
   const refreshSlopeSimulation = (opts: {
@@ -578,11 +527,11 @@ export function PlannerPage() {
     if (!draftPlan) {
       return;
     }
-    downloadPlanCsv(draftPlan);
+    downloadPlanProjectionCsv(draftPlan, 'plan_five_percent_projections.csv');
     acceptDraftAsApproved();
   };
 
-  const canExportExcel = draftPlan != null && panel != null && panel.rows.length > 0;
+  const canExportExcel = canExportPlanExcel(draftPlan, panel);
   const canSavePlan =
     draftPlan != null && panel != null && panelToSimulationFacts(panel).length > 0;
   const slopeLayers = useMemo(
@@ -612,30 +561,17 @@ export function PlannerPage() {
   }, [selectedStoreId, slopeSimulation]);
 
   const handleExportExcel = () => {
-    if (!draftPlan || !panel || panel.rows.length === 0 || excelExporting) {
+    if (!draftPlan || !panel) {
       return;
     }
-    setExcelExportError(false);
-    setExcelExporting(true);
-    const request =
-      slopeSimulation != null
-        ? buildExcelReportRequestFromSimulation(panel, draftPlan, slopeSimulation)
-        : buildExcelReportRequest(panel, draftPlan);
-    void postExcelReport(request)
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = 'sanitization-plan-report.xlsx';
-        anchor.click();
-        URL.revokeObjectURL(url);
-      })
-      .catch(() => {
-        setExcelExportError(true);
-      })
-      .finally(() => {
-        setExcelExporting(false);
-      });
+    exportExcel({
+      canExport: canExportExcel,
+      filename: 'sanitization-plan-report.xlsx',
+      buildRequest: () =>
+        slopeSimulation != null
+          ? buildExcelReportRequestFromSimulation(panel, draftPlan, slopeSimulation)
+          : buildExcelReportRequest(panel, draftPlan),
+    });
   };
 
   return (
@@ -725,21 +661,8 @@ export function PlannerPage() {
                 size="small"
                 value={targetText}
                 disabled={!baselineReady}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) {
-                    return;
-                  }
-                  setTargetText(raw);
-                  if (raw !== '' && Number.isFinite(Number(raw))) {
-                    setTarget(Number(raw));
-                  }
-                }}
-                onBlur={() => {
-                  const next = clampPlanTarget(targetText, target);
-                  setTarget(next);
-                  setTargetText(String(next));
-                }}
+                onChange={(e) => onTargetChange(e.target.value)}
+                onBlur={onTargetBlur}
                 inputProps={{ inputMode: 'decimal', 'aria-label': t('planner.target') }}
                 helperText={t('planner.targetHint')}
               />
@@ -749,21 +672,8 @@ export function PlannerPage() {
                 size="small"
                 value={horizonText}
                 disabled={!baselineReady}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw !== '' && !/^\d*$/.test(raw)) {
-                    return;
-                  }
-                  setHorizonText(raw);
-                  if (raw !== '' && Number.isFinite(Number(raw))) {
-                    setHorizon(Number(raw));
-                  }
-                }}
-                onBlur={() => {
-                  const next = clampPlanHorizon(horizonText, horizon);
-                  setHorizon(next);
-                  setHorizonText(String(next));
-                }}
+                onChange={(e) => onHorizonChange(e.target.value)}
+                onBlur={onHorizonBlur}
                 inputProps={{ inputMode: 'numeric', 'aria-label': t('planner.horizon') }}
                 helperText={t('planner.horizonHint')}
               />
