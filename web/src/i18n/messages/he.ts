@@ -295,9 +295,9 @@ export const he: Record<MessageKey, string> = {
   'planner.slope.tip.actual':
     'עובדה חודשית מנוקה עד חודש העובדה האחרון (נקודות שחורות). לא אותו דבר כמו תוכנית.',
   'planner.slope.tip.plan':
-    'יעדים חודשיים של התוכנית (כחול). אחרי שמירה קופאים; אחרת עוקבים אחרי הנתיב החי.',
+    'רשת: פירוק חודשי של תוכנית history-cum ליעד. סניף: אותה תוכנית שרשרת מחולקת לסניפים. לא תחזית הסימולציה.',
   'planner.slope.tip.planCum':
-    'ממוצע רץ של תוכנית חודשית בשנת התכנון — השוואה הוגנת מול עובדה + תחזית בשנת תכנון (מצטבר).',
+    'מסלול מצטבר היסטורי ליניארי מ־cum-as-of (אותה נקודה כמו History cumulative) ליעד הרשת עד דצמבר. השוואה הוגנת ל־History — לא לסדרת YTD.',
   'planner.slope.tip.cumActualSimYtd':
     'ממוצע רץ בשנת התכנון בלבד (לא כל ההיסטוריה): רציף עד עובדה אחרונה, מקווקו אחרי (תחזית). זו תחזית EOY מול היעד. אותו גרעין כמו תוכנית (מצטבר).',
   'planner.slope.tip.simulation':
@@ -403,6 +403,7 @@ export const he: Record<MessageKey, string> = {
   'planner.heroSub':
     'עובדה מנוקה משמאל ל־as-of · תחזית טיוטה + חרוט מ־as-of · סמן יעד',
   'planner.heroNeedPanel': 'נדרש פאנל מנוקה לתצוגת ההערכה.',
+  'planner.heroNeedSimulation': 'הרץ סימולציה כדי להציג את גרפי Slope.',
   'planner.atRiskTitle': 'רשימת חריגים בסיכון',
   'planner.atRiskSub': 'Management by Exception · מאחור / מובילים / הכל · Inspect פותח sandbox',
 

@@ -23,12 +23,10 @@ import {
   Select,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import {
@@ -44,7 +42,6 @@ import {
   buildNetworkCumulativeSlopeLayers,
   getStoreBoostGlance,
 } from '../components/planner/cumulativeSlopeLayers';
-import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import {
   mergeImpliedAdjustment,
   type ImpliedAdjustment,
@@ -142,8 +139,6 @@ export function PlannerPage() {
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
   const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
-  /** Keep legacy Hero as default; Slope is opt-in after /simulation lands. */
-  const [heroViewMode, setHeroViewMode] = useState<'legacy' | 'slope'>('legacy');
 
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
   usePlannerOnboardingShell({ prefix: 'planner', setControlsOpen, setAtRiskExpanded });
@@ -313,7 +308,6 @@ export function PlannerPage() {
           // Fresh /simulation has no overrides — drop session Apply stack.
           setImpliedAdjustments([]);
           setSlopeSimulation(response);
-          setHeroViewMode('slope');
         },
       },
     );
@@ -472,7 +466,6 @@ export function PlannerPage() {
         onSuccess: (response) => {
           setImpliedAdjustments(nextAdjustments);
           setSlopeSimulation(response);
-          setHeroViewMode('slope');
         },
         onError: () => {
           setAdjustSuggestionError(true);
@@ -1147,44 +1140,7 @@ export function PlannerPage() {
                 >
                   <CardHeader
                     title={t('planner.heroTitle')}
-                    subheader={t(
-                      slopeLayers && heroViewMode === 'slope'
-                        ? 'planner.heroSubSlope'
-                        : 'planner.heroSub',
-                    )}
-                    action={
-                      slopeLayers ? (
-                        <ToggleButtonGroup
-                          size="small"
-                          exclusive
-                          value={heroViewMode}
-                          onChange={(
-                            _event: MouseEvent<HTMLElement>,
-                            next: 'legacy' | 'slope' | null,
-                          ) => {
-                            if (next != null) {
-                              setHeroViewMode(next);
-                            }
-                          }}
-                          aria-label={t('planner.hero.viewModeAria')}
-                          data-testid="planner-hero-view-mode"
-                          sx={{ mr: 1, mt: 0.5 }}
-                        >
-                          <ToggleButton
-                            value="legacy"
-                            aria-label={t('planner.hero.viewLegacyAria')}
-                          >
-                            {t('planner.hero.viewLegacy')}
-                          </ToggleButton>
-                          <ToggleButton
-                            value="slope"
-                            aria-label={t('planner.hero.viewSlopeAria')}
-                          >
-                            {t('planner.hero.viewSlope')}
-                          </ToggleButton>
-                        </ToggleButtonGroup>
-                      ) : undefined
-                    }
+                    subheader={t('planner.heroSubSlope')}
                     sx={{ flexShrink: 0, pb: 0 }}
                   />
                   <CardContent
@@ -1217,30 +1173,14 @@ export function PlannerPage() {
                         />
                       </Tooltip>
                     ) : null}
-                    {panel && slopeLayers && heroViewMode === 'slope' ? (
+                    {panel && slopeLayers ? (
                       <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                         <CumulativeSlopeHeroChart layers={slopeLayers} />
                       </Box>
                     ) : panel ? (
-                      <HeroSimulationChart
-                        draftPlan={draftPlan}
-                        panel={panel}
-                        asOfYear={
-                          monitoring?.as_of_year ??
-                          asOfYear ??
-                          draftPlan.chain_trajectory[0]?.year ??
-                          effectiveYear ??
-                          new Date().getFullYear()
-                        }
-                        asOfMonth={
-                          monitoring?.as_of_month ??
-                          asOfMonth ??
-                          draftPlan.chain_trajectory[0]?.month ??
-                          effectiveMonth ??
-                          1
-                        }
-                        slackBandPp={Math.min(2, params.max_monthly_improve * 0.35)}
-                      />
+                      <Typography variant="body2" color="text.secondary">
+                        {t('planner.heroNeedSimulation')}
+                      </Typography>
                     ) : (
                       <Typography variant="body2" color="text.secondary">
                         {t('planner.heroNeedPanel')}

@@ -306,9 +306,9 @@ export const en = {
   'planner.slope.tip.actual':
     'Cleansed monthly fact through the last available fact month (black points). Not the same as Plan.',
   'planner.slope.tip.plan':
-    'Monthly plan targets (blue). After Save Plan these freeze; otherwise they follow the live computed path.',
+    'Network: monthly decomposition of the history-cum Plan to target. Store Inspect: that chain Plan allocated to stores (equal-weight mean tracks chain). Not the live Simulation forecast.',
   'planner.slope.tip.planCum':
-    'Running mean of monthly plan in the planning year — fair compare to Planning-year fact + forecast (cumulative).',
+    'Linear history cumulative path from cum-as-of (same point as History cumulative) to the network target by December. Fair compare to History cumulative — not the YTD series.',
   'planner.slope.tip.cumActualSimYtd':
     'Planning-year running mean only (not full history): solid through last fact, dashed after (forecast). This is the EOY forecast used vs Target. Same grain as Plan (cumulative).',
   'planner.slope.tip.simulation':
@@ -415,6 +415,7 @@ export const en = {
   'planner.heroSub':
     'Cleansed fact left of as-of · draft forecast + cone from as-of · target marker',
   'planner.heroNeedPanel': 'Cleansed panel required for evaluation view.',
+  'planner.heroNeedSimulation': 'Run simulation to show the Slope hero charts.',
   'planner.atRiskTitle': 'At-Risk Exception List',
   'planner.atRiskSub': 'Management by Exception · Behind / Gainers / All · Inspect opens sandbox',
 
