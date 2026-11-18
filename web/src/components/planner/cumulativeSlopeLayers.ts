@@ -1,7 +1,12 @@
 /** Build Plotly-ready Plan / Actual / Simulation series from SimulationResponse. */
 
 import type { SimulationResponse } from '../../schemas/cumulativePlan';
-import { requiredPairFromWindowThroughLastFact } from './heroEvaluationSeries';
+import { allocateStorePlansFromChain } from './chainStoreAllocate';
+import {
+  linearCumulativePathToTarget,
+  monthlyFromCumulativePath,
+  requiredPairFromWindowThroughLastFact,
+} from './heroEvaluationSeries';
 
 export interface YearMonth {
   year: number;
@@ -28,9 +33,9 @@ export interface SlopeCutover {
 /** Shared plot series for network Hero and store Inspect Slope panels. */
 export interface CumulativeSlopePlotLayers {
   labels: string[];
-  /** Frozen / computed monthly targets. */
+  /** Monthly Plan = decomposition of planCumYs (normative path to target). */
   planYs: (number | null)[];
-  /** Cumulative planned — planning-year running mean. */
+  /** Cumulative Plan — linear history-cum path from cum-as-of to target. */
   planCumYs: (number | null)[];
   /** Actual monthly (null after as-of). */
   actualYs: (number | null)[];
@@ -309,6 +314,118 @@ export function buildPlanningYearCumYs(
   });
 }
 
+export interface HistoryCumLinearPlanPair {
+  planYs: (number | null)[];
+  planCumYs: (number | null)[];
+}
+
+/** @deprecated alias — Plan is history-cum grain now. */
+export type PlanningYearLinearPlanPair = HistoryCumLinearPlanPair;
+
+/**
+ * Normative Plan in **history cumulative** grain: linear path from long-run cum-as-of
+ * to `target` by Dec of planning year, then monthly decomposition.
+ *
+ * Through handoff: Plan mirrors fact monthly + history cum (continuous with the grey line).
+ * After handoff: linear history-cum path (not YTD, not slope simulation).
+ */
+export function buildHistoryCumLinearPlan(
+  spine: YearMonth[],
+  planningYear: number,
+  actualYs: (number | null)[],
+  historyCumYs: (number | null)[],
+  cutover: SlopeCutover,
+  target: number,
+  entryFallback: number,
+): HistoryCumLinearPlanPair {
+  const n = spine.length;
+  const planYs: (number | null)[] = Array.from({ length: n }, () => null);
+  const planCumYs: (number | null)[] = Array.from({ length: n }, () => null);
+
+  const handoffIdx = cutover.factEndIndex;
+  const horizonEndIdx = (() => {
+    let last = -1;
+    for (let i = 0; i < n; i += 1) {
+      if (spine[i]!.year < planningYear || spine[i]!.year === planningYear) {
+        last = i;
+      }
+    }
+    return last;
+  })();
+
+  if (handoffIdx >= 0) {
+    const startCum = historyCumYs[handoffIdx];
+    if (startCum == null || !Number.isFinite(startCum)) {
+      return { planYs, planCumYs };
+    }
+    let startCount = 0;
+    for (let i = 0; i <= handoffIdx; i += 1) {
+      if (actualYs[i] != null) {
+        startCount += 1;
+      }
+      planYs[i] = actualYs[i];
+      planCumYs[i] = historyCumYs[i];
+    }
+    if (startCount < 1) {
+      startCount = 1;
+    }
+    const horizonIdxs: number[] = [];
+    for (let i = handoffIdx + 1; i <= horizonEndIdx; i += 1) {
+      horizonIdxs.push(i);
+    }
+    if (horizonIdxs.length === 0) {
+      return { planYs, planCumYs };
+    }
+    const path = linearCumulativePathToTarget(startCum, target, horizonIdxs.length);
+    const monthlies = monthlyFromCumulativePath(startCum, startCount, path);
+    for (let k = 0; k < horizonIdxs.length; k += 1) {
+      const idx = horizonIdxs[k]!;
+      planYs[idx] = monthlies[k]!;
+      planCumYs[idx] = path[k]!;
+    }
+    return { planYs, planCumYs };
+  }
+
+  // No plotted fact: path over full spine through Dec planning year from fallback.
+  if (horizonEndIdx < 0) {
+    return { planYs, planCumYs };
+  }
+  const horizonIdxs = Array.from({ length: horizonEndIdx + 1 }, (_, i) => i);
+  const path = linearCumulativePathToTarget(entryFallback, target, horizonIdxs.length);
+  const firstMonthly = path[0]!;
+  planYs[0] = firstMonthly;
+  planCumYs[0] = path[0]!;
+  if (horizonIdxs.length > 1) {
+    const rest = monthlyFromCumulativePath(path[0]!, 1, path.slice(1));
+    for (let k = 0; k < rest.length; k += 1) {
+      planYs[horizonIdxs[k + 1]!] = rest[k]!;
+      planCumYs[horizonIdxs[k + 1]!] = path[k + 1]!;
+    }
+  }
+  return { planYs, planCumYs };
+}
+
+/** @deprecated use {@link buildHistoryCumLinearPlan}. */
+export function buildPlanningYearLinearPlan(
+  spine: YearMonth[],
+  planningYear: number,
+  actualYs: (number | null)[],
+  historyCumYs: (number | null)[],
+  cutover: SlopeCutover,
+  target: number,
+  entryFallback: number,
+): HistoryCumLinearPlanPair {
+  return buildHistoryCumLinearPlan(
+    spine,
+    planningYear,
+    actualYs,
+    historyCumYs,
+    cutover,
+    target,
+    entryFallback,
+  );
+}
+
 /** Network-level layers for Hero (equal-weight across stores). */
 export function buildNetworkCumulativeSlopeLayers(
   sim: SimulationResponse,
@@ -320,10 +437,6 @@ export function buildNetworkCumulativeSlopeLayers(
   const asOfLabel = ymLabel(sim.as_of.year, sim.as_of.month);
   const asOfIdx = labels.indexOf(asOfLabel);
 
-  const planYs = spine.map((ym) => meanAt(sim.stores, (s) => s.monthly_target, ym.year, ym.month));
-  const planCumYs = spine.map((ym) =>
-    meanAt(sim.stores, (s) => s.cumulative_planned, ym.year, ym.month),
-  );
   const actualYs = spine.map((ym, i) => {
     if (asOfIdx >= 0 && i > asOfIdx) {
       return null;
@@ -344,6 +457,15 @@ export function buildNetworkCumulativeSlopeLayers(
     networkStitchedMonth(sim.stores, ym, asOfYm),
   );
   const cutover = resolveSlopeCutover(labels, actualYs, asOfLabel);
+  const { planYs, planCumYs } = buildHistoryCumLinearPlan(
+    spine,
+    sim.planning_year,
+    actualYs,
+    cumActualSimYs,
+    cutover,
+    sim.network.network_target,
+    sim.network.network_mean_as_of,
+  );
   const required = buildRequiredFromDataStart(
     spine,
     actualYs,
@@ -400,6 +522,94 @@ export function getStoreBoostGlance(
   };
 }
 
+/**
+ * Network Plan (steps 1–3) then allocate to every store (step 4).
+ * Store Inspect Plan is the allocated series — not an independent linear-to-implied path.
+ */
+export function buildAllocatedStorePlans(
+  sim: SimulationResponse,
+): {
+  spine: YearMonth[];
+  labels: string[];
+  networkPlanYs: (number | null)[];
+  networkPlanCumYs: (number | null)[];
+  networkCutover: SlopeCutover;
+  byStore: Map<number, { planYs: (number | null)[]; planCumYs: (number | null)[] }>;
+} {
+  const spineStart = inferSlopeSpineStart(sim);
+  const spineEnd: YearMonth = { year: sim.planning_year, month: 12 };
+  const spine = monthSpan(spineStart, spineEnd);
+  const labels = spine.map((ym) => ymLabel(ym.year, ym.month));
+  const asOfLabel = ymLabel(sim.as_of.year, sim.as_of.month);
+  const asOfIdx = labels.indexOf(asOfLabel);
+
+  const networkActualYs = spine.map((ym, i) => {
+    if (asOfIdx >= 0 && i > asOfIdx) {
+      return null;
+    }
+    return meanAt(sim.stores, (s) => s.actual, ym.year, ym.month);
+  });
+  const networkHistoryCum = spine.map((ym) =>
+    meanAt(sim.stores, (s) => s.cumulative_actual_or_simulation, ym.year, ym.month),
+  );
+  const networkCutover = resolveSlopeCutover(labels, networkActualYs, asOfLabel);
+  const { planYs: networkPlanYs, planCumYs: networkPlanCumYs } = buildHistoryCumLinearPlan(
+    spine,
+    sim.planning_year,
+    networkActualYs,
+    networkHistoryCum,
+    networkCutover,
+    sim.network.network_target,
+    sim.network.network_mean_as_of,
+  );
+
+  const storeIds = sim.stores.map((s) => s.store_id);
+  const storeActualYs = new Map<number, (number | null)[]>();
+  const storeHistoryCumYs = new Map<number, (number | null)[]>();
+  const entryScores = new Map<number, number>();
+  for (const s of sim.stores) {
+    const actual = spine.map((ym, i) => {
+      if (asOfIdx >= 0 && i > asOfIdx) {
+        return null;
+      }
+      return scoreAt(s.actual, ym.year, ym.month);
+    });
+    storeActualYs.set(s.store_id, actual);
+    storeHistoryCumYs.set(
+      s.store_id,
+      spine.map((ym) => scoreAt(s.cumulative_actual_or_simulation, ym.year, ym.month)),
+    );
+    const asOfScore =
+      scoreAt(s.actual, sim.as_of.year, sim.as_of.month) ??
+      [...actual].reverse().find((v) => v != null) ??
+      sim.network.network_mean_as_of;
+    entryScores.set(s.store_id, asOfScore);
+  }
+
+  const handoffIdx = networkCutover.factEndIndex;
+
+  const byStore = allocateStorePlansFromChain(
+    storeIds,
+    spine,
+    sim.planning_year,
+    networkPlanYs,
+    storeActualYs,
+    handoffIdx,
+    entryScores,
+    {},
+    storeHistoryCumYs,
+  );
+
+  return {
+    spine,
+    labels,
+    networkPlanYs,
+    networkPlanCumYs,
+    networkCutover,
+    byStore,
+  };
+}
+
 export function buildStoreCumulativeSlopeLayers(
   sim: SimulationResponse,
   storeId: number,
@@ -427,24 +637,30 @@ export function buildStoreCumulativeSlopeLayers(
   );
   const actualYs = actualRaw.map((v, i) => (asOfIdx >= 0 && i > asOfIdx ? null : v));
   const cutover = resolveSlopeCutover(labels, actualYs, asOfLabel);
+  const allocated = buildAllocatedStorePlans(sim);
+  const storePlan = allocated.byStore.get(storeId);
+  const planYs = storePlan?.planYs ?? Array.from({ length: labels.length }, () => null);
+  const planCumYs =
+    storePlan?.planCumYs ?? Array.from({ length: labels.length }, () => null);
+  const networkTarget = sim.network.network_target;
   const required = buildRequiredFromDataStart(
     spine,
     actualYs,
     spineStart,
-    sim.network.network_target,
+    networkTarget,
     sim.planning_year,
   );
   return {
     labels,
-    planYs: scoreMap(store.monthly_target),
-    planCumYs: scoreMap(store.cumulative_planned),
+    planYs,
+    planCumYs,
     actualYs,
     simYs: simRaw.map((v, i) => (asOfIdx >= 0 && i <= asOfIdx ? null : v)),
     cumActualSimYs: scoreMap(store.cumulative_actual_or_simulation),
     cumActualSimYtdYs,
     requiredMonthlyYs: required.requiredMonthlyYs,
     requiredCumulativeYs: required.requiredCumulativeYs,
-    target: sim.network.network_target,
+    target: networkTarget,
     asOfLabel,
     cutover,
     unreachable: store.unreachable,

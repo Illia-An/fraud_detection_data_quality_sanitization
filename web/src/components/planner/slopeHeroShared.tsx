@@ -109,9 +109,12 @@ export const SLOPE_MONTHLY_LEGEND: readonly EvaluationLegendItem[] = [
   },
 ] as const;
 
-/** Long-run cumulative + required path hidden by default on the cumulative panel. */
+/**
+ * History cum is the fair compare for Plan (history-cum grain).
+ * YTD forecast + required stay opt-in.
+ */
 export const SLOPE_CUMULATIVE_DEFAULT_HIDDEN: readonly string[] = [
-  'cumActualSim',
+  'cumActualSimYtd',
   'requiredCumulative',
 ];
 
