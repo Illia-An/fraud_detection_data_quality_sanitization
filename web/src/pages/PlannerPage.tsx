@@ -99,6 +99,7 @@ import {
   usePlannerExcelExport,
 } from '../components/planner/usePlannerExcelExport';
 import { useSlopePlanDraft } from '../components/planner/useSlopePlanDraft';
+import { storeMonthlyTargetsFromPackage } from '../components/planner/slopePlanRecompute';
 import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
 import {
@@ -477,7 +478,7 @@ export function PlannerPage() {
   };
 
   const handleSavePlan = () => {
-    if (!panel || !draftPlan) {
+    if (!panel || !draftPlan || !canSavePlan) {
       return;
     }
     const facts = panelToSimulationFacts(panel);
@@ -488,6 +489,21 @@ export function PlannerPage() {
       year: asOfYear ?? draftPlan.chain_trajectory[0]?.year ?? effectiveYear ?? new Date().getFullYear(),
       month: asOfMonth ?? draftPlan.chain_trajectory[0]?.month ?? effectiveMonth ?? 1,
     };
+    let storeMonthlyTargets:
+      | { store_id: number; monthly_target: { year: number; month: number; score: number }[] }[]
+      | undefined;
+    if (slopePlanDraft.dirty && slopePlanDraft.lastGood && slopeLayers) {
+      try {
+        storeMonthlyTargets = storeMonthlyTargetsFromPackage(
+          slopePlanDraft.lastGood,
+          slopeLayers.labels,
+          asOf.year,
+        );
+      } catch {
+        setSavePlanError(true);
+        return;
+      }
+    }
     setSavePlanError(false);
     setSavePlanOk(false);
     savePlanMutation.mutate(
@@ -499,12 +515,16 @@ export function PlannerPage() {
         cumulative_start: { year: 2025, month: 1 },
         solver: 'cumulative_slope',
         facts,
+        ...(storeMonthlyTargets != null && storeMonthlyTargets.length > 0
+          ? { store_monthly_targets: storeMonthlyTargets }
+          : {}),
       },
       {
         onSuccess: (version) => {
           setActivePlanVersionId(version.meta.id);
           setSavePlanOk(true);
           acceptDraftAsApproved();
+          slopePlanDraft.resetPins();
           refreshSlopeSimulation({
             networkTarget: target,
             asOf,
@@ -541,7 +561,7 @@ export function PlannerPage() {
     draftPlan != null &&
     panel != null &&
     panelToSimulationFacts(panel).length > 0 &&
-    !slopePlanDraft.dirty;
+    slopePlanDraft.status !== 'previewing';
 
   // Spec L4: UI target change cancels unfinished pin draft (sim target updates on Run).
   useEffect(() => {
@@ -902,7 +922,7 @@ export function PlannerPage() {
                 <Tooltip
                   title={
                     slopePlanDraft.dirty
-                      ? t('planner.savePlanBlockedByPinsTip')
+                      ? t('planner.savePlanWithPinsTip')
                       : canSavePlan
                         ? t('planner.savePlanTip')
                         : t('planner.savePlanDisabledTip')

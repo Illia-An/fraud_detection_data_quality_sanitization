@@ -281,7 +281,9 @@ export const en = {
     'Freeze the current baseline as a new server version (blue line). Simulation still updates live.',
   'planner.savePlanDisabledTip': 'Run a simulation first, then save a baseline version.',
   'planner.savePlanBlockedByPinsTip':
-    'Unsaved Slope plan point edits are draft-only. Reset the path or wait for Phase 2 Save — Save still freezes the simulation baseline, not the dragged plan.',
+    'Finish the point drag first (release the marker), then Save freezes the edited Slope path.',
+  'planner.savePlanWithPinsTip':
+    'Save freezes the edited Slope plan path (store monthlies from the pin package), not the live simulation forecast.',
   'planner.savePlanFailed': 'Could not save the plan version.',
   'planner.savePlanSaved': 'Plan version saved.',
   'planner.unreachableChip': '{count} stores: unrealistic implied targets',
@@ -344,7 +346,7 @@ export const en = {
   'planner.slope.dragHint':
     'Drag blue Plan markers after cutover (cumulative or monthly). Both panels and Inspect Plan update live. Simulation is not editable.',
   'planner.slope.pinsDirty':
-    'Slope plan path edited (draft). Save Plan is blocked until you reset — Phase 2 will persist dragged paths.',
+    'Slope plan path edited. Save Plan will freeze this path; Reset discards pin edits.',
   'planner.slope.resetPins': 'Reset plan path',
   'planner.slope.pinError': 'Plan edit rejected ({code}): {reason}',
   'planner.heroSubSlope':

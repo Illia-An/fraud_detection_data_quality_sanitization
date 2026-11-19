@@ -141,3 +141,41 @@ export function slopePlanContextKey(sim: SimulationResponse | null): string {
     ymLabel(sim.as_of.year, sim.as_of.month),
   ].join('|');
 }
+
+function parseLabel(label: string): { year: number; month: number } | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(label);
+  if (!m) return null;
+  return { year: Number(m[1]), month: Number(m[2]) };
+}
+
+/**
+ * Build Save payload overrides from an allocated pin package (planning-year months).
+ */
+export function storeMonthlyTargetsFromPackage(
+  pkg: SlopePlanPackage,
+  labels: string[],
+  planningYear: number,
+): { store_id: number; monthly_target: { year: number; month: number; score: number }[] }[] {
+  if (!pkg.byStore || pkg.byStore.size === 0) {
+    return [];
+  }
+  const out: {
+    store_id: number;
+    monthly_target: { year: number; month: number; score: number }[];
+  }[] = [];
+  for (const [storeId, series] of [...pkg.byStore.entries()].sort((a, b) => a[0] - b[0])) {
+    const monthly_target: { year: number; month: number; score: number }[] = [];
+    for (let i = 0; i < labels.length; i += 1) {
+      const ym = parseLabel(labels[i]!);
+      if (!ym || ym.year !== planningYear) continue;
+      const score = series.planYs[i];
+      if (score == null || !Number.isFinite(score)) continue;
+      monthly_target.push({ year: ym.year, month: ym.month, score });
+    }
+    if (monthly_target.length === 0) {
+      throw new Error(`store ${storeId} has no planning-year plan monthlies to save`);
+    }
+    out.push({ store_id: storeId, monthly_target });
+  }
+  return out;
+}

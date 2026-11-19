@@ -31,7 +31,10 @@ from backend.tts_plan_schemas import (
     TtsPlanResponse,
 )
 from planner.cumulative_slope import build_baseline_plan, simulate
-from planner.cumulative_slope.plan_version import build_plan_version
+from planner.cumulative_slope.plan_version import (
+    apply_store_monthly_overrides,
+    build_plan_version,
+)
 from planner.five_percent import plan_five_percent
 from planner.tts import plan_tts
 from planner.tts_bounds import tts_bounds_payload
@@ -165,6 +168,12 @@ def create_plan_version(body: PlanVersionCreateRequest) -> PlanVersionOut:
             cumulative_start=cumulative_start,
             params=params,
         )
+        if body.store_monthly_targets:
+            overrides = {
+                row.store_id: tuple(m.to_domain() for m in row.monthly_target)
+                for row in body.store_monthly_targets
+            }
+            result = apply_store_monthly_overrides(result, overrides)
         version = build_plan_version(
             result,
             cumulative_start=cumulative_start,

@@ -270,7 +270,9 @@ export const he: Record<MessageKey, string> = {
     'הקפאת קו הבסיס כגרסה חדשה בשרת (קו כחול). הסימולציה ממשיכה להתעדכן בזמן אמת.',
   'planner.savePlanDisabledTip': 'הרץ סימולציה ואז שמור גרסת תוכנית.',
   'planner.savePlanBlockedByPinsTip':
-    'עריכות נקודות תוכנית Slope הן טיוטה בלבד. אפסו את המסלול או המתינו ל־Phase 2 — Save עדיין מקפיא את קו הסימולציה, לא את התוכנית שנגררה.',
+    'סיימו את גרירת הנקודה (שחרור), ואז Save יקפיא את מסלול Slope הערוך.',
+  'planner.savePlanWithPinsTip':
+    'Save מקפיא את מסלול תוכנית Slope הערוך (חודשיים לפי חבילת ה־pin), לא את תחזית הסימולציה החיה.',
   'planner.savePlanFailed': 'לא ניתן לשמור את גרסת התוכנית.',
   'planner.savePlanSaved': 'גרסת התוכנית נשמרה.',
   'planner.unreachableChip': '{count} סניפים: יעדים מרומזים לא ריאליים',
@@ -333,7 +335,7 @@ export const he: Record<MessageKey, string> = {
   'planner.slope.dragHint':
     'גררו נקודות תוכנית כחולות אחרי החיתוך (מצטבר או חודשי). שני הפאנלים ותוכנית Inspect מתעדכנים בזמן אמת. הסימולציה אינה ניתנת לגרירה.',
   'planner.slope.pinsDirty':
-    'מסלול תוכנית Slope נערך (טיוטה). Save חסום עד איפוס — Phase 2 ישמור מסלולים שנגררו.',
+    'מסלול תוכנית Slope נערך. Save יקפיא מסלול זה; איפוס מבטל עריכות pin.',
   'planner.slope.resetPins': 'אפס מסלול תוכנית',
   'planner.slope.pinError': 'עריכת תוכנית נדחתה ({code}): {reason}',
   'planner.heroSubSlope':

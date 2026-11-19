@@ -3,7 +3,7 @@
 **Branch:** `exp/slope-plan-point-drag`  
 **Parent contract:** [`slope_plan_cum_to_target.md`](slope_plan_cum_to_target.md)  
 **Metric:** Q10012 five_percent (network Hero + store Inspect Slope)  
-**Status:** Phase 1 (draft drag) — implemented on branch; Save persist = Phase 2
+**Status:** Phase 1+2 on branch — live drag + Save Option A (`store_monthly_targets`)
 
 ---
 
@@ -188,9 +188,9 @@ pointerup → same recompute; on ok: lastGood = preview
 
 ### Step 5 — Phase 2 (optional, separate)
 
-- [ ] Persist edited package on Save (**Option A**: client sends monthlies)
-- [ ] Update parent contract Save non-goal
-- [ ] API / schema / tests
+- [x] Persist edited package on Save (**Option A**: client sends monthlies)
+- [x] Update parent contract Save non-goal
+- [x] API / schema / tests
 
 ---
 
@@ -291,14 +291,26 @@ pointerup → same recompute; on ok: lastGood = preview
   Server persists without re-solving pins. Porting pin math to Python only if
   we later need server-side authority (Option B).
 
-**Remaining:** manual UI checklist on `npm run dev` (drag both panels,
-Inspect sync, Save blocked, Reset / Run).
+### Report — Step 5 (Phase 2 Save Option A)
+
+**Date:** 2026-11-19  
+**Done:**
+
+- Backend: `apply_store_monthly_overrides` + optional
+  `store_monthly_targets` on `POST /plan-versions`.
+- FE: Save sends overrides from `lastGood` package; resets pins on success;
+  Save allowed while dirty (blocked only during active preview).
+- API test `test_save_with_store_monthly_targets_override` green.
+- Parent contract non-goal for Save payload lifted (pointer to this SPEC).
+
+**Remaining:** manual UI checklist on `npm run dev`.
 
 **Verify:**
 
 ```powershell
+uv run pytest tests/test_cumulative_plan_api.py::test_save_with_store_monthly_targets_override --no-cov
 cd web
 npm run test:run -- src/components/planner/planTrajectoryPins.test.ts src/components/planner/slopePlanRecompute.test.ts src/components/planner/useSlopePlanDraft.test.ts
 npm run dev
-# Planner → drag blue Plan markers after cutover on both panels
+# Planner → drag Plan markers → Save → confirm frozen monthlies
 ```

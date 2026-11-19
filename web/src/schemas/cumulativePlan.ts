@@ -32,6 +32,11 @@ export const networkPlanParamsSchema = z.object({
 
 export type NetworkPlanParamsIn = z.input<typeof networkPlanParamsSchema>;
 
+export const storeMonthlyTargetOverrideSchema = z.object({
+  store_id: z.number().int(),
+  monthly_target: z.array(monthScoreSchema).min(1),
+});
+
 export const planVersionCreateRequestSchema = z.object({
   label: z.string().nullable().optional(),
   network_target: z.number().min(0).max(100).default(75),
@@ -41,6 +46,8 @@ export const planVersionCreateRequestSchema = z.object({
   solver: z.literal('cumulative_slope').default('cumulative_slope'),
   params: networkPlanParamsSchema.default({}),
   facts: z.array(storeMonthFactSchema).min(1),
+  /** Phase 2 Option A — freeze client pin/allocate package instead of sim slopes. */
+  store_monthly_targets: z.array(storeMonthlyTargetOverrideSchema).optional(),
 });
 
 export type PlanVersionCreateRequest = z.input<typeof planVersionCreateRequestSchema>;

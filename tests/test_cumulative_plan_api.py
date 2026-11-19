@@ -87,6 +87,30 @@ def test_second_save_creates_new_immutable_version(tmp_path: Path, monkeypatch):
     assert len(listed) == 2
 
 
+def test_save_with_store_monthly_targets_override(tmp_path: Path, monkeypatch):
+    """Phase 2 Option A: client pin package monthlies freeze instead of sim slopes."""
+    monkeypatch.setenv("PLAN_STORE_PATH", str(tmp_path / "plans.sqlite"))
+    client = TestClient(create_app())
+    months = [
+        {"year": 2025, "month": m, "score": 70.0 + m}
+        for m in range(1, 13)
+    ]
+    created = client.post(
+        "/api/v1/plan-versions",
+        json=_base_body(
+            label="pinned",
+            store_monthly_targets=[
+                {"store_id": 10, "monthly_target": months},
+                {"store_id": 20, "monthly_target": months},
+            ],
+        ),
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    for store in body["stores"]:
+        assert [m["score"] for m in store["monthly_target"]] == [m["score"] for m in months]
+
+
 def test_simulation_live_and_overlay(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("PLAN_STORE_PATH", str(tmp_path / "plans.sqlite"))
     client = TestClient(create_app())

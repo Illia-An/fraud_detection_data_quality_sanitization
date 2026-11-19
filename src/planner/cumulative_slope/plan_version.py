@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
+from planner.cumulative_slope.cumulative import cumulative_mean, zip_month_scores
 from planner.cumulative_slope.mean import equal_weight_mean
 from planner.cumulative_slope.types import (
     MonthScore,
@@ -109,6 +110,56 @@ def _network_series_from_stores(
         running += ms.score
         cum.append(MonthScore(year=ms.year, month=ms.month, score=round(running / i, 4)))
     return tuple(monthly), tuple(cum)
+
+
+def apply_store_monthly_overrides(
+    result: SimulationResult,
+    overrides: dict[int, tuple[MonthScore, ...]],
+) -> SimulationResult:
+    """Replace store monthly_target / cumulative_planned (Phase 2 client pin Save).
+
+    Does not re-run the slope simulator — persists the edited allocate package.
+    """
+    if not overrides:
+        return result
+    missing = [sid for sid in overrides if not any(s.store_id == sid for s in result.stores)]
+    if missing:
+        raise ValueError(f"store_monthly_targets unknown store_id(s): {sorted(missing)}")
+    stores: list[StoreCurves] = []
+    for store in result.stores:
+        series = overrides.get(store.store_id)
+        if series is None:
+            stores.append(store)
+            continue
+        if not series:
+            raise ValueError(f"store {store.store_id} monthly_target must not be empty")
+        scores = [m.score for m in series]
+        months = [YearMonth(m.year, m.month) for m in series]
+        cum = zip_month_scores(months, cumulative_mean(scores))
+        stores.append(
+            StoreCurves(
+                store_id=store.store_id,
+                monthly_target=series,
+                cumulative_planned=cum,
+                actual=store.actual,
+                cumulative_actual=store.cumulative_actual,
+                simulation=store.simulation,
+                cumulative_actual_or_simulation=store.cumulative_actual_or_simulation,
+                implied_target=store.implied_target,
+                gap_to_mean=store.gap_to_mean,
+                slope=store.slope,
+                unreachable=store.unreachable,
+                suggested_implied_target=store.suggested_implied_target,
+                capped=store.capped,
+            )
+        )
+    return SimulationResult(
+        as_of=result.as_of,
+        planning_year=result.planning_year,
+        network=result.network,
+        stores=tuple(stores),
+        unreachable=result.unreachable,
+    )
 
 
 def build_plan_version(
