@@ -388,7 +388,6 @@ export function SlopeCumulativePanel({
             style={{ width: plotMinWidth, height: plotHeight }}
             useResizeHandler={false}
             onInitialized={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
-            onUpdate={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
           />
         </Suspense>
       </Box>

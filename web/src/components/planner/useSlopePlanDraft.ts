@@ -46,8 +46,12 @@ export function useSlopePlanDraft(
   const contextKey = slopePlanContextKey(sim);
   const baselineRef = useRef(baselineLayers);
   const simRef = useRef(sim);
+  const lastGoodRef = useRef<SlopePlanPackage | null>(null);
+  const pinsRef = useRef<PlanPin[]>([]);
   baselineRef.current = baselineLayers;
   simRef.current = sim;
+  lastGoodRef.current = lastGood;
+  pinsRef.current = pins;
 
   const resetAll = useCallback(() => {
     draggingRef.current = false;
@@ -71,9 +75,9 @@ export function useSlopePlanDraft(
   const cancelDrag = useCallback(() => {
     draggingRef.current = false;
     setGeneration((g) => g + 1);
-    setPreview(lastGood);
-    setStatus(error ? 'error' : 'idle');
-  }, [lastGood, error]);
+    setPreview(lastGoodRef.current);
+    setStatus((prev) => (prev === 'error' ? 'error' : 'idle'));
+  }, []);
 
   const resetPins = useCallback(() => {
     resetAll();
@@ -84,10 +88,10 @@ export function useSlopePlanDraft(
       const layers = baselineRef.current;
       const simulation = simRef.current;
       if (!layers || !simulation) return;
-      const basePins = lastGood?.pins ?? pins;
+      const basePins = lastGoodRef.current?.pins ?? pinsRef.current;
       const result = applyDragPin(layers, simulation, basePins, kind, monthIndex, value);
       if (!result.ok) {
-        setPreview(lastGood);
+        setPreview(lastGoodRef.current);
         setError(result.error);
         setStatus('error');
         if (mode === 'commit') {
@@ -106,7 +110,7 @@ export function useSlopePlanDraft(
       setStatus('idle');
       draggingRef.current = false;
     },
-    [lastGood, pins],
+    [],
   );
 
   const previewDrag = useCallback(
@@ -132,7 +136,10 @@ export function useSlopePlanDraft(
     return overlayNetworkPlanPackage(baselineLayers, activePackage);
   }, [baselineLayers, activePackage]);
 
-  const dirty = (lastGood?.pins.length ?? 0) > 0;
+  const dirty =
+    (lastGood?.pins.length ?? 0) > 0 ||
+    (preview?.pins.length ?? 0) > 0 ||
+    status === 'previewing';
 
   return {
     displayLayers,

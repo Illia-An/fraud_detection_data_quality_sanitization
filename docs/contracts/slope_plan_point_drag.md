@@ -180,12 +180,15 @@ pointerup → same recompute; on ok: lastGood = preview
 
 ### Step 4 — Phase 1 hardening / DoD review
 
-- [ ] DoD checklist green (manual UI pass remaining)
-- [ ] Decide Phase 2 Save approach (client payload vs server pins)
+- [x] Draft hook tests (commit / reject rollback / context reset)
+- [x] Dirty includes in-progress preview; target change resets pins
+- [x] Avoid Plotly `onUpdate` drag rebind thrash
+- [x] Phase 2 Save approach decided (see below)
+- [ ] Manual UI DoD on live Planner (operator checklist)
 
 ### Step 5 — Phase 2 (optional, separate)
 
-- [ ] Persist edited package on Save
+- [ ] Persist edited package on Save (**Option A**: client sends monthlies)
 - [ ] Update parent contract Save non-goal
 - [ ] API / schema / tests
 
@@ -274,14 +277,28 @@ pointerup → same recompute; on ok: lastGood = preview
   error banner.
 - `tsc -b` clean; unit tests for pins + recompute green.
 
-**Next:** Step 4 — manual UI DoD on Planner Hero (drag both panels, Inspect
-  sync, Save blocked, Reset / Run cancel). Then Phase 2 Save decision.
+### Report — Step 4 (hardening + Phase 2 decision)
+
+**Date:** 2026-11-19  
+**Done:**
+
+- `useSlopePlanDraft.test.ts` — commit/dirty/reset, reject keeps lastGood,
+  sim target context reset.
+- Draft: refs for rapid drag; dirty while previewing; UI `target` change →
+  `resetPins`; drop Plotly `onUpdate` rebind.
+- **Phase 2 decision: Option A** — on Save, client sends the edited
+  `network_monthly_target` (+ store rows from the same allocate package).
+  Server persists without re-solving pins. Porting pin math to Python only if
+  we later need server-side authority (Option B).
+
+**Remaining:** manual UI checklist on `npm run dev` (drag both panels,
+Inspect sync, Save blocked, Reset / Run).
 
 **Verify:**
 
 ```powershell
 cd web
-npm run test:run -- src/components/planner/planTrajectoryPins.test.ts src/components/planner/slopePlanRecompute.test.ts
+npm run test:run -- src/components/planner/planTrajectoryPins.test.ts src/components/planner/slopePlanRecompute.test.ts src/components/planner/useSlopePlanDraft.test.ts
 npm run dev
 # Planner → drag blue Plan markers after cutover on both panels
 ```

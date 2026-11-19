@@ -26,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import {
@@ -542,6 +542,12 @@ export function PlannerPage() {
     panel != null &&
     panelToSimulationFacts(panel).length > 0 &&
     !slopePlanDraft.dirty;
+
+  // Spec L4: UI target change cancels unfinished pin draft (sim target updates on Run).
+  useEffect(() => {
+    slopePlanDraft.resetPins();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when target number changes
+  }, [target]);
   const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
   const unreachableStoreIds = useMemo(() => {
     if (!slopeSimulation?.unreachable.length) {
