@@ -306,7 +306,7 @@ export const en = {
   'planner.slope.simulation': 'Simulation forecast',
   'planner.slope.cumActualSimYtd': 'Planning-year fact + forecast (cumulative)',
   'planner.slope.cumActualSimYtdForecast': 'Planning-year forecast (after cutover)',
-  'planner.slope.cumActualSim': 'History cumulative (since data start)',
+  'planner.slope.cumActualSim': 'History cumulative',
   'planner.slope.requiredMonthly': 'Required monthly (to network target)',
   'planner.slope.requiredCumulative': 'Required cumulative (to network target)',
   'planner.slope.tip.actual':
@@ -325,8 +325,11 @@ export const en = {
     'Not fact, not Simulation, and not this store’s implied target: monthly scores after the last fact that would carry the data-start running mean to the network target by Dec of the planning year. Often above a realistic cap — hidden by default.',
   'planner.slope.tip.requiredCumulative':
     'Running mean of fact from data start through the last fact, then required monthlies to the network target (not store implied). Hidden by default.',
-  'planner.slope.panelCumulative': 'Cumulative path (plan vs planning-year fact / forecast)',
-  'planner.slope.panelMonthly': 'Monthly levels (fact · plan · simulation forecast)',
+  'planner.slope.panelCumulative': 'Cumulative path',
+  'planner.slope.panelMonthly': 'Monthly levels',
+  'planner.slope.panelCumulativeMeta':
+    '{metric} · Planning-year cumulative plan / history since data start',
+  'planner.slope.panelMonthlyMeta': '{metric} · Fact / monthly plan / simulation forecast',
   'planner.slope.legendShow': 'Show legend',
   'planner.slope.legendHide': 'Hide legend',
   'planner.slope.legendToggleAria': 'Show or hide Slope chart legend',
@@ -336,13 +339,16 @@ export const en = {
     'Cutover: plotted fact through {factEnd} · forecast from {forecastStart} · declared as-of {declaredAsOf}',
   'planner.slope.cutoverCaptionNoFact':
     'Cutover: no plotted fact months · forecast from {forecastStart} · declared as-of {declaredAsOf}',
-  'planner.slope.cutoverLine': 'fact→plan/forecast',
+  'planner.slope.cutoverLine': '{month} cutover',
   'planner.slope.cutoverLegend': 'Cutover',
   'planner.slope.tip.cutover':
     'Vertical boundary after the last plotted fact month (may differ from declared as-of if that month has no fact yet): left = fact, right = plan / simulation forecast.',
-  'planner.slope.eoyPlan': 'EOY plan (planning year): {value}%',
-  'planner.slope.eoySim': 'EOY forecast (planning year): {value}%',
-  'planner.slope.eoyTarget': 'Network target: {value}%',
+  'planner.slope.eoyPlan': 'EOY plan {value}%',
+  'planner.slope.eoySim': 'EOY forecast {value}%',
+  'planner.slope.eoyTarget': 'Target {value}%',
+  'planner.slope.endPlan': 'End plan {value}%',
+  'planner.slope.yearHistory': '{year} history',
+  'planner.slope.yearPlanning': '{year} planning year',
   'planner.slope.statusHint':
     'Three different reads — (1) Ahead/Behind = fact vs plan at cutover · (2) Year outcome = EOY planning-year forecast vs target {target}% · (3) Yellow chip = unrealistic store implied targets. Not the same verdict.',
   'planner.slope.dragHint':
@@ -357,21 +363,21 @@ export const en = {
   'planner.heroSubSlope':
     'Planning-year cumulative verdict · monthly tempo · history optional · cutover = last plotted fact',
   'planner.inspect.boostTitle': 'Boost / slope',
-  'planner.inspect.boostGap': 'Gap to network mean: {gap} pp',
-  'planner.inspect.boostSlope': 'Monthly slope: {slope} pp',
+  'planner.inspect.boostGap': 'Gap to mean {gap} pp',
+  'planner.inspect.boostSlope': 'Slope {slope} pp/mo',
   'planner.inspect.boostHint':
     'Positive gap = below mean → steeper boost. Mild/plateau when ahead.',
-  'planner.inspect.factAsOfMonth': 'Fact As-Of ({month})',
-  'planner.inspect.planAsOfMonth': 'Plan As-Of ({month})',
+  'planner.inspect.factAsOfMonth': 'Fact ({month})',
+  'planner.inspect.planAsOfMonth': 'Plan ({month})',
   'planner.inspect.factAsOfHint':
     'Cleansed fact for the monitoring as-of month — not the blue Plan point on the chart.',
   'planner.inspect.factAsOfHintAligned':
     'Fact As-Of = last plotted fact on the chart. Gap = fact vs plan at that month (Ahead/Behind). Plan end (monthly) ≠ EOY plan/forecast (cumulative on the top chart). Required lines (if shown) aim at the network target, not this store’s implied target.',
   'planner.inspect.glanceSubAligned':
     'Store snapshot · last plotted fact {factMonth} · declared as-of {declaredAsOf} · Lift follows monthly plan end (Estimate overrides End)',
-  'planner.inspect.baselinePlanEnd': 'Baseline → Plan end (monthly)',
-  'planner.inspect.eoyPlanCum': 'EOY plan (cum.)',
-  'planner.inspect.eoyForecast': 'EOY forecast (cum.)',
+  'planner.inspect.baselinePlanEnd': 'Baseline → End',
+  'planner.inspect.eoyPlanCum': 'EOY plan',
+  'planner.inspect.eoyForecast': 'EOY forecast',
   'planner.slope.lastFact': 'Last fact',
   'planner.revertDraft': 'Revert draft',
   'planner.revertDraftTip':
@@ -433,6 +439,16 @@ export const en = {
   'planner.heroNeedSimulation': 'Run simulation to show the Slope hero charts.',
   'planner.atRiskTitle': 'At-Risk Exception List',
   'planner.atRiskSub': 'Management by Exception · Behind / Gainers / All · Inspect opens sandbox',
+  'planner.atRisk.panel.exception': 'As-of exceptions · who & gap now',
+  'planner.atRisk.panel.path': 'Store mix · Behind / Ahead / On plan',
+  'planner.atRisk.donut.stores': 'stores',
+  'planner.atRisk.chat.title': 'AI assistant',
+  'planner.atRisk.chat.empty':
+    'Ask about this plan, store mix, or behind stores. Connect your model when ready.',
+  'planner.atRisk.chat.placeholder': 'Ask about this plan…',
+  'planner.atRisk.chat.send': 'Send',
+  'planner.atRisk.chat.stubReply':
+    'AI is not connected yet — wire your model here to answer in project context.',
 
   'planner.block.noBaseline':
     'Run Sanitization first to build a cleansed Q10012 baseline.',
@@ -504,8 +520,13 @@ export const en = {
   'planner.atRisk.empty': 'No stores match this filter.',
   'planner.atRisk.inspect': 'Inspect',
   'planner.atRisk.footer':
-    'Management by exception · Gap = fact − plan at as-of ({asOf}). Volume / MoM / streak / gap share / lift help prioritize. Behind ranked by worst gap.',
+    'Left: as-of triage. Right: store-mix donut + AI chat. Gap = fact − plan at as-of ({asOf}).',
 
+  'planner.storePage.back': 'Back to Planner',
+  'planner.storePage.title': 'Store #{id}',
+  'planner.storePage.needSimulation':
+    'Run simulation on Planner first — store Slope charts need the live allocate package.',
+  'planner.inspect.openStore': 'Inspect store',
   'planner.inspect.titlePrefix': 'Inspect ·',
   'planner.inspect.storeSelect': 'Select store',
   'planner.inspect.glanceSub':

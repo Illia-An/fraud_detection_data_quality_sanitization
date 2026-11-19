@@ -53,9 +53,9 @@ export function usePlannerOnboardingShell({
     }
     if (onboardingStepId === `${prefix}-at-risk` || onboardingStepId === `${prefix}-inspect`) {
       setAtRiskExpanded(true);
-      // After Accordion opens, bring the sheet into view for spotlight.
+      // Snap/scroll the At-risk viewport screen into view for spotlight.
       const timerId = window.setTimeout(() => {
-        scrollToTourTarget(`${prefix}-at-risk`, { block: 'end', behavior: 'smooth' });
+        scrollToTourTarget(`${prefix}-at-risk`, { block: 'start', behavior: 'smooth' });
         if (onboardingStepId === `${prefix}-inspect`) {
           scrollToTourTarget(`${prefix}-inspect`, { block: 'center', behavior: 'smooth' });
         }

@@ -62,8 +62,8 @@ export function DashboardLayout() {
                   <DashboardHeader />
                 </Box>
               ) : (
-                <Box sx={{ width: '100%', flexShrink: 0, px: 2, pt: 0.5 }}>
-                  <DashboardHeader />
+                <Box sx={{ width: '100%', flexShrink: 0, px: 1.5, py: 0.25 }}>
+                  <DashboardHeader compact />
                 </Box>
               )}
               <Box

@@ -26,21 +26,20 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import {
-  useAdjustSimulation,
   usePlan,
   useRunSimulation,
   useSavePlanVersion,
 } from '../api/hooks';
-import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
-import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
 import {
-  buildNetworkCumulativeSlopeLayers,
-  getStoreBoostGlance,
-} from '../components/planner/cumulativeSlopeLayers';
+  AtRiskPanelsSection,
+  AtRiskPendingBanner,
+} from '../components/planner/AtRiskPanelsSection';
+import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
+import { buildNetworkCumulativeSlopeLayers } from '../components/planner/cumulativeSlopeLayers';
 import { SlopeCumulativePanel } from '../components/planner/SlopeCumulativePanel';
 import { SlopeMonthlyPanel } from '../components/planner/SlopeMonthlyPanel';
 import {
@@ -52,20 +51,14 @@ import {
   FIGMA_SECONDARY_BUTTON_HEIGHT_PX,
 } from '../components/planner/figmaPlannerLayout';
 import {
-  NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX,
   NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
   NETWORK_SLOPE_CHART_GAP_PX,
   PLANNER_ANALYTICS_PADDING_PX,
   PLANNER_ANALYTICS_SECTION_GAP_PX,
   SLOPE_STATUS_SLOT_MIN_HEIGHT_PX,
 } from '../components/planner/slopeHeroShared';
-import {
-  mergeImpliedAdjustment,
-  type ImpliedAdjustment,
-} from '../components/planner/impliedAdjustments';
 import { panelToSimulationFacts } from '../components/planner/panelToSimulationFacts';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
-import type { SimulationResponse, UnreachableHint } from '../schemas/cumulativePlan';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
@@ -73,7 +66,6 @@ import {
 import { useT } from '../i18n';
 import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
-import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
 import {
   buildExcelReportRequest,
@@ -96,9 +88,9 @@ import {
   type StoreMixQuestionId,
 } from '../schemas/storeMixQuestions';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
+import { usePlannerRuntimeStore } from '../store/plannerRuntimeStore';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import { PLANNER_PREFERRED_REFERENCE } from '../components/planner/plannerShell';
-import { PlannerAtRiskDock } from '../components/planner/PlannerAtRiskDock';
 import { PlannerPageShell } from '../components/planner/PlannerPageShell';
 import { useCollapsedPlayReveal } from '../components/planner/useCollapsedPlayReveal';
 import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
@@ -127,42 +119,42 @@ import { downloadPlanProjectionCsv } from '../components/planner/plannerCsv';
 
 export function PlannerPage() {
   const t = useT();
+  const navigate = useNavigate();
   const processResult = useUiStore((state) => state.processResult);
   const planMutation = usePlan();
 
   const draftPlan = usePlannerScenarioStore((s) => s.draftPlan);
   const approvedPlan = usePlannerScenarioStore((s) => s.approvedPlan);
-  const selectedStoreId = usePlannerScenarioStore((s) => s.selectedStoreId);
   const setDraftFromRun = usePlannerScenarioStore((s) => s.setDraftFromRun);
   const patchDraftPlan = usePlannerScenarioStore((s) => s.patchDraftPlan);
   const isDirty = usePlannerScenarioStore((s) => s.isDirty);
   const acceptDraftAsApproved = usePlannerScenarioStore((s) => s.acceptDraftAsApproved);
   const discardDraft = usePlannerScenarioStore((s) => s.discardDraft);
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
-  const selectStore = usePlannerScenarioStore((s) => s.selectStore);
   const activePlanVersionId = usePlannerScenarioStore((s) => s.activePlanVersionId);
   const setActivePlanVersionId = usePlannerScenarioStore((s) => s.setActivePlanVersionId);
+  const slopeSimulation = usePlannerRuntimeStore((s) => s.slopeSimulation);
+  const setSlopeSimulation = usePlannerRuntimeStore((s) => s.setSlopeSimulation);
+  const setMaxMonthlyImprove = usePlannerRuntimeStore((s) => s.setMaxMonthlyImprove);
+  const setImpliedAdjustments = usePlannerRuntimeStore((s) => s.setImpliedAdjustments);
+  const clearSlopeRuntime = usePlannerRuntimeStore((s) => s.clear);
 
   const simulationMutation = useRunSimulation();
-  const adjustSimulationMutation = useAdjustSimulation();
   const savePlanMutation = useSavePlanVersion();
 
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const showCollapsedPlay = useCollapsedPlayReveal(controlsOpen);
-  /** Figma overview: exception disclosure collapsed; expand compactifies charts. */
-  const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+  /** Onboarding still toggles this; At-risk is a full second viewport (no accordion). */
+  const [, setAtRiskExpanded] = useState(false);
+  const atRiskScreenRef = useRef<HTMLDivElement | null>(null);
   const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
-  const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
   const baselineSlopeLayers = useMemo(
     () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
     [slopeSimulation],
   );
   const slopePlanDraft = useSlopePlanDraft(baselineSlopeLayers, slopeSimulation);
-  /** Session overrides from Apply suggestion — sent together on each /simulation/adjust. */
-  const [impliedAdjustments, setImpliedAdjustments] = useState<ImpliedAdjustment[]>([]);
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
-  const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
 
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
   usePlannerOnboardingShell({ prefix: 'planner', setControlsOpen, setAtRiskExpanded });
@@ -348,9 +340,15 @@ export function PlannerPage() {
           // Fresh /simulation has no overrides — drop session Apply stack.
           setImpliedAdjustments([]);
           setSlopeSimulation(response);
+          setMaxMonthlyImprove(params.max_monthly_improve);
         },
       },
     );
+  };
+
+  const openStoreInspect = (storeId: number) => {
+    setMaxMonthlyImprove(params.max_monthly_improve);
+    navigate(`/planner/store/${storeId}`);
   };
 
   const handleRun = () => {
@@ -453,68 +451,6 @@ export function PlannerPage() {
     );
   };
 
-  const buildSimulationRequestBase = (opts?: {
-    networkTarget?: number;
-    asOf?: { year: number; month: number };
-    planVersionId?: string | null;
-  }) => {
-    if (!panel) {
-      return null;
-    }
-    const facts = panelToSimulationFacts(panel);
-    if (facts.length === 0) {
-      return null;
-    }
-    const asOf = opts?.asOf ?? {
-      year:
-        asOfYear ??
-        draftPlan?.chain_trajectory[0]?.year ??
-        effectiveYear ??
-        new Date().getFullYear(),
-      month:
-        asOfMonth ??
-        draftPlan?.chain_trajectory[0]?.month ??
-        effectiveMonth ??
-        1,
-    };
-    return {
-      network_target: opts?.networkTarget ?? target,
-      as_of: asOf,
-      planning_year: asOf.year,
-      cumulative_start: { year: 2025, month: 1 } as const,
-      solver: 'cumulative_slope' as const,
-      active_plan_version_id: opts?.planVersionId ?? activePlanVersionId,
-      facts,
-    };
-  };
-
-  const handleApplyUnreachableSuggestion = (hint: UnreachableHint) => {
-    const base = buildSimulationRequestBase();
-    if (base == null || adjustSimulationMutation.isPending) {
-      return;
-    }
-    setAdjustSuggestionError(false);
-    const nextAdjustments = mergeImpliedAdjustment(impliedAdjustments, {
-      store_id: hint.store_id,
-      new_implied_target: hint.suggested_implied_target,
-    });
-    adjustSimulationMutation.mutate(
-      {
-        ...base,
-        adjustments: nextAdjustments,
-      },
-      {
-        onSuccess: (response) => {
-          setImpliedAdjustments(nextAdjustments);
-          setSlopeSimulation(response);
-        },
-        onError: () => {
-          setAdjustSuggestionError(true);
-        },
-      },
-    );
-  };
-
   const handleSavePlan = () => {
     if (!panel || !draftPlan || !canSavePlan) {
       return;
@@ -609,20 +545,6 @@ export function PlannerPage() {
     }
     return new Set(slopeSimulation.unreachable.map((h) => h.store_id));
   }, [slopeSimulation]);
-  const selectedUnreachableHint = useMemo(() => {
-    if (selectedStoreId == null || !slopeSimulation?.unreachable.length) {
-      return null;
-    }
-    return (
-      slopeSimulation.unreachable.find((h) => h.store_id === selectedStoreId) ?? null
-    );
-  }, [selectedStoreId, slopeSimulation]);
-  const selectedBoostGlance = useMemo(() => {
-    if (selectedStoreId == null || slopeSimulation == null) {
-      return null;
-    }
-    return getStoreBoostGlance(slopeSimulation, selectedStoreId);
-  }, [selectedStoreId, slopeSimulation]);
 
   const handleExportExcel = () => {
     if (!draftPlan || !panel) {
@@ -780,8 +702,7 @@ export function PlannerPage() {
                     resetAnswerState();
                     setAsOfYear(null);
                     setAsOfMonth(null);
-                    setSlopeSimulation(null);
-                    setImpliedAdjustments([]);
+                    clearSlopeRuntime();
                   }}
                 >
                   {refs.map((ref) => (
@@ -1162,11 +1083,6 @@ export function PlannerPage() {
                   {t('planner.savePlanFailed')}
                 </Alert>
               ) : null}
-              {adjustSuggestionError ? (
-                <Alert severity="error" sx={{ py: 0.5 }}>
-                  {t('planner.unreachable.applyFailed')}
-                </Alert>
-              ) : null}
               {excelExportError ? (
                 <Alert severity="error" sx={{ py: 0.5 }}>
                   {t('planner.exportExcelFailed')}
@@ -1214,107 +1130,94 @@ export function PlannerPage() {
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: `${PLANNER_ANALYTICS_SECTION_GAP_PX}px`,
-              px: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
-              pt: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
-              overflow: { md: 'hidden' },
+              px: { md: 1.5 },
+              // Two full-viewport screens: charts, then At-risk — normal scroll.
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              scrollbarGutter: 'stable',
             }}
           >
-            {/* Figma §3.1 — run/provenance row */}
+            {/* Screen 1 — toolbar + dual Slope charts = one monitor */}
             <Box
-              data-testid="planner-glance-row"
-              role="region"
-              aria-label={t('planner.strip.aria')}
+              data-testid="planner-screen-charts"
               sx={{
-                flexShrink: 0,
-                display: 'flex',
-                flexWrap: { xs: 'wrap', md: 'nowrap' },
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                gap: 1,
-                width: '100%',
-                minHeight: 28,
-                overflowX: { md: 'auto' },
-              }}
-            >
-              {activeAnswer || answerUndo ? (
-                <Stack
-                  direction="row"
-                  spacing={0.5}
-                  alignItems="center"
-                  sx={{ alignSelf: 'center', flexShrink: 0 }}
-                >
-                  {activeAnswer ? (
-                    <Chip
-                      color="primary"
-                      variant="outlined"
-                      size="small"
-                      data-testid="planner-active-answer"
-                      label={t('planner.answer.chip', {
-                        label: t(activeAnswerLabelKey(activeAnswer)),
-                      })}
-                      sx={{
-                        fontWeight: 600,
-                        maxWidth: { xs: '100%', md: 240 },
-                        '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
-                      }}
-                    />
-                  ) : null}
-                  {answerUndo ? (
-                    <Tooltip title={t('planner.answer.undoTip')}>
-                      <Button
-                        size="small"
-                        variant="text"
-                        startIcon={<UndoRoundedIcon fontSize="small" />}
-                        onClick={handleUndoAnswer}
-                        data-testid="planner-undo-answer"
-                        sx={{ flexShrink: 0, minWidth: 0, px: 1, height: 28 }}
-                      >
-                        {t('planner.answer.undo')}
-                      </Button>
-                    </Tooltip>
-                  ) : null}
-                </Stack>
-              ) : null}
-              <PlannerContextStrip
-                panel={panel}
-                processResult={processResult}
-                baselineReady={baselineReady}
-                draftPlan={draftPlan}
-                horizonMonths={horizon}
-              />
-            </Box>
-
-            {/* Figma §3.2 — dedicated KPI strip */}
-            <SimulationSummaryKpis
-              draftPlan={draftPlan}
-              monitoring={monitoring}
-              horizonMonths={horizon}
-            />
-
-            <Box
-              data-testid="planner-explore-stack"
-              sx={{
-                position: 'relative',
-                flex: 1,
-                minHeight: 0,
+                flex: '0 0 auto',
+                height: { md: '100%' },
+                minHeight: { xs: 'auto', md: '100%' },
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden',
+                gap: 1,
+                pt: { md: 0.75 },
+                pb: 1,
+                boxSizing: 'border-box',
               }}
             >
               <Box
+                data-testid="planner-glance-row"
+                role="region"
+                aria-label={t('planner.strip.aria')}
                 sx={{
-                  flex: 1,
-                  minHeight: 0,
+                  flexShrink: 0,
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: `${PLANNER_ANALYTICS_SECTION_GAP_PX}px`,
-                  overflow: 'auto',
-                  scrollbarGutter: 'stable',
-                  pb: `${PLANNER_ANALYTICS_PADDING_PX}px`,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 0.75,
+                  width: '100%',
+                  overflowX: { md: 'auto' },
                 }}
               >
+                {activeAnswer || answerUndo ? (
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="center"
+                    sx={{ alignSelf: 'center', flexShrink: 0 }}
+                  >
+                    {activeAnswer ? (
+                      <Chip
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                        data-testid="planner-active-answer"
+                        label={t('planner.answer.chip', {
+                          label: t(activeAnswerLabelKey(activeAnswer)),
+                        })}
+                        sx={{
+                          fontWeight: 600,
+                          maxWidth: { xs: '100%', md: 240 },
+                          '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                        }}
+                      />
+                    ) : null}
+                    {answerUndo ? (
+                      <Tooltip title={t('planner.answer.undoTip')}>
+                        <Button
+                          size="small"
+                          variant="text"
+                          startIcon={<UndoRoundedIcon fontSize="small" />}
+                          onClick={handleUndoAnswer}
+                          data-testid="planner-undo-answer"
+                          sx={{ flexShrink: 0, minWidth: 0, px: 1, height: 28 }}
+                        >
+                          {t('planner.answer.undo')}
+                        </Button>
+                      </Tooltip>
+                    ) : null}
+                  </Stack>
+                ) : null}
+                <PlannerContextStrip
+                  panel={panel}
+                  processResult={processResult}
+                  baselineReady={baselineReady}
+                  draftPlan={draftPlan}
+                  horizonMonths={horizon}
+                />
+                <SimulationSummaryKpis
+                  draftPlan={draftPlan}
+                  monitoring={monitoring}
+                  horizonMonths={horizon}
+                />
                 {unreachableCount > 0 && slopeSimulation ? (
                   <Tooltip title={t('planner.unreachableChipTip')}>
                     <Chip
@@ -1323,111 +1226,157 @@ export function PlannerPage() {
                       clickable
                       onClick={() => {
                         const first = slopeSimulation.unreachable[0];
+                        atRiskScreenRef.current?.scrollIntoView({
+                          block: 'start',
+                          behavior: 'smooth',
+                        });
                         if (first) {
-                          setAtRiskExpanded(true);
-                          selectStore(first.store_id);
+                          openStoreInspect(first.store_id);
                         }
                       }}
-                      sx={{ alignSelf: 'flex-start', flexShrink: 0 }}
+                      sx={{ flexShrink: 0 }}
                       label={t('planner.unreachableChip', { count: unreachableCount })}
                       data-testid="planner-unreachable-chip"
                     />
                   </Tooltip>
                 ) : null}
-                {panel && slopeLayers ? (
-                  <>
-                    {/* Fixed slot (one alert): mount/unmount must not shift charts. */}
-                    <Box
-                      data-testid="slope-plan-status-slot"
-                      sx={{
-                        flexShrink: 0,
-                        minHeight: SLOPE_STATUS_SLOT_MIN_HEIGHT_PX,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-end',
-                      }}
-                    >
-                      {slopePlanDraft.error ? (
-                        <Alert
-                          severity="warning"
-                          sx={{ py: 0.25 }}
-                          data-testid="slope-plan-error-banner"
-                        >
-                          {t('planner.slope.pinError', {
-                            code: slopePlanDraft.error.code,
-                            reason: slopePlanDraft.error.reason,
-                          })}
-                        </Alert>
-                      ) : slopePlanDraft.status === 'allocating' ? (
-                        <Alert
-                          severity="info"
-                          sx={{ py: 0.25 }}
-                          icon={<CircularProgress size={16} />}
-                          data-testid="slope-plan-allocating-banner"
-                        >
-                          {t('planner.slope.allocating')}
-                        </Alert>
-                      ) : slopePlanDraft.dirty ? (
-                        <Alert
-                          severity="info"
-                          sx={{ py: 0.25 }}
-                          action={
-                            <Button
-                              color="inherit"
-                              size="small"
-                              onClick={() => slopePlanDraft.resetPins()}
-                              data-testid="slope-plan-reset"
-                            >
-                              {t('planner.slope.resetPins')}
-                            </Button>
-                          }
-                          data-testid="slope-plan-dirty-banner"
-                        >
-                          {t('planner.slope.pinsDirty')}
-                        </Alert>
-                      ) : null}
-                    </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  data-testid="planner-inspect-store"
+                  disabled={draftPlan.projections.length === 0}
+                  onClick={() => {
+                    const behindId = monitoring?.stores.find(
+                      (row) => row.signal === 'behind_plan',
+                    )?.store_id;
+                    const storeId =
+                      behindId ??
+                      slopeSimulation?.unreachable[0]?.store_id ??
+                      draftPlan.projections[0]?.store_id;
+                    if (storeId != null) {
+                      openStoreInspect(storeId);
+                    }
+                  }}
+                  sx={{
+                    ml: 'auto',
+                    flexShrink: 0,
+                    height: 28,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t('planner.inspect.openStore')}
+                </Button>
+              </Box>
 
-                    <Box
-                      data-testid="planner-slope-chart-stack"
-                      sx={{
-                        flex: '0 0 auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: `${NETWORK_SLOPE_CHART_GAP_PX}px`,
-                        width: '100%',
-                      }}
+              <Box
+                data-testid="planner-explore-stack"
+                sx={{
+                  position: 'relative',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  data-testid="slope-plan-status-slot"
+                  sx={{
+                    flexShrink: 0,
+                    minHeight:
+                      slopeLayers &&
+                      (slopePlanDraft.error ||
+                        slopePlanDraft.status === 'allocating' ||
+                        slopePlanDraft.dirty)
+                        ? SLOPE_STATUS_SLOT_MIN_HEIGHT_PX
+                        : 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'flex-end',
+                  }}
+                >
+                  {slopeLayers && slopePlanDraft.error ? (
+                    <Alert
+                      severity="warning"
+                      sx={{ py: 0.25 }}
+                      data-testid="slope-plan-error-banner"
                     >
-                    <Card
-                      variant="outlined"
-                      data-onboarding="planner-hero"
-                      data-testid="planner-slope-cumulative"
-                      data-density={atRiskExpanded ? 'compact' : 'overview'}
+                      {t('planner.slope.pinError', {
+                        code: slopePlanDraft.error.code,
+                        reason: slopePlanDraft.error.reason,
+                      })}
+                    </Alert>
+                  ) : slopeLayers && slopePlanDraft.status === 'allocating' ? (
+                    <Alert
+                      severity="info"
+                      sx={{ py: 0.25 }}
+                      icon={<CircularProgress size={16} />}
+                      data-testid="slope-plan-allocating-banner"
+                    >
+                      {t('planner.slope.allocating')}
+                    </Alert>
+                  ) : slopeLayers && slopePlanDraft.dirty ? (
+                    <Alert
+                      severity="info"
+                      sx={{ py: 0.25 }}
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          onClick={() => slopePlanDraft.resetPins()}
+                          data-testid="slope-plan-reset"
+                        >
+                          {t('planner.slope.resetPins')}
+                        </Button>
+                      }
+                      data-testid="slope-plan-dirty-banner"
+                    >
+                      {t('planner.slope.pinsDirty')}
+                    </Alert>
+                  ) : null}
+                </Box>
+
+                <Box
+                  data-testid="planner-slope-chart-stack"
+                  sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: `${NETWORK_SLOPE_CHART_GAP_PX}px`,
+                    width: '100%',
+                  }}
+                >
+                  <Card
+                    variant="outlined"
+                    data-onboarding="planner-hero"
+                    data-testid="planner-slope-cumulative"
+                    data-density="viewport"
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      width: '100%',
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderWidth: 2,
+                      borderColor: 'primary.light',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <CardContent
                       sx={{
-                        flex: '0 0 auto',
-                        height: atRiskExpanded
-                          ? NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX
-                          : NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
-                        width: '100%',
-                        minWidth: 0,
+                        flex: 1,
+                        minHeight: 0,
+                        pt: 1,
                         display: 'flex',
                         flexDirection: 'column',
-                        borderWidth: 2,
-                        borderColor: 'primary.light',
                         overflow: 'hidden',
+                        '&:last-child': { pb: 1.5 },
                       }}
                     >
-                      <CardContent
-                        sx={{
-                          flex: 1,
-                          minHeight: 0,
-                          pt: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          overflow: 'hidden',
-                          '&:last-child': { pb: 1.5 },
-                        }}
-                      >
+                      {slopeLayers ? (
                         <SlopeCumulativePanel
                           layers={slopeLayers}
                           planDragEnabled
@@ -1444,36 +1393,49 @@ export function PlannerPage() {
                           onPlanDragCancel={() => slopePlanDraft.cancelDrag()}
                           getPlanDragGeneration={getPlanDragGeneration}
                         />
-                      </CardContent>
-                    </Card>
+                      ) : (
+                        <Stack
+                          spacing={0.5}
+                          sx={{ flex: 1, px: 0.5 }}
+                          data-testid="slope-cumulative-placeholder"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {t('planner.slope.panelCumulative')}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                            {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                    <Card
-                      variant="outlined"
-                      data-testid="planner-slope-monthly"
-                      data-density={atRiskExpanded ? 'compact' : 'overview'}
+                  <Card
+                    variant="outlined"
+                    data-testid="planner-slope-monthly"
+                    data-density="viewport"
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      width: '100%',
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <CardContent
                       sx={{
-                        flex: '0 0 auto',
-                        height: atRiskExpanded
-                          ? NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX
-                          : NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
-                        width: '100%',
-                        minWidth: 0,
+                        flex: 1,
+                        minHeight: 0,
+                        pt: 1,
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
+                        '&:last-child': { pb: 1.5 },
                       }}
                     >
-                      <CardContent
-                        sx={{
-                          flex: 1,
-                          minHeight: 0,
-                          pt: 1,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          overflow: 'hidden',
-                          '&:last-child': { pb: 1.5 },
-                        }}
-                      >
+                      {slopeLayers ? (
                         <SlopeMonthlyPanel
                           layers={slopeLayers}
                           planDragEnabled
@@ -1490,105 +1452,141 @@ export function PlannerPage() {
                           onPlanDragCancel={() => slopePlanDraft.cancelDrag()}
                           getPlanDragGeneration={getPlanDragGeneration}
                         />
-                      </CardContent>
-                    </Card>
-                    </Box>
-                  </>
-                ) : (
-                  <Card
-                    variant="outlined"
-                    data-onboarding="planner-hero"
-                    sx={{
-                      flex: 1,
-                      minHeight: 240,
-                      borderWidth: 2,
-                      borderColor: 'primary.light',
-                    }}
-                  >
-                    <CardContent>
-                      <Typography variant="body2" color="text.secondary">
-                        {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
-                      </Typography>
+                      ) : (
+                        <Stack
+                          spacing={0.5}
+                          sx={{ flex: 1, px: 0.5 }}
+                          data-testid="slope-monthly-placeholder"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {t('planner.slope.panelMonthly')}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                            {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                          </Typography>
+                        </Stack>
+                      )}
                     </CardContent>
                   </Card>
-                )}
-
-                {panel && monitoring && planForMonitoring ? (
-                  <PlannerAtRiskDock
-                    placement="flow"
-                    testId="planner-at-risk-sheet"
-                    onboardingId="planner-at-risk"
-                    expanded={atRiskExpanded}
-                    onExpandedChange={setAtRiskExpanded}
-                    behindCount={monitoring.summary.behind}
-                    aheadCount={monitoring.summary.ahead}
-                    stableScrollbar
-                  >
-                    {atRiskPending ? (
-                      <Alert
-                        severity="info"
-                        sx={{ py: 0.25, mb: 1 }}
-                        data-testid="slope-at-risk-pending-banner"
-                      >
-                        {t('planner.slope.atRiskPending')}
-                      </Alert>
-                    ) : null}
-                    <AtRiskDeltaTable
-                      plan={planForMonitoring}
-                      approvedPlan={approvedPlan}
-                      baselineRows={baselineRows}
-                      panel={panel}
-                      insights={monitoring}
-                      asOfOptions={planForMonitoring.chain_trajectory.map((m) => ({
-                        year: m.year,
-                        month: m.month,
-                      }))}
-                      onAsOfChange={(year, month) => {
-                        setAsOfYear(year);
-                        setAsOfMonth(month);
-                      }}
-                      onInspect={(storeId) => selectStore(storeId)}
-                      unreachableStoreIds={unreachableStoreIds}
-                    />
-                  </PlannerAtRiskDock>
-                ) : null}
+                </Box>
               </Box>
             </Box>
 
-            {panel && monitoring && planForMonitoring && selectedStoreId != null && (
-              <StoreAuditDrawer
-                open
-                storeId={selectedStoreId}
-                plan={planForMonitoring}
-                panel={panel}
-                insights={monitoring}
-                processResult={processResult}
-                maxMonthlyImprove={params.max_monthly_improve}
-                baselineRows={baselineRows}
-                onClose={() => selectStore(null)}
-                onStoreChange={(id) => selectStore(id)}
-                onApplyPlan={(next) => patchDraftPlan(next)}
-                unreachableHint={selectedUnreachableHint}
-                onApplyUnreachableSuggestion={
-                  selectedUnreachableHint
-                    ? () => handleApplyUnreachableSuggestion(selectedUnreachableHint)
-                    : undefined
-                }
-                unreachableApplyPending={adjustSimulationMutation.isPending}
-                boostGlance={selectedBoostGlance}
-                slopeSimulation={slopeSimulation}
-                slopeStorePlanOverride={
-                  selectedStoreId != null
-                    ? slopePlanDraft.byStore?.get(selectedStoreId) ?? null
-                    : null
-                }
-              />
-            )}
+            {/* Screen 2 — At-risk panels = second full monitor */}
+            {panel && monitoring && planForMonitoring ? (
+              <Box
+                ref={atRiskScreenRef}
+                data-testid="planner-screen-atrisk"
+                sx={{
+                  flex: '0 0 auto',
+                  height: { md: '100%' },
+                  minHeight: { xs: 360, md: '100%' },
+                  boxSizing: 'border-box',
+                  pb: 1,
+                }}
+              >
+                <AtRiskPanelsSection
+                  testId="planner-at-risk-sheet"
+                  onboardingId="planner-at-risk"
+                  plan={planForMonitoring}
+                  approvedPlan={approvedPlan}
+                  baselineRows={baselineRows}
+                  panel={panel}
+                  insights={monitoring}
+                  asOfOptions={planForMonitoring.chain_trajectory.map((m) => ({
+                    year: m.year,
+                    month: m.month,
+                  }))}
+                  onAsOfChange={(year, month) => {
+                    setAsOfYear(year);
+                    setAsOfMonth(month);
+                  }}
+                  onInspect={openStoreInspect}
+                  unreachableStoreIds={unreachableStoreIds}
+                  pendingBanner={
+                    atRiskPending ? (
+                      <AtRiskPendingBanner message={t('planner.slope.atRiskPending')} />
+                    ) : null
+                  }
+                />
+              </Box>
+            ) : null}
           </Box>
         ) : (
-          <Alert severity="info" sx={{ flexShrink: 0 }}>
-            {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
-          </Alert>
+          <Box
+            data-testid="planner-analytics-empty"
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: `${PLANNER_ANALYTICS_SECTION_GAP_PX}px`,
+              px: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
+              pt: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
+              overflow: 'auto',
+              pb: `${PLANNER_ANALYTICS_PADDING_PX}px`,
+            }}
+          >
+            <Alert severity="info" sx={{ flexShrink: 0 }}>
+              {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
+            </Alert>
+            <Box
+              data-testid="planner-slope-chart-stack"
+              sx={{
+                flex: '0 0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: `${NETWORK_SLOPE_CHART_GAP_PX}px`,
+                width: '100%',
+              }}
+            >
+              <Card
+                variant="outlined"
+                data-onboarding="planner-hero"
+                data-testid="planner-slope-cumulative"
+                sx={{
+                  flex: '0 0 auto',
+                  height: NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+                  borderWidth: 2,
+                  borderColor: 'primary.light',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Stack spacing={0.5} sx={{ flex: 1 }} data-testid="slope-cumulative-placeholder">
+                    <Typography variant="caption" color="text.secondary">
+                      {t('planner.slope.panelCumulative')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                      {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+              <Card
+                variant="outlined"
+                data-testid="planner-slope-monthly"
+                sx={{
+                  flex: '0 0 auto',
+                  height: NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Stack spacing={0.5} sx={{ flex: 1 }} data-testid="slope-monthly-placeholder">
+                    <Typography variant="caption" color="text.secondary">
+                      {t('planner.slope.panelMonthly')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                      {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
         )}
     </PlannerPageShell>
   );

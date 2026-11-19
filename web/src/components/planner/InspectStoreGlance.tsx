@@ -152,79 +152,50 @@ export function InspectStoreGlance({
 
   return (
     <Stack
-      spacing={0.5}
+      direction="row"
+      spacing={1.5}
+      flexWrap="wrap"
+      useFlexGap
       data-testid="inspect-store-glance"
-      sx={{
-        flexShrink: 0,
-        px: 0.25,
-        py: 0.5,
-        borderBottom: 1,
-        borderColor: 'divider',
-      }}
+      sx={{ flexShrink: 0, px: 0.25, py: 0.25, rowGap: 0.75 }}
     >
-      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-        {metrics.aligned
-          ? t('planner.inspect.glanceSubAligned', {
-              factMonth: metrics.factMonth,
-              declaredAsOf: slopeAlign?.declaredAsOfLabel ?? monitoringAsOfLabel,
-            })
-          : t('planner.inspect.glanceSub', { asOf: monitoringAsOfLabel })}
-      </Typography>
-      <Stack
-        direction="row"
-        spacing={1.5}
-        flexWrap="wrap"
-        useFlexGap
-        sx={{ rowGap: 0.75 }}
-      >
+      <GlanceCell
+        label={t('planner.inspect.factAsOfMonth', { month: metrics.factMonth })}
+        value={formatScore(metrics.fact, unit)}
+      />
+      <GlanceCell
+        label={t('planner.inspect.planAsOfMonth', { month: metrics.factMonth })}
+        value={formatScore(metrics.planAtAsOf, unit)}
+      />
+      <GlanceCell
+        label={unit === 'min' ? t('ttsPlanner.atRisk.col.gap') : t('planner.atRisk.col.gap')}
+        value={formatGap(metrics.gapPp, unit)}
+        valueColor={gapColor}
+      />
+      <GlanceCell
+        label={
+          metrics.aligned
+            ? t('planner.inspect.baselinePlanEnd')
+            : t('planner.atRisk.col.baselineEnd')
+        }
+        value={`${formatScore(metrics.baseline, unit)} → ${formatScore(metrics.end, unit)}`}
+      />
+      {metrics.aligned ? (
         <GlanceCell
-          label={t('planner.inspect.factAsOfMonth', { month: metrics.factMonth })}
-          value={formatScore(metrics.fact, unit)}
+          label={t('planner.inspect.eoyPlanCum')}
+          value={formatScore(metrics.eoyPlanCum, unit)}
         />
+      ) : null}
+      {metrics.aligned ? (
         <GlanceCell
-          label={t('planner.inspect.planAsOfMonth', { month: metrics.factMonth })}
-          value={formatScore(metrics.planAtAsOf, unit)}
+          label={t('planner.inspect.eoyForecast')}
+          value={formatScore(metrics.eoyForecast, unit)}
         />
-        <GlanceCell
-          label={unit === 'min' ? t('ttsPlanner.atRisk.col.gap') : t('planner.atRisk.col.gap')}
-          value={formatGap(metrics.gapPp, unit)}
-          valueColor={gapColor}
-        />
-        <GlanceCell
-          label={
-            metrics.aligned
-              ? t('planner.inspect.baselinePlanEnd')
-              : t('planner.atRisk.col.baselineEnd')
-          }
-          value={`${formatScore(metrics.baseline, unit)} → ${formatScore(metrics.end, unit)}`}
-        />
-        {metrics.aligned ? (
-          <GlanceCell
-            label={t('planner.inspect.eoyPlanCum')}
-            value={formatScore(metrics.eoyPlanCum, unit)}
-          />
-        ) : null}
-        {metrics.aligned ? (
-          <GlanceCell
-            label={t('planner.inspect.eoyForecast')}
-            value={formatScore(metrics.eoyForecast, unit)}
-          />
-        ) : null}
-        <GlanceCell
-          label={t('planner.atRisk.col.lift')}
-          value={formatGap(metrics.liftToEnd, unit)}
-        />
-      </Stack>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ fontSize: '0.65rem', lineHeight: 1.3 }}
-        data-testid="inspect-fact-as-of-hint"
-      >
-        {metrics.aligned
-          ? t('planner.inspect.factAsOfHintAligned')
-          : t('planner.inspect.factAsOfHint')}
-      </Typography>
+      ) : null}
+      <GlanceCell
+        label={t('planner.atRisk.col.lift')}
+        value={formatGap(metrics.liftToEnd, unit)}
+      />
     </Stack>
   );
 }

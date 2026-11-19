@@ -80,7 +80,7 @@ describe.each(['planner', 'tts-planner'] as const)('usePlannerOnboardingShell (%
     expect(hero.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'auto' });
   });
 
-  it('expands At-risk and scrolls it to the end on the at-risk step', () => {
+  it('expands At-risk and scrolls it to the start of the viewport screen', () => {
     const atRisk = addTarget(`${prefix}-at-risk`);
     const inspect = addTarget(`${prefix}-inspect`);
     const { setAtRiskExpanded } = mount(prefix);
@@ -90,7 +90,7 @@ describe.each(['planner', 'tts-planner'] as const)('usePlannerOnboardingShell (%
     act(() => {
       vi.advanceTimersByTime(SCROLL_DELAY_MS);
     });
-    expect(atRisk.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
+    expect(atRisk.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
     expect(inspect.scrollIntoView).not.toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe.each(['planner', 'tts-planner'] as const)('usePlannerOnboardingShell (%
     act(() => {
       vi.advanceTimersByTime(SCROLL_DELAY_MS);
     });
-    expect(atRisk.scrollIntoView).toHaveBeenCalledWith({ block: 'end', behavior: 'smooth' });
+    expect(atRisk.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
     expect(inspect.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
   });
 

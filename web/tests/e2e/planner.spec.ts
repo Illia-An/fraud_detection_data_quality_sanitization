@@ -71,23 +71,22 @@ test.describe('Planner alt-UI smoke', () => {
       .getByRole('button', { name: /^Inspect$/i })
       .first();
     await expect(inspect).toBeVisible({ timeout: 15_000 });
-    // Native DOM click — force:true did not open the drawer in CI Linux Chromium.
+    // Native DOM click — force:true did not navigate in CI Linux Chromium.
     // Cast avoids HTMLElement (tsconfig.node has no DOM lib).
     await inspect.evaluate((el) => (el as { click: () => void }).click());
 
-    const dialog = page.getByTestId('store-inspect-dialog');
-    await expect(dialog).toBeVisible({ timeout: 15_000 });
-    await expect(dialog.getByText(/Inspect/i).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/planner\/store\/\d+/, { timeout: 15_000 });
+    const inspectPage = page.getByTestId('store-inspect-page');
+    await expect(inspectPage).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('inspect-store-select')).toBeVisible();
     await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
-    // After Run, Inspect uses Slope store layers (not legacy store-hero-evaluation-chart).
-    await expect(dialog.getByTestId('cumulative-slope-hero-chart')).toBeVisible();
+    await expect(page.getByTestId('inspect-sandbox-panel')).toBeVisible();
+    // After Run, Inspect uses Slope store layers (same charts as network screen 1).
+    await expect(page.getByTestId('store-inspect-slope-cumulative')).toBeVisible();
+    await expect(page.getByTestId('inspect-recalculate')).toBeVisible();
 
-    // Estimate funnel is collapsed by default.
-    await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
-    await expect(dialog.getByTestId('inspect-recalculate')).toBeVisible();
-
-    await dialog.locator('.MuiDialogActions-root').getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('store-inspect-dialog')).toHaveCount(0);
+    await page.getByTestId('store-inspect-back').click();
+    await expect(page).toHaveURL(/\/planner$/);
+    await expect(page.getByTestId('store-inspect-page')).toHaveCount(0);
   });
 });

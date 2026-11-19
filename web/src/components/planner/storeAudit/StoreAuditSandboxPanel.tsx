@@ -58,6 +58,8 @@ export interface StoreAuditSandboxPanelProps {
   onPoolDialogOpenChange: (open: boolean) => void;
   applyToastOpen: boolean;
   onApplyToastClose: () => void;
+  /** Dialog overlays the hero; full-page Inspect keeps the panel in document flow. */
+  layout?: 'overlay' | 'inline';
 }
 
 /**
@@ -86,30 +88,47 @@ export function StoreAuditSandboxPanel({
   onPoolDialogOpenChange,
   applyToastOpen,
   onApplyToastClose,
+  layout = 'overlay',
 }: StoreAuditSandboxPanelProps) {
   const t = useT();
   const fmt = (value: number) => formatScore(value, scoreDigits);
+  const inline = layout === 'inline';
 
   return (
     <>
       <Box
         data-testid="inspect-sandbox-overlay"
-        sx={{
-          position: { xs: 'relative', md: 'absolute' },
-          left: { md: 16 },
-          right: { md: 16 },
-          bottom: { md: SANDBOX_OVERLAY_GAP_PX },
-          zIndex: { md: 3 },
-          flexShrink: 0,
-          maxHeight: { md: SANDBOX_OVERLAY_MAX_HEIGHT },
-          overflow: { md: 'auto' },
-          mt: { xs: 1.5, md: 0 },
-          bgcolor: 'background.paper',
-          border: 1,
-          borderColor: 'divider',
-          borderRadius: 1,
-          boxShadow: { md: sandboxExpanded ? 8 : 2 },
-        }}
+        sx={
+          inline
+            ? {
+                position: 'relative',
+                flexShrink: 0,
+                maxHeight: 'none',
+                overflow: 'visible',
+                mt: 0,
+                bgcolor: 'background.paper',
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+                boxShadow: 1,
+              }
+            : {
+                position: { xs: 'relative', md: 'absolute' },
+                left: { md: 16 },
+                right: { md: 16 },
+                bottom: { md: SANDBOX_OVERLAY_GAP_PX },
+                zIndex: { md: 3 },
+                flexShrink: 0,
+                maxHeight: { md: SANDBOX_OVERLAY_MAX_HEIGHT },
+                overflow: { md: 'auto' },
+                mt: { xs: 1.5, md: 0 },
+                bgcolor: 'background.paper',
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 1,
+                boxShadow: { md: sandboxExpanded ? 8 : 2 },
+              }
+        }
       >
         <Accordion
           disableGutters

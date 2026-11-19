@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  PLANNER_AT_RISK_EXPANDED_HEIGHT_PX,
   PLANNER_AT_RISK_GAP_PX,
   PLANNER_AT_RISK_OVERLAY_MAX_HEIGHT,
   PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
@@ -13,6 +14,7 @@ describe('plannerShell constants', () => {
   it('keeps the values the pages used before the extract', () => {
     expect(PLANNER_COLLAPSED_PLAY_REVEAL_MS).toBe(250);
     expect(PLANNER_AT_RISK_SUMMARY_RESERVE_PX).toBe(52);
+    expect(PLANNER_AT_RISK_EXPANDED_HEIGHT_PX).toBe(300);
     expect(PLANNER_AT_RISK_GAP_PX).toBe(12);
     expect(PLANNER_AT_RISK_OVERLAY_MAX_HEIGHT).toBe('45vh');
     expect(PLANNER_PREFERRED_REFERENCE).toEqual({ year: 2025, month: 12 });

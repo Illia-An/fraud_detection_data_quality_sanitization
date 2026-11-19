@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
+import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 
 import type { FivePercentPlan } from '../../schemas/plan';
@@ -31,24 +32,24 @@ const monitoring: PlanMonitoringInsights = {
 };
 
 describe('SimulationSummaryKpis', () => {
-  it('renders five-card Figma strip: projected, horizon, target, behind, feasibility', () => {
+  it('renders compact KPIs without Horizon/Target duplicates (those stay on context strip)', () => {
     render(
       <ThemeProvider theme={appTheme}>
-        <SimulationSummaryKpis draftPlan={draft} monitoring={monitoring} horizonMonths={12} />
+        <BoxFlex>
+          <SimulationSummaryKpis draftPlan={draft} monitoring={monitoring} horizonMonths={12} />
+        </BoxFlex>
       </ThemeProvider>,
     );
 
     expect(screen.getByTestId('planner-kpi-strip')).toBeInTheDocument();
     expect(screen.getByTestId('planner-kpi-projected')).toBeInTheDocument();
-    expect(screen.getByTestId('planner-kpi-horizon')).toBeInTheDocument();
-    expect(screen.getByTestId('planner-kpi-target')).toBeInTheDocument();
+    expect(screen.queryByTestId('planner-kpi-horizon')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('planner-kpi-target')).not.toBeInTheDocument();
     expect(screen.getByTestId('planner-kpi-behind')).toBeInTheDocument();
     expect(screen.getByTestId('planner-kpi-feasibility')).toBeInTheDocument();
     // Always Current → Final (never approved Final → draft Final).
     expect(screen.getByText(/70\.00% → 74\.00%/)).toBeInTheDocument();
     expect(screen.getByText('+4.00 pp')).toBeInTheDocument();
-    expect(screen.getByText('12 mo')).toBeInTheDocument();
-    expect(screen.getByText('75.00%')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/quota N\/A/i)).toBeInTheDocument();
   });
@@ -62,9 +63,16 @@ describe('SimulationSummaryKpis', () => {
     };
     render(
       <ThemeProvider theme={appTheme}>
-        <SimulationSummaryKpis draftPlan={nearTarget} monitoring={monitoring} />
+        <BoxFlex>
+          <SimulationSummaryKpis draftPlan={nearTarget} monitoring={monitoring} />
+        </BoxFlex>
       </ThemeProvider>,
     );
     expect(screen.getByText(/61\.06% → 75\.47%/)).toBeInTheDocument();
   });
 });
+
+/** `display:contents` needs a flex parent for layout; tests only assert DOM. */
+function BoxFlex({ children }: { children: ReactNode }) {
+  return <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{children}</div>;
+}

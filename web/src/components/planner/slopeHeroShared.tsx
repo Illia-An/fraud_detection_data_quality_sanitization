@@ -252,6 +252,11 @@ export function buildSlopePlotLayout(opts: {
   /** Extra top margin when cutover / EOY labels are drawn. */
   topMargin?: number;
   rightMargin?: number;
+  /** Room for abbreviated ticks + year-band captions (Figma metadata row). */
+  bottomMargin?: number;
+  /** Category tick labels (same length as data x); defaults to raw categories. */
+  ticktext?: string[];
+  tickvals?: string[];
 }) {
   return {
     autosize: false as const,
@@ -259,22 +264,59 @@ export function buildSlopePlotLayout(opts: {
     height: opts.plotHeight,
     /** Keep camera / axis interaction stable across data updates (drag preview). */
     uirevision: 'slope-plan-stable',
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: '#ffffff',
     margin: {
-      l: 48,
-      r: opts.rightMargin ?? 72,
-      t: opts.topMargin ?? 28,
-      b: 36,
+      l: 52,
+      r: opts.rightMargin ?? 16,
+      t: opts.topMargin ?? 12,
+      b: opts.bottomMargin ?? 48,
     },
     showlegend: false,
     hovermode: HERO_HOVERMODE,
     xaxis: {
       type: 'category' as const,
-      tickangle: -45,
-      automargin: true,
+      tickangle: 0,
+      automargin: false,
+      tickfont: { size: 10, color: '#757575' },
+      showgrid: false,
+      zeroline: false,
+      ...(opts.tickvals != null && opts.ticktext != null
+        ? { tickmode: 'array' as const, tickvals: opts.tickvals, ticktext: opts.ticktext }
+        : {}),
       ...HERO_X_SPIKES,
     },
     shapes: opts.shapes,
     annotations: opts.annotations ?? [],
     hoverlabel: HERO_HOVERLABEL,
+  };
+}
+
+/** Emphasize the last finite Plan point (Figma endpoint node). */
+export function planEndMarkerTrace(
+  labels: string[],
+  values: (number | null)[],
+  color = '#1565c0',
+): {
+  x: string[];
+  y: number[];
+  type: 'scatter';
+  mode: 'markers';
+  marker: { size: number; color: string; line: { width: number; color: string } };
+  hoverinfo: 'skip';
+  showlegend: false;
+} | null {
+  const pt = lastFinitePoint(labels, values);
+  if (!pt) {
+    return null;
+  }
+  return {
+    x: [pt.label],
+    y: [pt.value],
+    type: 'scatter',
+    mode: 'markers',
+    marker: { size: 11, color, line: { width: 2, color: '#ffffff' } },
+    hoverinfo: 'skip',
+    showlegend: false,
   };
 }

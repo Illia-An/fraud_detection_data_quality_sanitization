@@ -1,11 +1,10 @@
 import {
-  Alert,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   Stack,
-  Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -344,31 +343,33 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           slopeAlign={slopeAlign}
         />
         {boostGlance != null ? (
-          <Alert
-            severity="info"
-            variant="outlined"
+          <Stack
+            direction="row"
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
             data-testid="inspect-boost-glance"
-            sx={{ flexShrink: 0, mb: 1, py: 0.5 }}
+            sx={{ flexShrink: 0, mb: 1 }}
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-              {t('planner.inspect.boostTitle')}
-            </Typography>
-            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.25 }}>
-              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {t('planner.inspect.boostGap', {
-                  gap: boostGlance.gapToMean.toFixed(1),
-                })}
-              </Typography>
-              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {t('planner.inspect.boostSlope', {
-                  slope: boostGlance.slope.toFixed(2),
-                })}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-              {t('planner.inspect.boostHint')}
-            </Typography>
-          </Alert>
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('planner.inspect.boostGap', {
+                gap: boostGlance.gapToMean.toFixed(1),
+              })}
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('planner.inspect.boostSlope', {
+                slope: boostGlance.slope.toFixed(2),
+              })}
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            />
+          </Stack>
         ) : null}
         {unreachableHint != null && onApplyUnreachableSuggestion != null ? (
           <UnreachableRecommendationCard

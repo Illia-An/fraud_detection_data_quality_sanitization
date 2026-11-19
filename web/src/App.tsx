@@ -4,6 +4,7 @@ import { DashboardLayout } from './dashboard/DashboardLayout';
 import { AppProviders } from './providers/AppProviders';
 import { DocumentationPage } from './pages/DocumentationPage';
 import { PlannerPage } from './pages/PlannerPage';
+import { StoreInspectPage } from './pages/StoreInspectPage';
 import { TtsPlannerPage } from './pages/TtsPlannerPage';
 import { SanitizationPage } from './pages/SanitizationPage';
 import { TtsKitchenPage } from './pages/TtsKitchenPage';
@@ -16,6 +17,7 @@ export default function App() {
           <Route index element={<SanitizationPage />} />
           <Route path="tts-kitchen" element={<TtsKitchenPage />} />
           <Route path="planner" element={<PlannerPage />} />
+          <Route path="planner/store/:storeId" element={<StoreInspectPage />} />
           <Route path="planner-tts" element={<TtsPlannerPage />} />
           <Route path="documentation" element={<DocumentationPage />} />
         </Route>

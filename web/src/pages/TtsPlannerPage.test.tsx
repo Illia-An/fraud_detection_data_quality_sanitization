@@ -215,7 +215,9 @@ describe('TtsPlannerPage shell', () => {
     });
     expect(requests[0]?.priority_power).toBe(1.5);
     expect(requests[0]?.max_monthly_improve).toBe(0.25);
-    fireEvent.click(screen.getByText('At-Risk Exception List'));
+    // Panels are always visible (no accordion).
+    expect(screen.getByTestId('atrisk-exception-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-path-panel')).toBeInTheDocument();
     expect(screen.getByText('Store #10')).toBeInTheDocument();
     expect(screen.getByText('4.20 min')).toBeInTheDocument();
     expect(screen.queryByText('4.20%')).not.toBeInTheDocument();

@@ -33,7 +33,8 @@ export const FIGMA_CHART_CARD_OVERVIEW_PX = 397;
 export const FIGMA_CHART_CARD_COMPACT_PX = 247;
 export const FIGMA_CHART_GAP_PX = 12;
 export const FIGMA_EXCEPTION_COLLAPSED_PX = 52;
-export const FIGMA_EXCEPTION_EXPANDED_PX = 421;
+/** Expanded At-risk dock height (summary + scrollable list). */
+export const FIGMA_EXCEPTION_EXPANDED_PX = 300;
 export const FIGMA_EXCEPTION_ROW_HEIGHT_PX = 44;
 
 /** §4 Inspection */

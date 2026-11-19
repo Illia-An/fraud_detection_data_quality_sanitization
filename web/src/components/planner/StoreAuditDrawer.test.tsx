@@ -167,10 +167,10 @@ describe('StoreAuditDrawer', () => {
 
     expect(screen.getByTestId('store-inspect-dialog')).toBeInTheDocument();
     expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
-    expect(screen.getByText(/Store snapshot/i)).toBeInTheDocument();
-    expect(screen.getByText(/Fact As-Of \(2025-04\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Plan As-Of \(2025-04\)/i)).toBeInTheDocument();
-    expect(screen.getByTestId('inspect-fact-as-of-hint')).toBeInTheDocument();
+    expect(screen.queryByText(/Store snapshot/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Fact \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plan \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('inspect-fact-as-of-hint')).not.toBeInTheDocument();
     expect(screen.getByText('66.0%')).toBeInTheDocument();
     expect(screen.getByText('68.0%')).toBeInTheDocument();
     expect(screen.getByText('−2.0 pp')).toBeInTheDocument();
@@ -315,10 +315,10 @@ describe('StoreAuditDrawer', () => {
     // Network cutover chrome stays on Planner analytics — not duplicated in Inspect.
     expect(screen.queryByTestId('slope-cutover-caption')).not.toBeInTheDocument();
     // Aligned glance: last plotted fact from slope curves (2025-04 in fixture).
-    expect(screen.getByText('Fact As-Of (2025-04)')).toBeInTheDocument();
-    expect(screen.getByText('Baseline → Plan end (monthly)')).toBeInTheDocument();
-    expect(screen.getByText('EOY plan (cum.)')).toBeInTheDocument();
-    expect(screen.getByText('EOY forecast (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('Fact (2025-04)')).toBeInTheDocument();
+    expect(screen.getByText('Baseline → End')).toBeInTheDocument();
+    expect(screen.getByText('EOY plan')).toBeInTheDocument();
+    expect(screen.getByText('EOY forecast')).toBeInTheDocument();
     expect(screen.getByTestId('slope-panel-cumulative')).toBeInTheDocument();
     expect(screen.queryByTestId('slope-panel-monthly')).not.toBeInTheDocument();
     await waitFor(() => {
