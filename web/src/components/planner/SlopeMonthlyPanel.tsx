@@ -42,6 +42,16 @@ export function SlopeMonthlyPanel({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const graphDivRef = useRef<HTMLElement | null>(null);
   const dragDisposerRef = useRef<(() => void) | null>(null);
+  const dragHandlersRef = useRef({
+    planDragEnabled,
+    onPlanDragPreview,
+    onPlanDragCommit,
+    onPlanDragCancel,
+    getPlanDragGeneration,
+    labels: [] as string[],
+    planYs: [] as (number | null)[],
+    editableFromIndex: 0,
+  });
   const [plotWidth, setPlotWidth] = useState(0);
   const [hostHeight, setHostHeight] = useState(0);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -80,42 +90,48 @@ export function SlopeMonthlyPanel({
   const factEndIdx = cutover.factEndIndex;
   const editableFromIndex = factEndIdx + 1;
 
-  const bindPlanDrag = useCallback(
-    (gd: HTMLElement) => {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-      graphDivRef.current = gd;
-      if (!planDragEnabled || !onPlanDragPreview || !onPlanDragCommit) return;
-      dragDisposerRef.current = attachSlopePlanDrag(gd, {
-        kind: 'monthly',
-        labels,
-        editableFromIndex,
-        onPreview: onPlanDragPreview,
-        onCommit: onPlanDragCommit,
-        onCancel: () => onPlanDragCancel?.(),
-        getGeneration: getPlanDragGeneration,
-      });
-    },
-    [
-      planDragEnabled,
-      onPlanDragPreview,
-      onPlanDragCommit,
-      onPlanDragCancel,
-      getPlanDragGeneration,
-      labels,
-      editableFromIndex,
-    ],
-  );
+  dragHandlersRef.current = {
+    planDragEnabled,
+    onPlanDragPreview,
+    onPlanDragCommit,
+    onPlanDragCancel,
+    getPlanDragGeneration,
+    labels,
+    planYs,
+    editableFromIndex,
+  };
+
+  const bindPlanDrag = useCallback((gd: HTMLElement) => {
+    graphDivRef.current = gd;
+    if (dragDisposerRef.current) return;
+    dragDisposerRef.current = attachSlopePlanDrag(gd, () => {
+      const h = dragHandlersRef.current;
+      return {
+        labels: h.labels,
+        editableFromIndex: h.editableFromIndex,
+        planYs: h.planYs,
+        onPreview: (monthIndex, value) => h.onPlanDragPreview?.(monthIndex, value),
+        onCommit: (monthIndex, value) => h.onPlanDragCommit?.(monthIndex, value),
+        onCancel: () => h.onPlanDragCancel?.(),
+        getGeneration: h.getPlanDragGeneration,
+      };
+    });
+  }, []);
 
   useEffect(() => {
-    if (graphDivRef.current) {
+    if (!planDragEnabled) {
+      dragDisposerRef.current?.();
+      dragDisposerRef.current = null;
+      return;
+    }
+    if (graphDivRef.current && !dragDisposerRef.current) {
       bindPlanDrag(graphDivRef.current);
     }
     return () => {
       dragDisposerRef.current?.();
       dragDisposerRef.current = null;
     };
-  }, [bindPlanDrag]);
+  }, [planDragEnabled, bindPlanDrag]);
 
   // Past plan muted (context); future plan full blue from last fact handoff.
   const planPastYs = useMemo(
@@ -213,7 +229,7 @@ export function SlopeMonthlyPanel({
             legendgroup: 'plan',
             line: { color: '#1565c0', width: 2 },
             marker: {
-              size: planDragEnabled ? 11 : 8,
+              size: planDragEnabled ? 13 : 8,
               color: '#1565c0',
               symbol: 'circle' as const,
             },

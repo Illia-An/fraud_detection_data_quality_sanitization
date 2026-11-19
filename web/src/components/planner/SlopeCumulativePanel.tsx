@@ -46,6 +46,16 @@ export function SlopeCumulativePanel({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const graphDivRef = useRef<HTMLElement | null>(null);
   const dragDisposerRef = useRef<(() => void) | null>(null);
+  const dragHandlersRef = useRef({
+    planDragEnabled,
+    onPlanDragPreview,
+    onPlanDragCommit,
+    onPlanDragCancel,
+    getPlanDragGeneration,
+    labels: [] as string[],
+    planYs: [] as (number | null)[],
+    editableFromIndex: 0,
+  });
   const [plotWidth, setPlotWidth] = useState(0);
   const [hostHeight, setHostHeight] = useState(0);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -88,42 +98,50 @@ export function SlopeCumulativePanel({
   } = layers;
   const editableFromIndex = cutover.factEndIndex + 1;
 
-  const bindPlanDrag = useCallback(
-    (gd: HTMLElement) => {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-      graphDivRef.current = gd;
-      if (!planDragEnabled || !onPlanDragPreview || !onPlanDragCommit) return;
-      dragDisposerRef.current = attachSlopePlanDrag(gd, {
-        kind: 'cumulative',
-        labels,
-        editableFromIndex,
-        onPreview: onPlanDragPreview,
-        onCommit: onPlanDragCommit,
-        onCancel: () => onPlanDragCancel?.(),
-        getGeneration: getPlanDragGeneration,
-      });
-    },
-    [
-      planDragEnabled,
-      onPlanDragPreview,
-      onPlanDragCommit,
-      onPlanDragCancel,
-      getPlanDragGeneration,
-      labels,
-      editableFromIndex,
-    ],
-  );
+  dragHandlersRef.current = {
+    planDragEnabled,
+    onPlanDragPreview,
+    onPlanDragCommit,
+    onPlanDragCancel,
+    getPlanDragGeneration,
+    labels,
+    planYs: planCumYs,
+    editableFromIndex,
+  };
+
+  const bindPlanDrag = useCallback((gd: HTMLElement) => {
+    graphDivRef.current = gd;
+    // Do not dispose/recreate while a drag may be active — getters read latest props.
+    if (dragDisposerRef.current) return;
+    dragDisposerRef.current = attachSlopePlanDrag(gd, () => {
+      const h = dragHandlersRef.current;
+      return {
+        labels: h.labels,
+        editableFromIndex: h.editableFromIndex,
+        planYs: h.planYs,
+        onPreview: (monthIndex, value) => h.onPlanDragPreview?.(monthIndex, value),
+        onCommit: (monthIndex, value) => h.onPlanDragCommit?.(monthIndex, value),
+        onCancel: () => h.onPlanDragCancel?.(),
+        getGeneration: h.getPlanDragGeneration,
+      };
+    });
+  }, []);
 
   useEffect(() => {
-    if (graphDivRef.current) {
+    if (!planDragEnabled) {
+      dragDisposerRef.current?.();
+      dragDisposerRef.current = null;
+      return;
+    }
+    if (graphDivRef.current && !dragDisposerRef.current) {
       bindPlanDrag(graphDivRef.current);
     }
     return () => {
       dragDisposerRef.current?.();
       dragDisposerRef.current = null;
     };
-  }, [bindPlanDrag]);
+    // Attach once while enabled — handlers read via ref (preview must not tear down drag).
+  }, [planDragEnabled, bindPlanDrag]);
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
   const plotHeight = Math.max(SLOPE_PANEL_MIN_HEIGHT_PX, hostHeight || SLOPE_PANEL_MIN_HEIGHT_PX);
@@ -221,7 +239,7 @@ export function SlopeCumulativePanel({
             mode: 'lines+markers' as const,
             name: t('planner.slope.planCum'),
             line: { color: '#1565c0', width: 3 },
-            marker: { size: planDragEnabled ? 10 : 6, color: '#1565c0' },
+            marker: { size: planDragEnabled ? 12 : 6, color: '#1565c0' },
             connectgaps: false,
             hovertemplate: HERO_HOVER_TEMPLATE,
             meta: planDragEnabled ? { slopePlanDrag: true } : undefined,

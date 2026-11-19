@@ -303,14 +303,25 @@ pointerup → same recompute; on ok: lastGood = preview
 - API test `test_save_with_store_monthly_targets_override` green.
 - Parent contract non-goal for Save payload lifted (pointer to this SPEC).
 
-**Remaining:** manual UI checklist on `npm run dev`.
+### Report — Drag fix (hit-test / stable bind)
+
+**Date:** 2026-11-19  
+**Done:**
+
+- Rewrote `slopePlanDrag.ts`: plot-area coords via `_fullLayout._size` +
+  axis `d2p`/`p2d`, larger hit radius, capture-phase listeners, marker
+  `pointer-events`.
+- Panels keep handlers in refs so preview re-renders do **not** tear down
+  the active drag session (root cause of “drag does nothing”).
+- Unit tests for geometry helpers.
+
+**Remaining:** re-run manual UI checklist after Vite HMR / refresh.
 
 **Verify:**
 
 ```powershell
-uv run pytest tests/test_cumulative_plan_api.py::test_save_with_store_monthly_targets_override --no-cov
 cd web
-npm run test:run -- src/components/planner/planTrajectoryPins.test.ts src/components/planner/slopePlanRecompute.test.ts src/components/planner/useSlopePlanDraft.test.ts
+npm run test:run -- src/components/planner/slopePlanDrag.test.ts
 npm run dev
-# Planner → drag Plan markers → Save → confirm frozen monthlies
+# Hard refresh Planner → cursor ns-resize on blue Plan dots after cutover → drag
 ```
