@@ -31,17 +31,24 @@ const monitoring: PlanMonitoringInsights = {
 };
 
 describe('SimulationSummaryKpis', () => {
-  it('renders Current → Final projected delta, behind count, and feasibility', () => {
+  it('renders five-card Figma strip: projected, horizon, target, behind, feasibility', () => {
     render(
       <ThemeProvider theme={appTheme}>
-        <SimulationSummaryKpis draftPlan={draft} monitoring={monitoring} />
+        <SimulationSummaryKpis draftPlan={draft} monitoring={monitoring} horizonMonths={12} />
       </ThemeProvider>,
     );
 
-    expect(screen.queryByText('Target KPI')).not.toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-strip')).toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-projected')).toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-horizon')).toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-target')).toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-behind')).toBeInTheDocument();
+    expect(screen.getByTestId('planner-kpi-feasibility')).toBeInTheDocument();
     // Always Current → Final (never approved Final → draft Final).
     expect(screen.getByText(/70\.00% → 74\.00%/)).toBeInTheDocument();
     expect(screen.getByText('+4.00 pp')).toBeInTheDocument();
+    expect(screen.getByText('12 mo')).toBeInTheDocument();
+    expect(screen.getByText('75.00%')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText(/quota N\/A/i)).toBeInTheDocument();
   });

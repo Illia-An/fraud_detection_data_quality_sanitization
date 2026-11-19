@@ -296,6 +296,24 @@ describe('recomputeSlopePlan + allocate gate', () => {
   });
 });
 
+describe('running-mean invert (product math, not chart stack)', () => {
+  it('linear cum→monthly is not flat at target (large handoffCount overshoots)', () => {
+    // m_k = (n+k)·c_k − (n+k−1)·c_{k−1}: slow linear cum rise with large n
+    // forces monthlies above the EOY cum target. Chart stack is not the cause.
+    const handoffCum = 71;
+    const handoffCount = 14;
+    const target = 75;
+    const steps = 11; // Feb–Dec
+    const cum = linearCumulativePathToTarget(handoffCum, target, steps);
+    const monthlies = monthlyFromCumulativePath(handoffCum, handoffCount, cum);
+    expect(cum[cum.length - 1]).toBe(target);
+    const unique = new Set(monthlies);
+    expect(unique.size).toBeGreaterThan(1);
+    expect(monthlies.every((m) => m === target)).toBe(false);
+    expect(Math.max(...monthlies)).toBeGreaterThan(target);
+  });
+});
+
 function roundVia(value: number): number {
   return Math.round(value * 100) / 100;
 }

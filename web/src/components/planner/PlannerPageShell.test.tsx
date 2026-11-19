@@ -119,4 +119,21 @@ describe('PlannerAtRiskDock', () => {
     fireEvent.click(screen.getByRole('button'));
     expect(onExpandedChange).toHaveBeenCalledWith(true);
   });
+
+  it('marks flow placement for in-page At-risk section', () => {
+    renderWithTheme(
+      <PlannerAtRiskDock
+        placement="flow"
+        testId="dock"
+        onboardingId="dock-onboarding"
+        expanded
+        onExpandedChange={() => {}}
+        behindCount={0}
+        aheadCount={0}
+      >
+        <div data-testid="table-slot">table</div>
+      </PlannerAtRiskDock>,
+    );
+    expect(screen.getByTestId('dock')).toHaveAttribute('data-placement', 'flow');
+  });
 });

@@ -236,6 +236,8 @@ export const he: Record<MessageKey, string> = {
   'planner.leversTitle': 'בקרי תוכנית',
   'planner.leversSub': 'Q10012 top-box · ממוצע שווה של סניפים בחודש הייחוס',
   'planner.section.goalTime': 'יעד וזמן',
+  'planner.section.advancedControls': 'בקרות מתקדמות',
+  'planner.exportDisclosure': 'ייצוא והורדה',
   'planner.section.allocator': 'מנופים ידניים',
   'planner.current': 'נוכחי:',
   'planner.currentHint':
@@ -333,9 +335,12 @@ export const he: Record<MessageKey, string> = {
   'planner.slope.statusHint':
     'שלוש קריאות שונות — (1) Ahead/Behind = עובדה מול תוכנית בחיתוך · (2) תוצאת השנה = תחזית EOY של שנת התכנון מול יעד {target}% · (3) שבב צהוב = יעדים מרומזים לא ריאליים לסניפים. לא אותו פסק דין.',
   'planner.slope.dragHint':
-    'גררו נקודות תוכנית כחולות אחרי החיתוך (מצטבר או חודשי). שני הפאנלים ותוכנית Inspect מתעדכנים בזמן אמת. הסימולציה אינה ניתנת לגרירה.',
+    'גררו נקודות תוכנית כחולות אחרי החיתוך (מצטבר או חודשי). הגרפים מתעדכנים תוך כדי גרירה; הקצאת סניפים ו-At-risk מתרעננים בשחרור. הסימולציה אינה ניתנת לגרירה.',
   'planner.slope.pinsDirty':
     'מסלול תוכנית Slope נערך. Save יקפיא מסלול זה; איפוס מבטל עריכות pin.',
+  'planner.slope.allocating': 'מעדכן תוכניות סניפים ממסלול הרשת…',
+  'planner.slope.atRiskPending':
+    'At-risk עדיין מציג את מסלול Slope האחרון שאושר — ציוני הסניפים יתעדכנו בשחרור הסמן.',
   'planner.slope.resetPins': 'אפס מסלול תוכנית',
   'planner.slope.pinError': 'עריכת תוכנית נדחתה ({code}): {reason}',
   'planner.heroSubSlope':
@@ -446,6 +451,11 @@ export const he: Record<MessageKey, string> = {
   'planner.kpi.projected': 'KPI רשת צפוי',
   'planner.kpi.acceptedDraft': 'מאושר → טיוטה',
   'planner.kpi.currentDraft': 'נוכחי → סופי טיוטה',
+  'planner.kpi.horizon': 'אופק',
+  'planner.kpi.horizonMonths': '{count} חוד׳',
+  'planner.kpi.horizonDetail': 'חודשי תוכנית אחרי as-of',
+  'planner.kpi.target': 'יעד',
+  'planner.kpi.targetDetail': 'יעד רשת',
   'planner.kpi.behind': 'סניפים מאחורי התוכנית',
   'planner.kpi.asOf': 'נכון ל־{label}',
   'planner.kpi.feasibility': 'היתכנות',

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { SimulationResponse } from '../../schemas/cumulativePlan';
 import { buildNetworkCumulativeSlopeLayers } from './cumulativeSlopeLayers';
-import { applyDragPin, overlayNetworkPlanPackage } from './slopePlanRecompute';
+import type { DirectedPlan } from '../../schemas/metricScore';
+import {
+  applyDragPin,
+  overlayDirectedPlanWithSlopePackage,
+  overlayNetworkPlanPackage,
+  recomputePinnedSlopePlan,
+} from './slopePlanRecompute';
 
 function sampleSim(): SimulationResponse {
   return {
@@ -105,5 +111,65 @@ describe('slopePlanRecompute', () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error.code).toBe('invalid_month');
+  });
+
+  it('network mode skips byStore; full mode allocates', () => {
+    const sim = sampleSim();
+    const layers = buildNetworkCumulativeSlopeLayers(sim);
+    const idx = layers.cutover.factEndIndex + 2;
+    const net = recomputePinnedSlopePlan(layers, sim, [{ kind: 'cumulative', monthIndex: idx, value: 72 }], 'network');
+    expect(net.ok).toBe(true);
+    if (net.ok) expect(net.package.byStore).toBeNull();
+
+    const full = recomputePinnedSlopePlan(layers, sim, [{ kind: 'cumulative', monthIndex: idx, value: 72 }], 'full');
+    expect(full.ok).toBe(true);
+    if (full.ok) {
+      expect(full.package.byStore).not.toBeNull();
+      expect(full.package.planYs).toEqual(net.ok ? net.package.planYs : null);
+    }
+  });
+
+  it('overlayDirectedPlanWithSlopePackage patches plan-end from allocate', () => {
+    const sim = sampleSim();
+    const layers = buildNetworkCumulativeSlopeLayers(sim);
+    const idx = layers.cutover.factEndIndex + 2;
+    const r = applyDragPin(layers, sim, [], 'cumulative', idx, 72);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+
+    const plan: DirectedPlan = {
+      direction: 'higher_is_better',
+      unit: '%',
+      target: 75,
+      current_chain: 64,
+      required_change: 11,
+      final_chain: 70,
+      feasible: true,
+      chain_trajectory: [
+        { year: 2026, month: 2, score: 65 },
+        { year: 2026, month: 12, score: 70 },
+      ],
+      projections: [
+        {
+          store_id: 1,
+          months: [
+            { year: 2026, month: 2, score: 63 },
+            { year: 2026, month: 12, score: 70 },
+          ],
+        },
+        {
+          store_id: 2,
+          months: [
+            { year: 2026, month: 2, score: 67 },
+            { year: 2026, month: 12, score: 70 },
+          ],
+        },
+      ],
+    };
+    const overlaid = overlayDirectedPlanWithSlopePackage(plan, r.package, layers.labels);
+    const decIdx = layers.labels.indexOf('2026-12');
+    expect(decIdx).toBeGreaterThanOrEqual(0);
+    expect(overlaid.projections[0]!.months[1]!.score).toBe(r.package.byStore!.get(1)!.planYs[decIdx]!);
+    expect(overlaid.final_chain).toBe(r.package.planYs[decIdx]!);
   });
 });

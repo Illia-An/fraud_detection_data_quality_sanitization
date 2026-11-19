@@ -4,6 +4,13 @@ import { lazy } from 'react';
 
 import type { EvaluationLegendItem } from './EvaluationLegend';
 import {
+  FIGMA_ANALYTICS_PADDING_PX,
+  FIGMA_ANALYTICS_SECTION_GAP_PX,
+  FIGMA_CHART_CARD_COMPACT_PX,
+  FIGMA_CHART_CARD_OVERVIEW_PX,
+  FIGMA_CHART_GAP_PX,
+} from './figmaPlannerLayout';
+import {
   HERO_HOVERLABEL,
   HERO_HOVERMODE,
   HERO_X_SPIKES,
@@ -14,10 +21,28 @@ export const SlopePlot = lazy(async () => {
   return { default: module.default };
 });
 
-/** Minimum plot height inside a panel. */
+/** Minimum plot height inside a panel (stacked / Inspect). */
 export const SLOPE_PANEL_MIN_HEIGHT_PX = 140;
 /** @deprecated alias — prefer SLOPE_PANEL_MIN_HEIGHT_PX. */
 export const SLOPE_PANEL_HEIGHT_PX = SLOPE_PANEL_MIN_HEIGHT_PX;
+
+/**
+ * Figma `figm_res_v2` network chart density (1900×1280 desktop).
+ * Expanding At-risk compactifies both plots; collapsing restores overview.
+ */
+export const NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX = FIGMA_CHART_CARD_OVERVIEW_PX;
+export const NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX = FIGMA_CHART_CARD_COMPACT_PX;
+/** Gap between cumulative and monthly cards (Measured). */
+export const NETWORK_SLOPE_CHART_GAP_PX = FIGMA_CHART_GAP_PX;
+/** Analytics region outer padding / section rhythm (Measured). */
+export const PLANNER_ANALYTICS_PADDING_PX = FIGMA_ANALYTICS_PADDING_PX;
+export const PLANNER_ANALYTICS_SECTION_GAP_PX = FIGMA_ANALYTICS_SECTION_GAP_PX;
+
+/**
+ * Reserved height for Slope status alerts (dirty / allocating / error)
+ * so mount/unmount does not shift the charts (CLS).
+ */
+export const SLOPE_STATUS_SLOT_MIN_HEIGHT_PX = 44;
 
 export const SLOPE_CUMULATIVE_LEGEND: readonly EvaluationLegendItem[] = [
   {
@@ -232,6 +257,8 @@ export function buildSlopePlotLayout(opts: {
     autosize: false as const,
     width: opts.plotWidth,
     height: opts.plotHeight,
+    /** Keep camera / axis interaction stable across data updates (drag preview). */
+    uirevision: 'slope-plan-stable',
     margin: {
       l: 48,
       r: opts.rightMargin ?? 72,

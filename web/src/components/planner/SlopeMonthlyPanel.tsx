@@ -18,11 +18,14 @@ import {
   SlopePlot,
 } from './slopeHeroShared';
 import { attachSlopePlanDrag } from './slopePlanDrag';
+import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeMonthlyPanelProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
   planDragEnabled?: boolean;
+  /** Freeze plot size + Y-range (drag preview / allocate) to avoid layout jitter. */
+  layoutFrozen?: boolean;
   onPlanDragPreview?: (monthIndex: number, value: number) => void;
   onPlanDragCommit?: (monthIndex: number, value: number) => void;
   onPlanDragCancel?: () => void;
@@ -33,13 +36,13 @@ export function SlopeMonthlyPanel({
   layers,
   yAxisTitle = '5% Score',
   planDragEnabled = false,
+  layoutFrozen = false,
   onPlanDragPreview,
   onPlanDragCommit,
   onPlanDragCancel,
   getPlanDragGeneration,
 }: SlopeMonthlyPanelProps) {
   const t = useT();
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const graphDivRef = useRef<HTMLElement | null>(null);
   const dragDisposerRef = useRef<(() => void) | null>(null);
   const dragHandlersRef = useRef({
@@ -52,8 +55,7 @@ export function SlopeMonthlyPanel({
     planYs: [] as (number | null)[],
     editableFromIndex: 0,
   });
-  const [plotWidth, setPlotWidth] = useState(0);
-  const [hostHeight, setHostHeight] = useState(0);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(layoutFrozen);
   const [legendOpen, setLegendOpen] = useState(true);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_MONTHLY_DEFAULT_HIDDEN),
@@ -69,19 +71,6 @@ export function SlopeMonthlyPanel({
   }, []);
 
   const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
-
-  useEffect(() => {
-    const node = hostRef.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (!rect) return;
-      setPlotWidth(Math.max(0, Math.floor(rect.width)));
-      setHostHeight(Math.max(0, Math.floor(rect.height)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   const { labels, planYs, actualYs, simYs, requiredMonthlyYs, target, cutover } = layers;
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
@@ -162,6 +151,10 @@ export function SlopeMonthlyPanel({
     [isVisible, actualYs, planYs, simYs, requiredMonthlyYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
+  const yRange = useFrozenYRange(
+    layoutFrozen,
+    fitY.range as [number, number] | undefined,
+  );
   const { shapes, annotations } = asOfShapes(
     cutover.lineLabel,
     isVisible('asOf'),
@@ -352,7 +345,7 @@ export function SlopeMonthlyPanel({
               dragmode: planDragEnabled ? false : 'zoom',
               yaxis: {
                 title: { text: yAxisTitle },
-                range: fitY.range,
+                range: yRange,
                 ticksuffix: '%',
                 ...HERO_Y_SPIKES,
               },

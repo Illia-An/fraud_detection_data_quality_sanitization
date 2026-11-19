@@ -43,6 +43,12 @@ import {
   formatScore as formatScoreValue,
   scoreDisplayForUnit,
 } from './storeAudit/storeAuditFormat';
+import {
+  FIGMA_INSPECT_PADDING_PX,
+  FIGMA_INSPECT_SECTION_GAP_PX,
+  FIGMA_INSPECT_SIDE_GUTTER_PX,
+  FIGMA_INSPECT_VERTICAL_GUTTER_PX,
+} from './figmaPlannerLayout';
 import { INSPECT_DIALOG_PAPER_MAX_PX } from './storeAudit/storeAuditLayout';
 
 type InspectPanel = MetricScorePanel & {
@@ -283,12 +289,22 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
       maxWidth={false}
       scroll="paper"
       data-testid="store-inspect-dialog"
+      slotProps={{
+        backdrop: { sx: { bgcolor: 'rgba(0,0,0,0.35)' } },
+      }}
       PaperProps={{
         sx: {
-          height: { xs: '100%', md: '90vh' },
-          maxHeight: { xs: '100%', md: '90vh' },
-          m: { xs: 0, md: 2 },
-          width: { xs: '100%', md: 'calc(100% - 32px)' },
+          // Figma §4.1 / §5.2 — centered, capped 1600, gutters from viewport.
+          height: { xs: '100%', md: 'auto' },
+          maxHeight: {
+            xs: '100%',
+            md: `calc(100dvh - ${FIGMA_INSPECT_VERTICAL_GUTTER_PX * 2}px)`,
+          },
+          m: { xs: 0, md: `${FIGMA_INSPECT_VERTICAL_GUTTER_PX}px auto` },
+          width: {
+            xs: '100%',
+            md: `min(${INSPECT_DIALOG_PAPER_MAX_PX}px, calc(100vw - ${FIGMA_INSPECT_SIDE_GUTTER_PX * 2}px))`,
+          },
           maxWidth: { md: INSPECT_DIALOG_PAPER_MAX_PX },
           display: 'flex',
           flexDirection: 'column',
@@ -311,12 +327,12 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          gap: 0,
-          py: 1.5,
-          px: 2,
+          gap: `${FIGMA_INSPECT_SECTION_GAP_PX}px`,
+          py: `${FIGMA_INSPECT_PADDING_PX}px`,
+          px: `${FIGMA_INSPECT_PADDING_PX}px`,
           flex: 1,
           minHeight: 0,
-          overflow: 'hidden',
+          overflow: 'auto',
         }}
       >
         <InspectStoreGlance

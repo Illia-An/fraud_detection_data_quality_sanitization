@@ -1,0 +1,925 @@
+# Planner Layout Specification for Cursor
+
+## Purpose
+
+Refactor and redistribute existing application components to match the inspected desktop designs without replacing underlying state, data, validation, calculation, or persistence logic.
+
+No canvas modifications were made.
+
+---
+
+## 0. Scope and interpretation
+
+### Source states
+
+| State | Figma reference |
+|---|---|
+| Overview | <figma-node-link node-id="36:2525">01 · Planner Overview</figma-node-link> |
+| Expanded exceptions | <figma-node-link node-id="36:2595">02 · Exception List Expanded</figma-node-link> |
+| Store inspection | <figma-node-link node-id="36:2705">03 · Store Inspection with Estimate Table</figma-node-link> |
+
+All three are 1900 × 1280 desktop compositions.
+
+### Evidence labels
+
+- **Measured:** directly present in the design.
+- **Derived:** calculated from measured dimensions or Auto Layout relationships.
+- **Recommended:** implementation behavior needed where the design does not define it.
+
+### Important limitations
+
+The designs establish desktop layout and several visibility transitions, but do not define:
+
+- Responsive breakpoint values.
+- Browser scroll ownership.
+- Mobile layouts.
+- Minimum or maximum widths.
+- Complete behavior for every visible control.
+
+Recommendations below are not claims about authored responsive behavior.
+
+---
+
+# 1. Shared page and grid architecture
+
+## 1.1 Three-column application shell
+
+**Measured:** all three states use the same horizontal, gapless shell.
+
+| Zone | Position at reference size | Width rule | Height | Viewport width share |
+|---|---:|---|---:|---:|
+| Navigation | x = 0 | 176 px rendered width | 1280 px, fill parent | 9.26% |
+| Planning controls | x = 176 | Fixed 320 px | Fill parent | 16.84% |
+| Analytics | x = 496 | Fill remaining width: 1404 px | Fill parent | 73.89% |
+
+### Implementation sizing contract
+
+- Root: horizontal layout, full viewport width and height.
+- Navigation: nonshrinking 176 px expanded width.
+- Controls: nonshrinking 320 px width.
+- Analytics: flexible remaining width, with min-width: 0.
+- Formula with expanded navigation:
+  - Analytics outer width = viewport width − 496 px.
+  - Analytics content width = viewport width − 544 px.
+- At 1900 px viewport width:
+  - Analytics outer width = 1404 px.
+  - Analytics content width = 1356 px.
+
+Do not implement the measured percentages as column widths. The first two columns are stable-width regions; analytics absorbs width changes.
+
+The navigation wrapper is technically width-to-content in the design, but its child establishes the 176 px width. Treat it as a fixed-width shell column.
+
+## 1.2 Scroll ownership and fixed regions
+
+### Measured
+
+- Screen roots and the three main regions clip their contents.
+- Authored overflow is NONE.
+- No vertical or horizontal scrolling is configured.
+- The controls footer is bottom-anchored through a flexible middle region, not an absolutely positioned overlay.
+- Analytics content stacks from the top.
+- No sticky analytics header is authored.
+
+### Recommended production behavior
+
+- Keep the application shell viewport-height.
+- Prevent document-level scrolling.
+- Keep navigation stationary; allow internal scrolling only if height becomes insufficient.
+- Structure controls as three vertical rows:
+  1. Content-height title.
+  2. Flexible, independently vertically scrollable inputs.
+  3. Content-height action footer.
+- Use analytics as the primary vertical scroll container.
+- Put wide tables inside independent horizontal overflow wrappers.
+- Avoid a second vertical scrollbar inside the six-row exception preview.
+
+This preserves access to controls on shorter displays without arbitrarily shrinking charts.
+
+---
+
+# 2. Component redistribution and hierarchy
+
+The following names describe implementation roles, not assumed existing application identifiers. Map existing components into these roles rather than creating parallel stateful copies.
+
+## 2.1 Application hierarchy
+
+- Application shell — horizontal
+  - Navigation region
+    - Workspace identity
+    - Primary navigation
+    - Flexible support region, bottom-aligned
+  - Planning controls — vertical
+    - Panel title
+    - Flexible input region
+      - Goal and time settings
+      - Scenario/question shortcuts
+      - Advanced-controls disclosure
+      - Manual controls, initially hidden
+    - Bottom action region
+      - Run simulation
+      - Save/revert row
+      - Export disclosure
+      - Export actions, initially hidden
+  - Analytics region — vertical
+    - Workspace title/status row
+    - Run/provenance row
+    - Network KPI strip
+    - Evaluation context/warning row
+    - Chart stack
+      - Cumulative chart
+      - Monthly chart
+    - Exception disclosure
+      - Summary header
+      - Filters, column headers, rows, and footer when expanded
+  - Inspection overlay, conditionally present
+    - Viewport backdrop
+    - Inspection dialog
+
+There is no inspection side drawer in the selected designs. Inspection overlays the entire application without changing underlying column widths.
+
+## 2.2 Navigation distribution
+
+Reference: <figma-node-link node-id="41:2349">Navigation rail</figma-node-link>.
+
+### Measured
+
+- Internal padding: 12 px.
+- Usable width: 152 px.
+- Major group spacing: 20 px.
+- Identity group: 84 px high.
+- Primary navigation starts at y = 116 px.
+- Primary items: 42 px high.
+- Gap between primary items: 8 px.
+- Primary item order:
+  1. Sanitization.
+  2. Kitchen TTS.
+  3. Planner — active.
+  4. TTS Planner.
+  5. Documentation.
+- Product tour and About PoC are bottom-aligned inside a flexible support group.
+- Support items: 32 px high.
+- Gap between support items: 8 px.
+
+### Collapsed variant
+
+A reusable 64 px collapsed navigation variant exists, using abbreviated labels.
+
+- Expanded width: 176 px.
+- Collapsed width: 64 px.
+- Width released to analytics: 112 px.
+- The inspected screen interactions do not wire the visible collapse control to this variant.
+
+## 2.3 Controls distribution
+
+Reference: <figma-node-link node-id="36:2528">Plan controls</figma-node-link>.
+
+### Measured outer layout
+
+- Outer width: 320 px.
+- Padding: 20 px on every side.
+- Major vertical gaps: 24 px.
+- Title:
+  - y = 20 px.
+  - Height = 28 px.
+- Input region:
+  - y = 72 px.
+  - Height = 1032 px in the default state.
+  - Flexible remaining height.
+- Footer:
+  - y = 1128 px.
+  - Height = 132 px.
+- Bottom inset: 20 px.
+- Actual child width: 279 px.
+- Implement approximately 280 px usable width rather than hardcoding the one-pixel discrepancy.
+
+### Input-region order
+
+#### A. Goal and time block — 194 px high
+
+1. Section label.
+2. Two equal-width numeric fields in one horizontal row:
+   - Target (%): 75.
+   - Horizon (months): 12.
+3. Validation/help line.
+4. Reference-month label.
+5. Full-width month select.
+6. Baseline context row.
+
+Sizing:
+
+- Gap between numeric fields: 8 px.
+- Numeric field group height: 58 px.
+- Numeric input surface height: 38 px.
+- Month select height: 30 px.
+- Baseline description aligns left.
+- Baseline percentage sits at the trailing edge.
+
+#### B. Scenario shortcuts — 428 px high
+
+1. Section label.
+2. Close gap to target → Show Plan.
+3. Even monthly progress → Show Plan.
+4. Lift behind stores using ahead surplus → Show Adjustment.
+5. Rebalance without increasing the network → Show Adjustment.
+6. Adjustment-method help text.
+
+Each question/action pair:
+
+- Vertical padding: 12 px.
+- Question-to-action gap: 8 px.
+- Content-driven height:
+  - 81 px for a single-line question.
+  - 101 px for a two-line question.
+
+#### C. Advanced disclosure
+
+- Full-width.
+- Height: 32 px.
+- Manual-controls content is initially hidden.
+
+#### D. Manual controls — 184 px when visible
+
+Order:
+
+1. Section label.
+2. Equal-width numeric fields:
+   - Maximum monthly improvement: 4.
+   - Lift priority power: 1.
+3. Trajectory label.
+4. Full-width trajectory select:
+   - Value: Uniform.
+5. Advanced allocator options disclosure.
+
+No expanded allocator-options content is specified in the inspected states.
+
+### Footer order
+
+1. Top padding: 12 px.
+2. Run Simulation:
+   - Height: 40 px.
+3. Gap: 8 px.
+4. Save Plan / Revert Draft:
+   - Equal-width buttons.
+   - Height: 32 px.
+   - Horizontal gap: 8 px.
+5. Gap: 8 px.
+6. Export & download:
+   - Height: 32 px.
+7. Export actions, initially hidden:
+   - Export CSV.
+   - Export Excel.
+   - Equal-width buttons.
+   - Height: 32 px.
+
+### Derived expansion behavior
+
+- Opening manual controls adds 208 px of input-flow occupancy:
+  - 184 px content.
+  - 24 px section gap.
+- Opening export adds 40 px to the footer:
+  - 32 px row.
+  - 8 px gap.
+- Footer growth consumes space upward.
+- The flexible input region loses available height.
+- Neither expansion should resize analytics or change chart density.
+
+---
+
+# 3. Analytics layout by screen state
+
+## 3.1 Shared top stack
+
+Reference: <figma-node-link node-id="36:2565">Analytics workspace</figma-node-link>.
+
+### Measured
+
+- Outer padding: 24 px.
+- Section spacing: 16 px.
+- All sections fill the 1356 px content width.
+
+Coordinates below are relative to the analytics region, not the whole viewport.
+
+| Section | y | Height |
+|---|---:|---:|
+| Workspace title/status | 24 | 36 |
+| Run/provenance | 76 | 28 |
+| KPI strip | 120 | 103 |
+| Evaluation context | 239 | 44 overview / 48 expanded |
+| Charts | 299 overview / 303 expanded | State-dependent |
+| Exceptions | 1121 overview / 825 expanded | State-dependent |
+
+### Header relationships
+
+- Workspace title fills remaining horizontal space.
+- API status and product-context label hug content at the right.
+- Header gap: 8 px.
+
+Run/provenance row order:
+
+1. Active-answer pill.
+2. Undo button:
+   - 132 × 28 px.
+3. Baseline provenance:
+   - Flexible width.
+4. As-of label:
+   - Trailing, content-width item.
+
+Evaluation context:
+
+- Text group fills available width.
+- Warning pill remains trailing.
+- Warning pill reference dimensions: 194 × 28 px.
+
+## 3.2 Network KPI strip
+
+Reference: <figma-node-link node-id="36:2575">Evaluation status strip</figma-node-link>.
+
+### Measured
+
+One horizontal row with no inter-card gap.
+
+| Order | KPI | Width |
+|---|---|---:|
+| 1 | Projected network KPI | Fixed 340 px |
+| 2 | Horizon | Flexible 254 px |
+| 3 | Target | Flexible 254 px |
+| 4 | Stores behind plan | Flexible 254 px |
+| 5 | Feasibility | Flexible 254 px |
+
+Sizing formula:
+
+- Primary card = 340 px.
+- Each secondary card = (available strip width − 340 px) ÷ 4.
+
+At the reference width:
+
+- Primary card = 25.07% of content width.
+- Each secondary card = 18.73%.
+
+Internal layout:
+
+- Padding: 12 px.
+- Vertical gap: 4 px.
+- Nesting: label → value → contextual detail.
+- Cards top-align.
+- Content heights are not forced equal.
+
+### Numerical alignment
+
+KPI text and values are left-aligned in the design.
+
+Do not globally right-align KPI cards merely because their values are numeric.
+
+## 3.3 State A — Overview
+
+### Measured layout
+
+- Two full-width charts are vertically stacked.
+- Chart stack height: 806 px.
+- Chart stack occupies approximately 63.0% of viewport height.
+- Each chart card: 397 px high.
+- Gap between charts: 12 px.
+- Exception disclosure is collapsed:
+  - Height: 52 px.
+  - Approximately 4.1% of viewport height.
+- Collapsed exception header remains visible with counts and Expand action.
+- Filters, column headers, rows, and table footer are absent from the overview layout.
+
+### Chart internal architecture
+
+Each overview chart contains:
+
+1. Top padding: 12 px.
+2. Title/outcome/legend-control row: 28 px.
+3. Gap: 8 px.
+4. Series legend: 16 px.
+5. Gap: 8 px.
+6. Plot: 290 px.
+7. Gap: 8 px.
+8. Metadata: 14 px.
+9. Bottom padding: approximately 12 px, plus separator accounting.
+
+Horizontal title-row behavior:
+
+- Title flexes.
+- Outcome hugs content toward the right.
+- Legend action occupies 132 × 28 px at the right.
+
+## 3.4 State B — Expanded exceptions
+
+### Measured layout
+
+- Shell, top headers, and KPI widths remain unchanged.
+- Both charts switch to compact presentation:
+  - Card height: 247 px each.
+  - Plot height: 140 px.
+  - Combined chart-stack height: 506 px.
+- Charts remain vertically stacked.
+- Expanded exception section:
+  - Height: 421 px.
+  - Approximately 32.9% of viewport height.
+- Compact chart stack occupies approximately 39.5% of viewport height.
+
+### Critical redistribution rule
+
+Expanding exceptions reduces each plot by 150 px.
+
+It does not merely append a large table below unchanged overview charts.
+
+The exception section moves upward by 296 px:
+
+- 300 px total chart reduction.
+- Offset by a 4 px taller evaluation-context row.
+
+### Expanded exception section
+
+Reference: <figma-node-link node-id="36:2659">At-Risk Exception List</figma-node-link>.
+
+| Child | Height |
+|---|---:|
+| Summary/disclosure header | 52 px |
+| Filter row | 38 px |
+| Column headers | 37 px |
+| Six rows | 264 px total |
+| Footer | 30 px |
+| Total | 421 px |
+
+Header:
+
+- Padding: 12 px vertical, 16 px horizontal.
+- Title fills remaining width.
+- Behind/ahead pills and Collapse action remain trailing.
+
+Filter-row order:
+
+1. Ranking explanation:
+   - Flexible width.
+2. View label.
+3. View select:
+   - 210 × 30 px.
+4. As-of label.
+5. Month select:
+   - 124 × 30 px.
+
+Rows:
+
+- Six preview rows.
+- Each row: 44 px high.
+- Preview shows six of 72 behind stores.
+- This is not a rendering of the full dataset.
+
+Footer:
+
+- Preview/count guidance at the left.
+- Next-store information at the right.
+- Pagination and full-list loading behavior are not defined.
+
+### Exception column order
+
+1. Store ID.
+2. Volume.
+3. Fact As-Of.
+4. Plan As-Of.
+5. Gap (pp).
+6. MoM (pp).
+7. Baseline → End.
+8. Behind streak.
+9. Gap share.
+10. Lift to end.
+11. Error Budget Deficit.
+12. Action.
+
+### Column sizing at 1356 px table width
+
+- Outer row padding: 10 px on each side.
+- Store, deficit, and action columns:
+  - Approximately 103.83 px each.
+- Nine numerical columns:
+  - Approximately 113.83 px each.
+  - Includes 10 px trailing inset.
+- Headers and rows use matching tracks.
+- Deficit indicator:
+  - 88 × 3 px at the reference size.
+
+### Implementation recommendation
+
+Use one shared table/grid column definition for headers and rows.
+
+Do not let each row independently size its columns.
+
+---
+
+# 4. State C — Store inspection overlay
+
+Reference: <figma-node-link node-id="36:2816">Planner / Store Inspection modal</figma-node-link>.
+
+## 4.1 Overlay geometry
+
+### Measured
+
+- Underlying page remains in expanded-exceptions layout.
+- Backdrop covers the full 1900 × 1280 viewport.
+- Backdrop opacity: 35%.
+- Dialog dimensions: 1600 × 1032 px.
+- Position:
+  - x = 150 px.
+  - y = 124 px.
+- Horizontal margins: 150 px on both sides.
+- Vertical margins: 124 px on both sides.
+- Viewport share:
+  - Width: 84.21%.
+  - Height: 80.63%.
+- Dialog padding: 32 px.
+- Internal content width: 1536 px.
+- Main vertical section gap: 20 px.
+- Authored dialog width is fixed.
+- Authored dialog height hugs content.
+
+The dialog is visually centered, but its authored constraints are top/left rather than responsive center constraints.
+
+Implement centering explicitly; do not copy literal x/y offsets into responsive positioning.
+
+## 4.2 Exact vertical nesting
+
+Coordinates are relative to the dialog.
+
+| Section | y | Height |
+|---|---:|---:|
+| Header | 32 | 36 |
+| Snapshot/provenance | 88 | 16 |
+| Store KPI strip | 124 | 94 |
+| Boost/slope strip | 238 | 44 |
+| Evaluation context | 302 | 24 |
+| Store cumulative chart | 346 | 247 |
+| Estimate evidence section | 613 | 322 |
+| Footer | 955 | 45 |
+
+### Header order
+
+1. Inspection title.
+2. Store selector:
+   - 150 × 30 px.
+3. Flexible badge group:
+   - Badges align to the group’s right edge.
+4. Close action:
+   - 132 × 28 px.
+
+Badge order:
+
+1. Behind.
+2. Warnings.
+3. Inspection preview.
+
+### Store KPI strip
+
+Seven equal-width cards:
+
+1. Fact As-Of.
+2. Plan As-Of.
+3. Gap.
+4. Baseline → End.
+5. EOY plan.
+6. EOY forecast.
+7. Lift to end.
+
+Sizing:
+
+- Available width: 1536 px.
+- Each card: approximately 219.43 px.
+- Formula: 1536 ÷ 7.
+
+### Store chart
+
+- Uses compact/store chart structure.
+- Card height: 247 px.
+- Plot height: 140 px.
+- Only the cumulative chart appears inside inspection.
+- Do not duplicate the network monthly chart inside the dialog.
+
+## 4.3 Estimate evidence section
+
+### Measured default
+
+Expanded in the inspected store-inspection state.
+
+### Nesting
+
+1. Header:
+   - Height: 28 px.
+   - Title.
+   - Flexible “Last month only · In range” context.
+   - Taken and distributed badges.
+   - Collapse action.
+2. Gap: 12 px.
+3. Monthly breakdown:
+   - Height: 186 px.
+   - Month headers: 41 px.
+   - Estimate row: 55 px.
+   - Actual row: 45 px.
+   - Difference row: 45 px.
+4. Gap: 12 px.
+5. Allowed-range/allocation summary:
+   - Height: 16 px.
+6. Gap: 12 px.
+7. Preview actions:
+   - Height: 32 px.
+
+Section padding:
+
+- Top: 12 px.
+- Bottom: 12 px.
+
+### Monthly evidence
+
+- Twelve month columns cover January–December 2026.
+- December estimate contains an editable 72 × 30 px input.
+- Numeric cells align right.
+
+### Preview actions
+
+Order:
+
+1. Recalculate.
+2. Apply to Draft.
+3. Reset Preview.
+
+Sizing:
+
+- Each action: 144 × 32 px.
+- Gap: 8 px.
+
+State:
+
+- Apply to Draft is visually disabled.
+- Reset Preview is visually disabled.
+
+### Derived collapse behavior
+
+One visibility state controls:
+
+- Monthly breakdown.
+- Allowed-range/allocation summary.
+- Preview actions.
+
+Collapsing removes all three, not just the monthly rows.
+
+Result:
+
+- Evidence section reduces from 322 px to 52 px.
+- Dialog content height reduces by 270 px.
+- Content-height dialog becomes approximately 762 px tall.
+- Header, summary KPIs, slope context, chart, and footer remain visible.
+
+### Implementation recommendation
+
+Use a shared column definition across all monthly rows.
+
+The design independently sizes row-label content, causing slight numeric-column offsets between rows. Do not reproduce that drift in a semantic table.
+
+---
+
+# 5. Responsive and state-transition contract
+
+## 5.1 Behavior established by the design
+
+| State change | Layout consequence |
+|---|---|
+| Expand exception list | Compact both network plots from 290 to 140 px; reveal filters and six-row table |
+| Collapse exception list | Restore overview plots and summary-only disclosure |
+| Open manual controls | Add 184 px section plus 24 px gap inside controls |
+| Expand exports | Add 32 px row plus 8 px gap to footer |
+| Hide one chart legend | Remove 16 px legend plus one 8 px gap; plot height remains unchanged |
+| Open inspection | Overlay expanded page without underlying column redistribution |
+| Collapse estimate evidence | Remove 270 px of dialog content |
+| Collapse navigation variant | Width changes from 176 to 64 px; analytics can gain 112 px |
+
+Additional rules:
+
+- Legend visibility is independent for each chart.
+- Hiding a legend does not hide its data series.
+- Authored navigation between the three screen states is instantaneous.
+- No sliding, chart morphing, or drawer animation is specified.
+
+### Authored interaction references
+
+Expand/collapse transition:
+
+<figma-prototype-interaction-link source-node-id="36:2664" interaction-id="41:2348" />
+
+Inspection entry:
+
+<figma-prototype-interaction-link source-node-id="I36:2696;35:71" interaction-id="41:2902" />
+
+Inspection close:
+
+<figma-prototype-interaction-link source-node-id="I36:2816;35:1943" interaction-id="41:2905" />
+
+Estimate disclosure:
+
+<figma-prototype-interaction-link source-node-id="I36:2816;35:2078" interaction-id="41:2909" />
+
+Only the first exception row has an authored inspection destination.
+
+Generalizing inspection to every row is a sensible application behavior, but is not demonstrated by the inspected prototype.
+
+## 5.2 Recommended responsive constraints
+
+These are implementation recommendations, not measured breakpoint specifications.
+
+### Desktop width changes
+
+- Preserve 176 px navigation and 320 px controls while content fits.
+- Let analytics and chart plots resize to their container width.
+- Preserve chart heights by display state.
+- Do not scale the entire screen proportionally.
+- Recalculate chart scales and tick density for available width.
+- Reduce x-axis label density before reducing label font size.
+- Allow metadata and header rows to wrap when necessary.
+
+### Narrower layouts
+
+- Prefer the existing 64 px navigation variant before shrinking controls.
+- When a 320 px controls column leaves insufficient analytics width, expose the same controls through a dismissible overlay panel.
+- This narrow-screen controls panel is an adaptation, not an authored state.
+- Preserve controls state when moving between docked and overlay presentation.
+- Reflow KPI cards into fewer columns when labels and values no longer fit.
+- Keep charts stacked.
+- Keep tables horizontally scrollable.
+- Do not wrap numerical cells into multiple lines.
+- Choose breakpoint values from actual minimum-content widths; the design does not establish exact breakpoint numbers.
+
+### Shorter viewports
+
+- Scroll the controls’ middle region.
+- Keep the action footer visible.
+- Scroll analytics vertically.
+- Do not compress compact plots below 140 px merely to force the expanded page above the fold.
+
+### Dialog
+
+Recommended behavior:
+
+- Width = available viewport width minus safe side gutters, capped at 1600 px.
+- Maximum height = viewport height minus safe top/bottom gutters.
+- Center within the viewport.
+- If maximum height is reached, scroll the dialog body.
+- Keep close controls accessible.
+- Lock background scrolling.
+- Trap focus inside the dialog.
+- Restore focus to the invoking control on close.
+
+Escape-key and backdrop-click dismissal are not authored; follow existing application conventions.
+
+---
+
+# 6. Alignment, typography, and spacing
+
+## 6.1 Numerical alignment
+
+### Measured
+
+- Table numerical cells are visually right-aligned through parent-cell alignment.
+- Some individual text layers report left alignment because they hug their contents.
+- Their cell containers still place them against the right edge.
+- Numerical column headers are explicitly right-aligned.
+- Numeric table font:
+  - IBM Plex Mono.
+  - Generally 12 px size / 20 px line height.
+- KPI values:
+  - IBM Plex Mono.
+  - Generally 20 px size / 28 px line height.
+- Supporting interface text:
+  - Inter.
+
+### Implementation rules
+
+- Right-align numerical table headers and values.
+- Right-align numeric inputs.
+- Use tabular numerals.
+- Preserve units and signed values.
+- Keep percentage points (“pp”) distinct from percentages (“%”).
+- Preserve left alignment for:
+  - KPI card content.
+  - Store identifiers.
+  - Action links.
+  - Descriptive text.
+- Keep numeric values on one line.
+- Use shared formatting functions for consistent precision across charts, KPIs, and tables.
+
+## 6.2 Spacing rhythm
+
+| Purpose | Spacing |
+|---|---:|
+| Label/value/detail micro-spacing | 4 px |
+| Control gaps, chart internals, navigation items | 8 px |
+| Chart-to-chart gap, card vertical padding | 12 px |
+| Analytics section gap | 16 px |
+| Navigation groups, modal sections, controls padding | 20 px |
+| Analytics outer padding, controls major sections | 24 px |
+| Modal outer padding | 32 px |
+
+---
+
+# 7. Cursor handoff mapping and state preservation
+
+## 7.1 Reuse contract
+
+The design already uses linked instances for:
+
+- Numeric inputs.
+- Question cards.
+- KPIs.
+- Status pills.
+- Exception rows.
+- Chart presentations.
+- Simulation actions.
+- Inspection dialog.
+
+Map existing application components to these roles.
+
+| Role | Presentation responsibility | Must continue using |
+|---|---|---|
+| Controls region | Goal, time, scenarios, manual settings | Existing form values, validation, and scenario handlers |
+| Action footer | Run, save, revert, export | Existing mutation and download handlers |
+| KPI strip | Current derived summaries | Existing selectors and calculation results |
+| Chart presentation | Overview, compact, and store density | Existing series, scales, filters, and chart interactions |
+| Exception disclosure | Open state and table visibility | Existing ranked/filterable store collection |
+| Exception row | Store metrics and inspection action | Stable store identifier |
+| Inspection dialog | Selected-store preview | Existing preview/draft distinction and calculations |
+| Evidence disclosure | Monthly evidence visibility | Existing estimates, actuals, differences, and validation |
+
+## 7.2 State boundaries
+
+Keep presentation state independent from domain state.
+
+### Presentation state
+
+- Navigation expanded/collapsed.
+- Manual section open/closed.
+- Exports open/closed.
+- Exceptions open/closed.
+- Per-chart legend visibility.
+- Inspection open/closed.
+- Estimate evidence open/closed.
+
+### Domain state
+
+- Target.
+- Horizon.
+- Reference month.
+- Scenario.
+- Draft plan.
+- Saved plan.
+- Selected store.
+- Estimates.
+- Preview calculations.
+
+### Do not
+
+- Create separate planning models for overview, exceptions, and inspection.
+- Re-run simulations merely because a section expands.
+- Reset inputs when a panel changes position.
+- Recreate chart instances unnecessarily when only plot height changes.
+- Treat inspection preview as a committed draft change.
+- Change ranking or calculations to reconcile visual sample values.
+
+## 7.3 Data inconsistencies requiring clarification
+
+The selected states contain materially different values for the same store across list and inspection.
+
+| Context | Displayed values |
+|---|---|
+| Exception list | Plan As-Of 59.6%; gap −24.4 pp |
+| Inspection summary | Plan As-Of 35.2%; gap 0.0 pp |
+| Inspection monthly evidence | January estimate 59.6; actual 35.2; difference −24.4 |
+| List and December estimate | End value 73.8% |
+| Inspection summary | End value 99.4% |
+
+The inspection context distinguishes preview from saved-draft ranking, but does not fully explain every discrepancy.
+
+Retain existing data semantics and surface these as product/data clarification items.
+
+Do not hardcode the displayed samples into calculations.
+
+---
+
+# 8. Acceptance criteria
+
+At 1900 × 1280:
+
+- Shell columns render at 176 / 320 / 1404 px.
+- Analytics content starts at global x = 520 px.
+- Analytics content width is 1356 px.
+- Overview contains:
+  - Two 397 px chart cards.
+  - One 52 px exception summary.
+- Expanded state contains:
+  - Two 247 px chart cards.
+  - One 421 px exception section.
+- Numeric table headers and values share right-aligned column edges.
+- Controls retain a visible bottom action region.
+- Inspection overlays the unchanged expanded layout.
+- Inspection reference dimensions are 1600 × 1032 px.
+- Disclosure changes affect only their intended layout regions.
+- Resizing preserves form values, draft state, selection, and preview state.
+- Switching presentation states does not alter underlying data logic.

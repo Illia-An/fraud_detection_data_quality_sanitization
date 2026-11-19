@@ -15,6 +15,12 @@ import Tooltip from '@mui/material/Tooltip';
 import type { ReactNode } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
 
+import {
+  FIGMA_NAV_GROUP_GAP_PX,
+  FIGMA_NAV_ITEM_GAP_PX,
+  FIGMA_NAV_ITEM_HEIGHT_PX,
+  FIGMA_NAV_PADDING_PX,
+} from '../../components/planner/figmaPlannerLayout';
 import { useT, type MessageKey } from '../../i18n';
 import { useOnboardingStore } from '../../onboarding';
 import { usePlannerScenarioStore } from '../../store/plannerScenarioStore';
@@ -78,8 +84,20 @@ export default function MenuContent({
   };
 
   return (
-    <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
-      <List dense data-onboarding="nav-main" data-onboarding-surface={surface}>
+    <Stack
+      sx={{
+        flexGrow: 1,
+        p: `${FIGMA_NAV_PADDING_PX}px`,
+        justifyContent: 'space-between',
+        gap: `${FIGMA_NAV_GROUP_GAP_PX}px`,
+      }}
+    >
+      <List
+        dense
+        data-onboarding="nav-main"
+        data-onboarding-surface={surface}
+        sx={{ display: 'flex', flexDirection: 'column', gap: `${FIGMA_NAV_ITEM_GAP_PX}px` }}
+      >
         {mainListItems.map((item) => {
           const label = t(item.textKey);
           const button = (
@@ -98,6 +116,8 @@ export default function MenuContent({
               sx={{
                 justifyContent: collapsed ? 'center' : 'flex-start',
                 px: collapsed ? 1 : 2,
+                minHeight: FIGMA_NAV_ITEM_HEIGHT_PX,
+                height: FIGMA_NAV_ITEM_HEIGHT_PX,
               }}
             >
               <ListItemIcon

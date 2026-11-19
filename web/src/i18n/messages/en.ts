@@ -248,6 +248,8 @@ export const en = {
   'planner.leversSub': 'Q10012 top-box · equal-mean stores at reference month',
   'planner.section.goalTime': 'Goal & time',
   'planner.section.allocator': 'Manual levers',
+  'planner.section.advancedControls': 'Advanced controls',
+  'planner.exportDisclosure': 'Export & download',
   'planner.current': 'Current:',
   'planner.currentHint':
     'Equal mean of cleansed store scores at the reference month (not Final over the whole period)',
@@ -344,9 +346,12 @@ export const en = {
   'planner.slope.statusHint':
     'Three different reads — (1) Ahead/Behind = fact vs plan at cutover · (2) Year outcome = EOY planning-year forecast vs target {target}% · (3) Yellow chip = unrealistic store implied targets. Not the same verdict.',
   'planner.slope.dragHint':
-    'Drag blue Plan markers after cutover (cumulative or monthly). Both panels and Inspect Plan update live. Simulation is not editable.',
+    'Drag blue Plan markers after cutover (cumulative or monthly). Charts update while dragging; store allocation and At-risk refresh on release. Simulation is not editable.',
   'planner.slope.pinsDirty':
     'Slope plan path edited. Save Plan will freeze this path; Reset discards pin edits.',
+  'planner.slope.allocating': 'Updating store plans from the network path…',
+  'planner.slope.atRiskPending':
+    'At-risk still shows the last committed Slope path — store scores refresh when you release the marker.',
   'planner.slope.resetPins': 'Reset plan path',
   'planner.slope.pinError': 'Plan edit rejected ({code}): {reason}',
   'planner.heroSubSlope':
@@ -462,6 +467,11 @@ export const en = {
   'planner.kpi.projected': 'Projected network KPI',
   'planner.kpi.acceptedDraft': 'Accepted → draft',
   'planner.kpi.currentDraft': 'Current → draft final',
+  'planner.kpi.horizon': 'Horizon',
+  'planner.kpi.horizonMonths': '{count} mo',
+  'planner.kpi.horizonDetail': 'Plan months after as-of',
+  'planner.kpi.target': 'Target',
+  'planner.kpi.targetDetail': 'Network goal',
   'planner.kpi.behind': 'Stores behind plan',
   'planner.kpi.asOf': 'As of {label}',
   'planner.kpi.feasibility': 'Feasibility',

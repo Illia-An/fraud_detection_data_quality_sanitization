@@ -4,16 +4,19 @@
  */
 
 export const PLANNER_RAIL_WIDTH_PX = 320;
-export const PLANNER_RAIL_COLLAPSED_PX = 40;
+/** Figma collapsed navigation variant (figm_res_v2 §2.2). */
+export const PLANNER_RAIL_COLLAPSED_PX = 64;
 /** Delay before showing collapsed Play so the collapse click cannot ghost-hit it. */
 export const PLANNER_COLLAPSED_PLAY_REVEAL_MS = 250;
 
-/** Collapsed At-risk summary height reserved so Hero is not covered on md. */
-export const PLANNER_AT_RISK_SUMMARY_RESERVE_PX = 80;
-/** Gap above At-risk overlay — same as KPI strip ↔ Hero (`gap: 1.5` → 12px). */
+/** Collapsed At-risk summary height (Figma overview disclosure ≈ 52 px). */
+export const PLANNER_AT_RISK_SUMMARY_RESERVE_PX = 52;
+/** Gap above At-risk overlay — chart-to-chart / section rhythm 12 px. */
 export const PLANNER_AT_RISK_GAP_PX = 12;
-/** Expanded At-risk overlay cap on md — scrolls internally; Hero underneath does not move. */
+/** Expanded At-risk overlay cap on md (TTS legacy). Network Planner uses flow + fixed 421 px. */
 export const PLANNER_AT_RISK_OVERLAY_MAX_HEIGHT = '45vh';
+/** Figma expanded exception section height (figm_res_v2 §3.4). */
+export const PLANNER_AT_RISK_EXPANDED_HEIGHT_PX = 421;
 
 /** Prefer this month when present in the loaded panel (DB demo path). */
 export const PLANNER_PREFERRED_REFERENCE = { year: 2025, month: 12 } as const;

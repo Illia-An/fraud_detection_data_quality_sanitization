@@ -35,6 +35,10 @@ import {
   planEndScore,
   type StoreBaselineRow,
 } from './atRiskRowMetrics';
+import {
+  FIGMA_EXCEPTION_ROW_HEIGHT_PX,
+  FIGMA_FONT_MONO,
+} from './figmaPlannerLayout';
 
 export type { StoreBaselineRow };
 
@@ -214,18 +218,22 @@ export function AtRiskDeltaTable({
   const topSliceCount = Math.min(TOP_SLICE_LIMIT, allStoresCount);
 
   const cellSx = {
-    py: 0.4,
-    px: 0.75,
+    py: 0.5,
+    px: 1.25,
     fontSize: '0.75rem',
-    lineHeight: 1.25,
+    lineHeight: '20px',
+    fontFamily: FIGMA_FONT_MONO,
+    fontVariantNumeric: 'tabular-nums',
   } as const;
   const headSx = {
     ...cellSx,
     fontWeight: 700,
     bgcolor: 'grey.50',
-    fontSize: '0.65rem',
+    fontSize: '0.75rem',
     whiteSpace: 'nowrap',
+    textAlign: 'right' as const,
   } as const;
+  const storeHeadSx = { ...headSx, textAlign: 'left' as const, fontFamily: 'inherit' };
 
   return (
     <Stack
@@ -369,7 +377,7 @@ export function AtRiskDeltaTable({
         <Table size="small" stickyHeader sx={{ '& .MuiTableCell-root': cellSx }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={headSx}>{t('planner.atRisk.col.store')}</TableCell>
+              <TableCell sx={storeHeadSx}>{t('planner.atRisk.col.store')}</TableCell>
               <TableCell align="right" sx={headSx}>
                 {t('planner.atRisk.col.volume')}
               </TableCell>
@@ -428,12 +436,13 @@ export function AtRiskDeltaTable({
                     key={row.storeId}
                     hover
                     sx={{
+                      height: FIGMA_EXCEPTION_ROW_HEIGHT_PX,
                       cursor: 'pointer',
                       '&:hover': { bgcolor: 'action.hover' },
                     }}
                     onClick={() => onInspect(row.storeId)}
                   >
-                    <TableCell>
+                    <TableCell sx={{ ...cellSx, fontFamily: 'inherit', textAlign: 'left' }}>
                       <Stack spacing={0.15}>
                         <Typography
                           component="span"

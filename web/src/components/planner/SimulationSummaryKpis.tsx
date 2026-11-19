@@ -5,10 +5,18 @@ import { useT } from '../../i18n';
 import { periodLabel } from '../../schemas/plan';
 import type { DirectedPlan } from '../../schemas/metricScore';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
+import {
+  FIGMA_FONT_MONO,
+  FIGMA_KPI_CARD_PADDING_PX,
+  FIGMA_KPI_PRIMARY_WIDTH_PX,
+  FIGMA_KPI_STRIP_HEIGHT_PX,
+} from './figmaPlannerLayout';
 
 interface SimulationSummaryKpisProps {
   draftPlan: DirectedPlan;
   monitoring: PlanMonitoringInsights | null;
+  /** Optional horizon override; defaults to chain_trajectory length. */
+  horizonMonths?: number;
   projectedTestId?: string;
 }
 
@@ -22,45 +30,62 @@ function formatDelta(value: number, unit: string): string {
 }
 
 const labelSx = {
-  fontSize: '0.65rem',
+  fontSize: '0.75rem',
   fontWeight: 600,
   color: 'text.secondary',
-  lineHeight: 1.15,
-  whiteSpace: 'nowrap',
+  lineHeight: 1.2,
 } as const;
 
 const valueSx = {
-  fontSize: '0.8rem',
-  fontWeight: 700,
+  fontFamily: FIGMA_FONT_MONO,
+  fontSize: '1.25rem',
+  fontWeight: 600,
   fontVariantNumeric: 'tabular-nums',
+  lineHeight: '28px',
+} as const;
+
+const detailSx = {
+  fontSize: '0.7rem',
+  fontWeight: 400,
+  color: 'text.secondary',
   lineHeight: 1.2,
-  whiteSpace: 'nowrap',
 } as const;
 
 const chipSx = {
-  height: 18,
-  fontSize: '0.65rem',
+  height: 22,
+  fontSize: '0.7rem',
   fontWeight: 600,
-  '& .MuiChip-label': { px: 0.6 },
+  '& .MuiChip-label': { px: 0.75 },
 } as const;
 
-function MiniCard({ children }: { children: ReactNode }) {
+function KpiCard({
+  primary,
+  children,
+  testId,
+}: {
+  primary?: boolean;
+  children: ReactNode;
+  testId?: string;
+}) {
   return (
     <Box
+      data-testid={testId}
       sx={{
-        width: 'fit-content',
-        maxWidth: '100%',
-        flex: '0 1 auto',
-        px: 1,
-        py: 0.5,
+        flex: primary ? `0 0 ${FIGMA_KPI_PRIMARY_WIDTH_PX}px` : '1 1 0',
+        width: primary ? FIGMA_KPI_PRIMARY_WIDTH_PX : undefined,
+        minWidth: 0,
+        height: '100%',
+        px: `${FIGMA_KPI_CARD_PADDING_PX}px`,
+        py: `${FIGMA_KPI_CARD_PADDING_PX}px`,
         bgcolor: 'background.paper',
         border: 1,
         borderColor: 'divider',
-        borderRadius: 1,
+        borderRadius: 0,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
-        gap: 0.15,
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        gap: '4px',
         overflow: 'hidden',
       }}
     >
@@ -69,14 +94,17 @@ function MiniCard({ children }: { children: ReactNode }) {
   );
 }
 
-/** Macro KPI strip — cards hug content (equal L/R padding). */
+/**
+ * Figma §3.2 — full-width evaluation status strip:
+ * primary 340px + four equal secondary cards; left-aligned content.
+ */
 export function SimulationSummaryKpis({
   draftPlan,
   monitoring,
+  horizonMonths,
   projectedTestId,
 }: SimulationSummaryKpisProps) {
   const t = useT();
-  /** Current (equal-mean @ reference) → draft Final — not approved Final→Final. */
   const current = draftPlan.current_chain;
   const projected = draftPlan.final_chain;
   const networkDelta = projected - current;
@@ -86,44 +114,66 @@ export function SimulationSummaryKpis({
   const asOfLabel = monitoring
     ? periodLabel(monitoring.as_of_year, monitoring.as_of_month)
     : '—';
+  const horizon =
+    horizonMonths ??
+    (draftPlan.chain_trajectory.length > 0 ? draftPlan.chain_trajectory.length : null);
 
   return (
     <Box
       data-testid="planner-kpi-strip"
-      // Participate in parent glance row as a flat card stream.
-      sx={{ display: 'contents' }}
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        width: '100%',
+        minHeight: FIGMA_KPI_STRIP_HEIGHT_PX,
+        height: FIGMA_KPI_STRIP_HEIGHT_PX,
+        flexShrink: 0,
+        gap: 0,
+        overflow: 'hidden',
+      }}
     >
-      <MiniCard>
+      <KpiCard primary testId="planner-kpi-projected">
         <Typography sx={labelSx}>{t('planner.kpi.projected')}</Typography>
-        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-          <Typography sx={valueSx} data-testid={projectedTestId}>
-            {formatScore(current, draftPlan.unit)} → {formatScore(projected, draftPlan.unit)}
-          </Typography>
-          <Chip
-            size="small"
-            label={formatDelta(networkDelta, draftPlan.unit)}
-            color={improved ? 'success' : 'warning'}
-            sx={chipSx}
-          />
-        </Stack>
-      </MiniCard>
+        <Typography sx={valueSx} data-testid={projectedTestId}>
+          {formatScore(current, draftPlan.unit)} → {formatScore(projected, draftPlan.unit)}
+        </Typography>
+        <Chip
+          size="small"
+          label={formatDelta(networkDelta, draftPlan.unit)}
+          color={improved ? 'success' : 'warning'}
+          sx={chipSx}
+        />
+      </KpiCard>
 
-      <MiniCard>
+      <KpiCard testId="planner-kpi-horizon">
+        <Typography sx={labelSx}>{t('planner.kpi.horizon')}</Typography>
+        <Typography sx={valueSx}>
+          {horizon == null ? '—' : t('planner.kpi.horizonMonths', { count: horizon })}
+        </Typography>
+        <Typography sx={detailSx}>{t('planner.kpi.horizonDetail')}</Typography>
+      </KpiCard>
+
+      <KpiCard testId="planner-kpi-target">
+        <Typography sx={labelSx}>{t('planner.kpi.target')}</Typography>
+        <Typography sx={valueSx}>{formatScore(draftPlan.target, draftPlan.unit)}</Typography>
+        <Typography sx={detailSx}>{t('planner.kpi.targetDetail')}</Typography>
+      </KpiCard>
+
+      <KpiCard testId="planner-kpi-behind">
         <Typography sx={labelSx}>{t('planner.kpi.behind')}</Typography>
-        <Stack direction="row" spacing={0.5} alignItems="baseline">
-          <Typography
-            sx={valueSx}
-            color={behindDraft != null && behindDraft > 0 ? 'warning.main' : undefined}
-          >
-            {behindDraft == null ? '—' : behindDraft}
-          </Typography>
-          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
-            {t('planner.kpi.asOf', { label: asOfLabel })}
-          </Typography>
-        </Stack>
-      </MiniCard>
+        <Typography
+          sx={{
+            ...valueSx,
+            color: behindDraft != null && behindDraft > 0 ? 'warning.main' : undefined,
+          }}
+        >
+          {behindDraft == null ? '—' : behindDraft}
+        </Typography>
+        <Typography sx={detailSx}>{t('planner.kpi.asOf', { label: asOfLabel })}</Typography>
+      </KpiCard>
 
-      <MiniCard>
+      <KpiCard testId="planner-kpi-feasibility">
         <Typography sx={labelSx}>{t('planner.kpi.feasibility')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Chip
@@ -132,13 +182,13 @@ export function SimulationSummaryKpis({
             color={draftPlan.feasible ? 'success' : 'warning'}
             sx={chipSx}
           />
-          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
-            {t('planner.kpi.liftQuota', {
-              lift: formatDelta(draftPlan.required_change, draftPlan.unit),
-            })}
-          </Typography>
         </Stack>
-      </MiniCard>
+        <Typography sx={detailSx}>
+          {t('planner.kpi.liftQuota', {
+            lift: formatDelta(draftPlan.required_change, draftPlan.unit),
+          })}
+        </Typography>
+      </KpiCard>
     </Box>
   );
 }

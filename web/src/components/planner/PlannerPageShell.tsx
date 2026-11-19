@@ -111,8 +111,10 @@ export function PlannerPageShell({
             minHeight: { md: 0 },
             overflowY: { xs: 'visible', md: 'hidden' },
             overflowX: 'hidden',
-            gap: 1.5,
-            pb: 1,
+            gap: 0,
+            // Figma §2.3 — controls column owns its own 20px padding via card/footer.
+            pb: 0,
+            px: 0,
           }}
         >
           {rail}

@@ -28,18 +28,16 @@ Unchanged from parent contract:
 3. Invert to monthly via running-mean formula (see Math).
 4. Chain → stores via `allocateStorePlansFromChain`; store cum = history running mean.
 
-### L1 — Live preview (every drag frame)
+### L1 — Live preview (hot path)
 
-- On each pointer-move frame, update the **atomic plan package** locally.
-- No Run / Calculate button; no waiting on the server for the plan path.
-- `pointerup` / `pointercancel` finalizes the same recompute (no deferred “apply”).
-- Preview must update **related Slope plan surfaces**, not only the two lines:
-  - Network Cumulative Plan
-  - Network Monthly Plan
-  - Store Inspect Slope Plan (monthlies + cum) derived from the same package
+- On each pointer-move, **rAF-throttle** a **network-only** trajectory recompute
+  (no allocate). Update network Cumulative + Monthly Plan lines immediately.
+- On `pointerup`, run **full** recompute (trajectory + allocate gate) and commit
+  `lastGood`. Store Inspect Plan + At-risk refresh from that package.
+- During drag / allocate: At-risk and Inspect store series stay on `lastGood`
+  with an explicit **pending** banner — never a half-allocated package.
+- No Run / Calculate button; no server round-trip for the plan path.
 - Simulation / unreachable chips stay on live `simulate` (Plan ≠ Simulation).
-- Legacy At-Risk (`draftPlan` five%) is **out of Phase 1 live scope** — do not
-  pretend it tracks Slope pins.
 
 ### L2 — Allocation feasibility in Phase 1 (atomic package)
 
@@ -52,9 +50,10 @@ within ε for every future month.
 - Outward result is either a full package `{ planYs, planCumYs, byStore, pins }`
   or an error with reason; no partial apply.
 
-**Sync rule:** trajectory + allocate in the **same frame**. Do not throttle
-network lines ahead of allocate. If allocate ever becomes async, keep panels on
-`lastGood` and show `pending` until the full package is ready (or ignore stale).
+**Sync rule (revised):** network trajectory may lead allocate by one gesture
+(rAF preview). Allocate always runs on commit (`pointerup`). Until allocate
+succeeds, store Inspect + At-risk remain on `lastGood` with `pending` /
+`allocating` status. Rejected allocate rolls network preview back to `lastGood`.
 
 ### L3 — Pin math and multi-pin behaviour
 
@@ -113,7 +112,7 @@ over the full horizon (do not reset count per segment).
 | Drag Simulation forecast | Never (this experiment) |
 | Persist edited plan on Save | Phase 2 |
 | TTS planner parity | Out of scope |
-| Live-update legacy At-Risk from Slope pins | Out of Phase 1 |
+| Live-update At-Risk from Slope pins | On commit (`lastGood.byStore` overlay) |
 
 ---
 
@@ -324,4 +323,26 @@ cd web
 npm run test:run -- src/components/planner/slopePlanDrag.test.ts
 npm run dev
 # Hard refresh Planner → cursor ns-resize on blue Plan dots after cutover → drag
+```
+
+### Report — P0 At-risk sync + P1 drag hot path
+
+**Date:** 2026-11-19  
+**Done:**
+
+- **P1:** `recomputePinnedSlopePlan(..., mode)` — `network` skips allocate;
+  `full` runs allocate gate. Draft hook rAF-throttles network preview;
+  allocate only on `endDrag` (`status: allocating`). Removed redundant
+  `buildAllocatedStorePlans` on the hot path; cache `buildSlopeStoreAllocateInputs`.
+- **P0:** `overlayDirectedPlanWithSlopePackage` feeds At-risk + Inspect from
+  `lastGood.byStore`. Pending banner while `previewing` / `allocating`.
+- **P2 note:** running-mean invert of a linear cum path does **not** yield
+  flat monthlies at target — with large `handoffCount`, monthlies **overshoot**
+  the EOY cum target (locked by unit test; not a chart-stack bug).
+
+**Verify:**
+
+```powershell
+cd web
+npm run test:run -- src/components/planner/slopePlanRecompute.test.ts src/components/planner/useSlopePlanDraft.test.ts src/components/planner/planTrajectoryPins.test.ts
 ```

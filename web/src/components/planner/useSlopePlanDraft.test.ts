@@ -118,6 +118,33 @@ describe('useSlopePlanDraft', () => {
     expect(result.current.dirty).toBe(true);
   });
 
+  it('previewDrag is network-only; endDrag allocates byStore', async () => {
+    const sim = sampleSim();
+    const layers = buildNetworkCumulativeSlopeLayers(sim);
+    const monthIndex = layers.cutover.factEndIndex + 2;
+    const { result } = renderHook(() => useSlopePlanDraft(layers, sim));
+
+    act(() => {
+      result.current.previewDrag('cumulative', monthIndex, 72);
+    });
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+    expect(result.current.status).toBe('previewing');
+    expect(result.current.byStore).toBeNull();
+    expect(result.current.preview?.byStore).toBeNull();
+    expect(result.current.displayLayers?.planCumYs).not.toEqual(layers.planCumYs);
+
+    act(() => {
+      result.current.endDrag('cumulative', monthIndex, 72);
+    });
+    expect(result.current.status).toBe('idle');
+    expect(result.current.byStore).not.toBeNull();
+    expect(result.current.lastGood?.byStore?.size).toBe(2);
+  });
+
   it('resets when simulation context (target) changes', () => {
     const sim75 = sampleSim(75);
     const layers75 = buildNetworkCumulativeSlopeLayers(sim75);

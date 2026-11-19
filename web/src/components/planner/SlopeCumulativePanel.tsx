@@ -21,12 +21,15 @@ import {
   type PlotlyAnnotation,
 } from './slopeHeroShared';
 import { attachSlopePlanDrag } from './slopePlanDrag';
+import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeCumulativePanelProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
   /** Enable Y-drag on future Plan (cumulative) markers. */
   planDragEnabled?: boolean;
+  /** Freeze plot size + Y-range (drag preview / allocate) to avoid layout jitter. */
+  layoutFrozen?: boolean;
   onPlanDragPreview?: (monthIndex: number, value: number) => void;
   onPlanDragCommit?: (monthIndex: number, value: number) => void;
   onPlanDragCancel?: () => void;
@@ -37,13 +40,13 @@ export function SlopeCumulativePanel({
   layers,
   yAxisTitle = '5% Score',
   planDragEnabled = false,
+  layoutFrozen = false,
   onPlanDragPreview,
   onPlanDragCommit,
   onPlanDragCancel,
   getPlanDragGeneration,
 }: SlopeCumulativePanelProps) {
   const t = useT();
-  const hostRef = useRef<HTMLDivElement | null>(null);
   const graphDivRef = useRef<HTMLElement | null>(null);
   const dragDisposerRef = useRef<(() => void) | null>(null);
   const dragHandlersRef = useRef({
@@ -56,8 +59,7 @@ export function SlopeCumulativePanel({
     planYs: [] as (number | null)[],
     editableFromIndex: 0,
   });
-  const [plotWidth, setPlotWidth] = useState(0);
-  const [hostHeight, setHostHeight] = useState(0);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(layoutFrozen);
   const [legendOpen, setLegendOpen] = useState(true);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_CUMULATIVE_DEFAULT_HIDDEN),
@@ -73,19 +75,6 @@ export function SlopeCumulativePanel({
   }, []);
 
   const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
-
-  useEffect(() => {
-    const node = hostRef.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (!rect) return;
-      setPlotWidth(Math.max(0, Math.floor(rect.width)));
-      setHostHeight(Math.max(0, Math.floor(rect.height)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   const {
     labels,
@@ -163,6 +152,10 @@ export function SlopeCumulativePanel({
     [isVisible, planCumYs, cumActualSimYtdYs, cumActualSimYs, requiredCumulativeYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
+  const yRange = useFrozenYRange(
+    layoutFrozen,
+    fitY.range as [number, number] | undefined,
+  );
   const cutoverAnn = t('planner.slope.cutoverLine');
   const { shapes, annotations: cutoverAnnotations } = asOfShapes(
     cutover.lineLabel,
@@ -397,7 +390,7 @@ export function SlopeCumulativePanel({
               dragmode: planDragEnabled ? false : 'zoom',
               yaxis: {
                 title: { text: yAxisTitle },
-                range: fitY.range,
+                range: yRange,
                 ticksuffix: '%',
                 ...HERO_Y_SPIKES,
               },

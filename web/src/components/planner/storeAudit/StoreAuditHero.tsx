@@ -4,13 +4,13 @@ import { useT } from '../../../i18n';
 import type { DirectedPlan, MetricScorePanel } from '../../../schemas/metricScore';
 import type { PlanMonitoringInsights } from '../../../schemas/planMonitoring';
 import type { CumulativeSlopeStoreLayers } from '../cumulativeSlopeLayers';
-import { CumulativeSlopeHeroChart } from '../CumulativeSlopeHeroChart';
+import { SlopeCumulativePanel } from '../SlopeCumulativePanel';
+import { NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX } from '../slopeHeroShared';
 import { StoreHeroEvaluationChart } from '../StoreHeroEvaluationChart';
 import {
   SANDBOX_OVERLAY_GAP_PX,
   SANDBOX_SUMMARY_RESERVE_PX,
   STORE_HERO_IN_DIALOG_MIN_PX,
-  STORE_SLOPE_IN_DIALOG_MIN_PX,
 } from './storeAuditLayout';
 
 export interface StoreAuditHeroProps {
@@ -24,7 +24,10 @@ export interface StoreAuditHeroProps {
   tickSuffix?: string;
 }
 
-/** Inspect hero: dual-panel Slope chart when layers exist, else legacy store evaluation. */
+/**
+ * Inspect hero: Figma §4.2 — compact cumulative Slope only (no network monthly duplicate).
+ * Falls back to legacy store evaluation when Slope layers are absent.
+ */
 export function StoreAuditHero({
   plan,
   storeId,
@@ -40,8 +43,7 @@ export function StoreAuditHero({
   return (
     <Box
       sx={{
-        flex: 1,
-        minHeight: slopeLayers != null ? STORE_SLOPE_IN_DIALOG_MIN_PX : 0,
+        flex: '0 0 auto',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -52,16 +54,25 @@ export function StoreAuditHero({
       }}
     >
       {slopeLayers != null ? (
-        <Stack spacing={0.35} sx={{ flex: 1, minHeight: 0, height: '100%' }}>
+        <Stack spacing={0.35} sx={{ width: '100%' }}>
           <Typography
             sx={{ fontSize: '0.8rem', fontWeight: 700, lineHeight: 1.2, flexShrink: 0 }}
           >
             {t('planner.storeHero.title')}
           </Typography>
-          <CumulativeSlopeHeroChart
-            layers={slopeLayers}
-            yAxisTitle={yAxisTitle ?? '5% Score'}
-          />
+          <Box
+            data-testid="inspect-slope-cumulative"
+            sx={{
+              height: NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX,
+              width: '100%',
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <SlopeCumulativePanel layers={slopeLayers} yAxisTitle={yAxisTitle ?? '5% Score'} />
+          </Box>
         </Stack>
       ) : (
         <StoreHeroEvaluationChart
