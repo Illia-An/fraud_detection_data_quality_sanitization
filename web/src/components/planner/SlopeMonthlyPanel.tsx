@@ -17,18 +17,31 @@ import {
   SLOPE_PANEL_MIN_HEIGHT_PX,
   SlopePlot,
 } from './slopeHeroShared';
+import { attachSlopePlanDrag } from './slopePlanDrag';
 
 interface SlopeMonthlyPanelProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
+  planDragEnabled?: boolean;
+  onPlanDragPreview?: (monthIndex: number, value: number) => void;
+  onPlanDragCommit?: (monthIndex: number, value: number) => void;
+  onPlanDragCancel?: () => void;
+  getPlanDragGeneration?: () => number;
 }
 
 export function SlopeMonthlyPanel({
   layers,
   yAxisTitle = '5% Score',
+  planDragEnabled = false,
+  onPlanDragPreview,
+  onPlanDragCommit,
+  onPlanDragCancel,
+  getPlanDragGeneration,
 }: SlopeMonthlyPanelProps) {
   const t = useT();
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const graphDivRef = useRef<HTMLElement | null>(null);
+  const dragDisposerRef = useRef<(() => void) | null>(null);
   const [plotWidth, setPlotWidth] = useState(0);
   const [hostHeight, setHostHeight] = useState(0);
   const [legendOpen, setLegendOpen] = useState(true);
@@ -65,6 +78,44 @@ export function SlopeMonthlyPanel({
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
   const plotHeight = Math.max(SLOPE_PANEL_MIN_HEIGHT_PX, hostHeight || SLOPE_PANEL_MIN_HEIGHT_PX);
   const factEndIdx = cutover.factEndIndex;
+  const editableFromIndex = factEndIdx + 1;
+
+  const bindPlanDrag = useCallback(
+    (gd: HTMLElement) => {
+      dragDisposerRef.current?.();
+      dragDisposerRef.current = null;
+      graphDivRef.current = gd;
+      if (!planDragEnabled || !onPlanDragPreview || !onPlanDragCommit) return;
+      dragDisposerRef.current = attachSlopePlanDrag(gd, {
+        kind: 'monthly',
+        labels,
+        editableFromIndex,
+        onPreview: onPlanDragPreview,
+        onCommit: onPlanDragCommit,
+        onCancel: () => onPlanDragCancel?.(),
+        getGeneration: getPlanDragGeneration,
+      });
+    },
+    [
+      planDragEnabled,
+      onPlanDragPreview,
+      onPlanDragCommit,
+      onPlanDragCancel,
+      getPlanDragGeneration,
+      labels,
+      editableFromIndex,
+    ],
+  );
+
+  useEffect(() => {
+    if (graphDivRef.current) {
+      bindPlanDrag(graphDivRef.current);
+    }
+    return () => {
+      dragDisposerRef.current?.();
+      dragDisposerRef.current = null;
+    };
+  }, [bindPlanDrag]);
 
   // Past plan muted (context); future plan full blue from last fact handoff.
   const planPastYs = useMemo(
@@ -161,9 +212,14 @@ export function SlopeMonthlyPanel({
             name: t('planner.slope.plan'),
             legendgroup: 'plan',
             line: { color: '#1565c0', width: 2 },
-            marker: { size: 8, color: '#1565c0', symbol: 'circle' as const },
+            marker: {
+              size: planDragEnabled ? 11 : 8,
+              color: '#1565c0',
+              symbol: 'circle' as const,
+            },
             connectgaps: false,
             hovertemplate: HERO_HOVER_TEMPLATE,
+            meta: planDragEnabled ? { slopePlanDrag: true } : undefined,
           },
         ]
       : []),
@@ -277,6 +333,7 @@ export function SlopeMonthlyPanel({
                 shapes,
                 annotations,
               }),
+              dragmode: planDragEnabled ? false : 'zoom',
               yaxis: {
                 title: { text: yAxisTitle },
                 range: fitY.range,
@@ -287,6 +344,8 @@ export function SlopeMonthlyPanel({
             config={{ displayModeBar: false, responsive: true }}
             style={{ width: plotMinWidth, height: plotHeight }}
             useResizeHandler={false}
+            onInitialized={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
+            onUpdate={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
           />
         </Suspense>
       </Box>

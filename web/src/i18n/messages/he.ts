@@ -269,6 +269,8 @@ export const he: Record<MessageKey, string> = {
   'planner.savePlanTip':
     'הקפאת קו הבסיס כגרסה חדשה בשרת (קו כחול). הסימולציה ממשיכה להתעדכן בזמן אמת.',
   'planner.savePlanDisabledTip': 'הרץ סימולציה ואז שמור גרסת תוכנית.',
+  'planner.savePlanBlockedByPinsTip':
+    'עריכות נקודות תוכנית Slope הן טיוטה בלבד. אפסו את המסלול או המתינו ל־Phase 2 — Save עדיין מקפיא את קו הסימולציה, לא את התוכנית שנגררה.',
   'planner.savePlanFailed': 'לא ניתן לשמור את גרסת התוכנית.',
   'planner.savePlanSaved': 'גרסת התוכנית נשמרה.',
   'planner.unreachableChip': '{count} סניפים: יעדים מרומזים לא ריאליים',
@@ -328,6 +330,12 @@ export const he: Record<MessageKey, string> = {
   'planner.slope.eoyTarget': 'יעד רשת: {value}%',
   'planner.slope.statusHint':
     'שלוש קריאות שונות — (1) Ahead/Behind = עובדה מול תוכנית בחיתוך · (2) תוצאת השנה = תחזית EOY של שנת התכנון מול יעד {target}% · (3) שבב צהוב = יעדים מרומזים לא ריאליים לסניפים. לא אותו פסק דין.',
+  'planner.slope.dragHint':
+    'גררו נקודות תוכנית כחולות אחרי החיתוך (מצטבר או חודשי). שני הפאנלים ותוכנית Inspect מתעדכנים בזמן אמת. הסימולציה אינה ניתנת לגרירה.',
+  'planner.slope.pinsDirty':
+    'מסלול תוכנית Slope נערך (טיוטה). Save חסום עד איפוס — Phase 2 ישמור מסלולים שנגררו.',
+  'planner.slope.resetPins': 'אפס מסלול תוכנית',
+  'planner.slope.pinError': 'עריכת תוכנית נדחתה ({code}): {reason}',
   'planner.heroSubSlope':
     'פסק דין מצטבר לשנת תכנון · קצב חודשי · היסטוריה אופציונלית · חיתוך = עובדה מצוירת אחרונה',
   'planner.inspect.boostTitle': 'בוסט / שיפוע',

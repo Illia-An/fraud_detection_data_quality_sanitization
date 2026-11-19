@@ -73,6 +73,11 @@ interface StoreAuditDrawerProps<T extends DirectedPlan = DirectedPlan> {
   boostGlance?: StoreBoostGlance | null;
   /** Live Slope simulation — when present, Inspect uses dual-panel Slope chart. */
   slopeSimulation?: SimulationResponse | null;
+  /**
+   * Atomic Slope pin-draft store plan (same package as network Hero).
+   * When set, Inspect Plan must use this — never stale allocate beside new network.
+   */
+  slopeStorePlanOverride?: { planYs: (number | null)[]; planCumYs: (number | null)[] } | null;
   /** Store evaluation Y-axis title. Default keeps the 5% planner label. */
   yAxisTitle?: string;
   /** Appended to store evaluation tick labels. Default `%`. */
@@ -100,6 +105,7 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   unreachableApplyPending = false,
   boostGlance = null,
   slopeSimulation = null,
+  slopeStorePlanOverride = null,
   yAxisTitle,
   tickSuffix,
 }: StoreAuditDrawerProps<T>) {
@@ -112,9 +118,13 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   const slopeLayers = useMemo(
     () =>
       slopeSimulation != null
-        ? buildStoreCumulativeSlopeLayers(slopeSimulation, storeId)
+        ? buildStoreCumulativeSlopeLayers(
+            slopeSimulation,
+            storeId,
+            slopeStorePlanOverride,
+          )
         : null,
-    [slopeSimulation, storeId],
+    [slopeSimulation, storeId, slopeStorePlanOverride],
   );
   const slopeAlign = useMemo(
     () => (slopeLayers != null ? buildInspectSlopeAlign(slopeLayers) : null),

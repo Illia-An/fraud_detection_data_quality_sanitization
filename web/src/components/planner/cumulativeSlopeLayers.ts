@@ -164,7 +164,7 @@ export interface CumulativeSlopeNetworkLayers extends CumulativeSlopePlotLayers 
   planningYear: number;
 }
 
-function ymLabel(year: number, month: number): string {
+export function ymLabel(year: number, month: number): string {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
@@ -172,7 +172,7 @@ function compareYm(a: YearMonth, b: YearMonth): number {
   return a.year !== b.year ? a.year - b.year : a.month - b.month;
 }
 
-function monthSpan(start: YearMonth, end: YearMonth): YearMonth[] {
+export function monthSpan(start: YearMonth, end: YearMonth): YearMonth[] {
   const out: YearMonth[] = [];
   let year = start.year;
   let month = start.month;
@@ -233,7 +233,7 @@ function meanAt(
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
-function scoreAt(
+export function scoreAt(
   rows: { year: number; month: number; score: number }[],
   year: number,
   month: number,
@@ -613,6 +613,8 @@ export function buildAllocatedStorePlans(
 export function buildStoreCumulativeSlopeLayers(
   sim: SimulationResponse,
   storeId: number,
+  /** When set (Slope pin draft), use this store plan instead of fresh allocate. */
+  storePlanOverride?: { planYs: (number | null)[]; planCumYs: (number | null)[] } | null,
 ): CumulativeSlopeStoreLayers | null {
   const store = sim.stores.find((s) => s.store_id === storeId);
   if (!store) {
@@ -637,8 +639,8 @@ export function buildStoreCumulativeSlopeLayers(
   );
   const actualYs = actualRaw.map((v, i) => (asOfIdx >= 0 && i > asOfIdx ? null : v));
   const cutover = resolveSlopeCutover(labels, actualYs, asOfLabel);
-  const allocated = buildAllocatedStorePlans(sim);
-  const storePlan = allocated.byStore.get(storeId);
+  const allocated = storePlanOverride ? null : buildAllocatedStorePlans(sim);
+  const storePlan = storePlanOverride ?? allocated?.byStore.get(storeId);
   const planYs = storePlan?.planYs ?? Array.from({ length: labels.length }, () => null);
   const planCumYs =
     storePlan?.planCumYs ?? Array.from({ length: labels.length }, () => null);

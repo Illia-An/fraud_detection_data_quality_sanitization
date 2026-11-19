@@ -280,6 +280,8 @@ export const en = {
   'planner.savePlanTip':
     'Freeze the current baseline as a new server version (blue line). Simulation still updates live.',
   'planner.savePlanDisabledTip': 'Run a simulation first, then save a baseline version.',
+  'planner.savePlanBlockedByPinsTip':
+    'Unsaved Slope plan point edits are draft-only. Reset the path or wait for Phase 2 Save — Save still freezes the simulation baseline, not the dragged plan.',
   'planner.savePlanFailed': 'Could not save the plan version.',
   'planner.savePlanSaved': 'Plan version saved.',
   'planner.unreachableChip': '{count} stores: unrealistic implied targets',
@@ -339,6 +341,12 @@ export const en = {
   'planner.slope.eoyTarget': 'Network target: {value}%',
   'planner.slope.statusHint':
     'Three different reads — (1) Ahead/Behind = fact vs plan at cutover · (2) Year outcome = EOY planning-year forecast vs target {target}% · (3) Yellow chip = unrealistic store implied targets. Not the same verdict.',
+  'planner.slope.dragHint':
+    'Drag blue Plan markers after cutover (cumulative or monthly). Both panels and Inspect Plan update live. Simulation is not editable.',
+  'planner.slope.pinsDirty':
+    'Slope plan path edited (draft). Save Plan is blocked until you reset — Phase 2 will persist dragged paths.',
+  'planner.slope.resetPins': 'Reset plan path',
+  'planner.slope.pinError': 'Plan edit rejected ({code}): {reason}',
   'planner.heroSubSlope':
     'Planning-year cumulative verdict · monthly tempo · history optional · cutover = last plotted fact',
   'planner.inspect.boostTitle': 'Boost / slope',

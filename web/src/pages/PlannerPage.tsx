@@ -26,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 
 import {
@@ -98,6 +98,7 @@ import {
   canExportPlanExcel,
   usePlannerExcelExport,
 } from '../components/planner/usePlannerExcelExport';
+import { useSlopePlanDraft } from '../components/planner/useSlopePlanDraft';
 import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
 import {
@@ -339,6 +340,7 @@ export function PlannerPage() {
       },
       {
         onSuccess: (response) => {
+          slopePlanDraft.resetPins();
           const next = response.metrics.five_percent;
           setDraftFromRun(next);
           setMixNote(null);
@@ -525,12 +527,21 @@ export function PlannerPage() {
   };
 
   const canExportExcel = canExportPlanExcel(draftPlan, panel);
-  const canSavePlan =
-    draftPlan != null && panel != null && panelToSimulationFacts(panel).length > 0;
-  const slopeLayers = useMemo(
+  const baselineSlopeLayers = useMemo(
     () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
     [slopeSimulation],
   );
+  const slopePlanDraft = useSlopePlanDraft(baselineSlopeLayers, slopeSimulation);
+  const slopeLayers = slopePlanDraft.displayLayers;
+  const getPlanDragGeneration = useCallback(
+    () => slopePlanDraft.generation,
+    [slopePlanDraft.generation],
+  );
+  const canSavePlan =
+    draftPlan != null &&
+    panel != null &&
+    panelToSimulationFacts(panel).length > 0 &&
+    !slopePlanDraft.dirty;
   const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
   const unreachableStoreIds = useMemo(() => {
     if (!slopeSimulation?.unreachable.length) {
@@ -883,7 +894,13 @@ export function PlannerPage() {
               </Tooltip>
               <Stack direction="row" spacing={1}>
                 <Tooltip
-                  title={canSavePlan ? t('planner.savePlanTip') : t('planner.savePlanDisabledTip')}
+                  title={
+                    slopePlanDraft.dirty
+                      ? t('planner.savePlanBlockedByPinsTip')
+                      : canSavePlan
+                        ? t('planner.savePlanTip')
+                        : t('planner.savePlanDisabledTip')
+                  }
                 >
                   <span style={{ flex: 1 }}>
                     <Button
@@ -1175,7 +1192,55 @@ export function PlannerPage() {
                     ) : null}
                     {panel && slopeLayers ? (
                       <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                        <CumulativeSlopeHeroChart layers={slopeLayers} />
+                        {slopePlanDraft.dirty ? (
+                          <Alert
+                            severity="info"
+                            sx={{ py: 0.25, mb: 0.5, flexShrink: 0 }}
+                            action={
+                              <Button
+                                color="inherit"
+                                size="small"
+                                onClick={() => slopePlanDraft.resetPins()}
+                                data-testid="slope-plan-reset"
+                              >
+                                {t('planner.slope.resetPins')}
+                              </Button>
+                            }
+                            data-testid="slope-plan-dirty-banner"
+                          >
+                            {t('planner.slope.pinsDirty')}
+                          </Alert>
+                        ) : null}
+                        {slopePlanDraft.error ? (
+                          <Alert
+                            severity="warning"
+                            sx={{ py: 0.25, mb: 0.5, flexShrink: 0 }}
+                            data-testid="slope-plan-error-banner"
+                          >
+                            {t('planner.slope.pinError', {
+                              code: slopePlanDraft.error.code,
+                              reason: slopePlanDraft.error.reason,
+                            })}
+                          </Alert>
+                        ) : null}
+                        <CumulativeSlopeHeroChart
+                          layers={slopeLayers}
+                          planDragEnabled
+                          onCumulativePlanDragPreview={(monthIndex, value) =>
+                            slopePlanDraft.previewDrag('cumulative', monthIndex, value)
+                          }
+                          onCumulativePlanDragCommit={(monthIndex, value) =>
+                            slopePlanDraft.endDrag('cumulative', monthIndex, value)
+                          }
+                          onMonthlyPlanDragPreview={(monthIndex, value) =>
+                            slopePlanDraft.previewDrag('monthly', monthIndex, value)
+                          }
+                          onMonthlyPlanDragCommit={(monthIndex, value) =>
+                            slopePlanDraft.endDrag('monthly', monthIndex, value)
+                          }
+                          onPlanDragCancel={() => slopePlanDraft.cancelDrag()}
+                          getPlanDragGeneration={getPlanDragGeneration}
+                        />
                       </Box>
                     ) : panel ? (
                       <Typography variant="body2" color="text.secondary">
@@ -1243,6 +1308,11 @@ export function PlannerPage() {
                 unreachableApplyPending={adjustSimulationMutation.isPending}
                 boostGlance={selectedBoostGlance}
                 slopeSimulation={slopeSimulation}
+                slopeStorePlanOverride={
+                  selectedStoreId != null
+                    ? slopePlanDraft.byStore?.get(selectedStoreId) ?? null
+                    : null
+                }
               />
             )}
           </Box>
