@@ -9,17 +9,24 @@ import Typography from '@mui/material/Typography';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
+import {
+  FIGMA_NAV_COLLAPSED_PX,
+  FIGMA_NAV_EXPANDED_PX,
+  FIGMA_NAV_PADDING_PX,
+} from '../../components/planner/figmaPlannerLayout';
 import { useT } from '../../i18n';
 import { BrandLogo } from './BrandLogo';
 import MenuContent from './MenuContent';
 
-export const DRAWER_WIDTH = 240;
-export const DRAWER_WIDTH_COLLAPSED = 64;
+/** Figma figm_res_v2 §2.2 — expanded 176 / collapsed 64. */
+export const DRAWER_WIDTH = FIGMA_NAV_EXPANDED_PX;
+export const DRAWER_WIDTH_COLLAPSED = FIGMA_NAV_COLLAPSED_PX;
 
 export default function SideMenu() {
   const t = useT();
   const theme = useTheme();
-  const [open, setOpen] = useState(false);
+  /** Desktop composition uses expanded navigation (Measured overview). */
+  const [open, setOpen] = useState(true);
   const width = open ? DRAWER_WIDTH : DRAWER_WIDTH_COLLAPSED;
 
   return (
@@ -55,9 +62,9 @@ export default function SideMenu() {
           justifyContent: open ? 'space-between' : 'center',
           gap: open ? 1 : 0.5,
           mt: 'calc(var(--template-frame-height, 0px) + 4px)',
-          px: open ? 1.5 : 0.5,
+          px: `${FIGMA_NAV_PADDING_PX}px`,
           py: 1.5,
-          minHeight: open ? 56 : undefined,
+          minHeight: open ? 84 : undefined,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>

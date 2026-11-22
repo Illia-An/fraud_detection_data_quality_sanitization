@@ -6,7 +6,7 @@ Day-to-day docs that stay with the product:
 |------|------|
 | [`BRANCHING.md`](BRANCHING.md) | Trunk / tags / Angular PoC restore |
 | [`ops/`](ops/) | Deploy + snapshot refresh runbooks |
-| [`contracts/`](contracts/) | Doc-side contract notes |
+| [`contracts/`](contracts/) | Doc-side contract notes (incl. Slope Plan drag SPEC) |
 
 Historical SPEC/REPORT tracks, assessments, labs, research notebooks, and
 root planning files were moved to the offline warehouse:

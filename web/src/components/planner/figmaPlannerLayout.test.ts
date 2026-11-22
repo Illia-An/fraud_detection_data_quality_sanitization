@@ -1,0 +1,36 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  FIGMA_CHART_CARD_COMPACT_PX,
+  FIGMA_CHART_CARD_OVERVIEW_PX,
+  FIGMA_CONTROLS_WIDTH_PX,
+  FIGMA_EXCEPTION_EXPANDED_PX,
+  FIGMA_INSPECT_WIDTH_PX,
+  FIGMA_KPI_PRIMARY_WIDTH_PX,
+  FIGMA_NAV_COLLAPSED_PX,
+  FIGMA_NAV_EXPANDED_PX,
+} from './figmaPlannerLayout';
+import { PLANNER_RAIL_COLLAPSED_PX, PLANNER_RAIL_WIDTH_PX } from './plannerShell';
+import {
+  NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX,
+  NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+} from './slopeHeroShared';
+import { INSPECT_DIALOG_PAPER_MAX_PX } from './storeAudit/storeAuditLayout';
+
+describe('figm_res_v2 layout tokens', () => {
+  it('matches shell / chart / inspect acceptance sizes', () => {
+    expect(FIGMA_NAV_EXPANDED_PX).toBe(176);
+    expect(FIGMA_NAV_COLLAPSED_PX).toBe(64);
+    expect(FIGMA_CONTROLS_WIDTH_PX).toBe(320);
+    expect(PLANNER_RAIL_WIDTH_PX).toBe(FIGMA_CONTROLS_WIDTH_PX);
+    expect(PLANNER_RAIL_COLLAPSED_PX).toBe(FIGMA_NAV_COLLAPSED_PX);
+    expect(FIGMA_KPI_PRIMARY_WIDTH_PX).toBe(340);
+    expect(FIGMA_CHART_CARD_OVERVIEW_PX).toBe(397);
+    expect(FIGMA_CHART_CARD_COMPACT_PX).toBe(247);
+    expect(NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX).toBe(FIGMA_CHART_CARD_OVERVIEW_PX);
+    expect(NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX).toBe(FIGMA_CHART_CARD_COMPACT_PX);
+    expect(FIGMA_EXCEPTION_EXPANDED_PX).toBe(300);
+    expect(FIGMA_INSPECT_WIDTH_PX).toBe(1600);
+    expect(INSPECT_DIALOG_PAPER_MAX_PX).toBe(FIGMA_INSPECT_WIDTH_PX);
+  });
+});

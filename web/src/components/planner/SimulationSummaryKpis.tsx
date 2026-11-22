@@ -5,10 +5,13 @@ import { useT } from '../../i18n';
 import { periodLabel } from '../../schemas/plan';
 import type { DirectedPlan } from '../../schemas/metricScore';
 import type { PlanMonitoringInsights } from '../../schemas/planMonitoring';
+import { FIGMA_FONT_MONO } from './figmaPlannerLayout';
 
 interface SimulationSummaryKpisProps {
   draftPlan: DirectedPlan;
   monitoring: PlanMonitoringInsights | null;
+  /** Optional horizon override (unused in strip — Horizon lives on context strip). */
+  horizonMonths?: number;
   projectedTestId?: string;
 }
 
@@ -30,10 +33,19 @@ const labelSx = {
 } as const;
 
 const valueSx = {
+  fontFamily: FIGMA_FONT_MONO,
   fontSize: '0.8rem',
   fontWeight: 700,
   fontVariantNumeric: 'tabular-nums',
   lineHeight: 1.2,
+  whiteSpace: 'nowrap',
+} as const;
+
+const detailSx = {
+  fontSize: '0.65rem',
+  fontWeight: 400,
+  color: 'text.secondary',
+  lineHeight: 1.15,
   whiteSpace: 'nowrap',
 } as const;
 
@@ -44,9 +56,10 @@ const chipSx = {
   '& .MuiChip-label': { px: 0.6 },
 } as const;
 
-function MiniCard({ children }: { children: ReactNode }) {
+function MiniCard({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <Box
+      data-testid={testId}
       sx={{
         width: 'fit-content',
         maxWidth: '100%',
@@ -69,14 +82,18 @@ function MiniCard({ children }: { children: ReactNode }) {
   );
 }
 
-/** Macro KPI strip — cards hug content (equal L/R padding). */
+/**
+ * Compact evaluation KPIs (no Horizon/Target — those stay on PlannerContextStrip).
+ * Designed to sit in the same row as baseline / answer chips.
+ */
 export function SimulationSummaryKpis({
   draftPlan,
   monitoring,
+  horizonMonths: _horizonMonths,
   projectedTestId,
 }: SimulationSummaryKpisProps) {
+  void _horizonMonths;
   const t = useT();
-  /** Current (equal-mean @ reference) → draft Final — not approved Final→Final. */
   const current = draftPlan.current_chain;
   const projected = draftPlan.final_chain;
   const networkDelta = projected - current;
@@ -90,10 +107,11 @@ export function SimulationSummaryKpis({
   return (
     <Box
       data-testid="planner-kpi-strip"
-      // Participate in parent glance row as a flat card stream.
-      sx={{ display: 'contents' }}
+      sx={{
+        display: 'contents',
+      }}
     >
-      <MiniCard>
+      <MiniCard testId="planner-kpi-projected">
         <Typography sx={labelSx}>{t('planner.kpi.projected')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Typography sx={valueSx} data-testid={projectedTestId}>
@@ -108,22 +126,22 @@ export function SimulationSummaryKpis({
         </Stack>
       </MiniCard>
 
-      <MiniCard>
+      <MiniCard testId="planner-kpi-behind">
         <Typography sx={labelSx}>{t('planner.kpi.behind')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="baseline">
           <Typography
-            sx={valueSx}
-            color={behindDraft != null && behindDraft > 0 ? 'warning.main' : undefined}
+            sx={{
+              ...valueSx,
+              color: behindDraft != null && behindDraft > 0 ? 'warning.main' : undefined,
+            }}
           >
             {behindDraft == null ? '—' : behindDraft}
           </Typography>
-          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
-            {t('planner.kpi.asOf', { label: asOfLabel })}
-          </Typography>
+          <Typography sx={detailSx}>{t('planner.kpi.asOf', { label: asOfLabel })}</Typography>
         </Stack>
       </MiniCard>
 
-      <MiniCard>
+      <MiniCard testId="planner-kpi-feasibility">
         <Typography sx={labelSx}>{t('planner.kpi.feasibility')}</Typography>
         <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
           <Chip
@@ -132,7 +150,7 @@ export function SimulationSummaryKpis({
             color={draftPlan.feasible ? 'success' : 'warning'}
             sx={chipSx}
           />
-          <Typography sx={{ ...labelSx, fontWeight: 400 }}>
+          <Typography sx={detailSx}>
             {t('planner.kpi.liftQuota', {
               lift: formatDelta(draftPlan.required_change, draftPlan.unit),
             })}

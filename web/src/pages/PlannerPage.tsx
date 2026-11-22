@@ -26,29 +26,35 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useMemo, useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
+import { useMemo, useRef, useState } from 'react';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import {
-  useAdjustSimulation,
   usePlan,
   useRunSimulation,
   useSavePlanVersion,
 } from '../api/hooks';
-import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
+import { AtRiskPanelsSection } from '../components/planner/AtRiskPanelsSection';
 import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
-import { CumulativeSlopeHeroChart } from '../components/planner/CumulativeSlopeHeroChart';
+import { buildNetworkCumulativeSlopeLayers } from '../components/planner/cumulativeSlopeLayers';
+import { SlopeCumulativePanel } from '../components/planner/SlopeCumulativePanel';
+import { SlopeMonthlyPanel } from '../components/planner/SlopeMonthlyPanel';
 import {
-  buildNetworkCumulativeSlopeLayers,
-  getStoreBoostGlance,
-} from '../components/planner/cumulativeSlopeLayers';
+  FIGMA_CONTROLS_FIELD_GAP_PX,
+  FIGMA_CONTROLS_PADDING_PX,
+  FIGMA_CONTROLS_SECTION_GAP_PX,
+  FIGMA_FONT_MONO,
+  FIGMA_RUN_BUTTON_HEIGHT_PX,
+  FIGMA_SECONDARY_BUTTON_HEIGHT_PX,
+} from '../components/planner/figmaPlannerLayout';
 import {
-  mergeImpliedAdjustment,
-  type ImpliedAdjustment,
-} from '../components/planner/impliedAdjustments';
+  NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+  NETWORK_SLOPE_CHART_GAP_PX,
+  PLANNER_ANALYTICS_PADDING_PX,
+  PLANNER_ANALYTICS_SECTION_GAP_PX,
+} from '../components/planner/slopeHeroShared';
 import { panelToSimulationFacts } from '../components/planner/panelToSimulationFacts';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
-import type { SimulationResponse, UnreachableHint } from '../schemas/cumulativePlan';
 import {
   PLANNER_RUN_BLOCK_MESSAGE_KEYS,
   plannerRunBlockReason,
@@ -56,7 +62,6 @@ import {
 import { useT } from '../i18n';
 import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
 import { SimulationSummaryKpis } from '../components/planner/SimulationSummaryKpis';
-import { StoreAuditDrawer } from '../components/planner/StoreAuditDrawer';
 import { StoreMixQuestionCards } from '../components/planner/StoreMixQuestionCards';
 import {
   buildExcelReportRequest,
@@ -79,13 +84,9 @@ import {
   type StoreMixQuestionId,
 } from '../schemas/storeMixQuestions';
 import { redistributeSurplusToBehind } from '../schemas/surplusRedistribute';
+import { usePlannerRuntimeStore } from '../store/plannerRuntimeStore';
 import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
-import {
-  PLANNER_AT_RISK_GAP_PX,
-  PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
-  PLANNER_PREFERRED_REFERENCE,
-} from '../components/planner/plannerShell';
-import { PlannerAtRiskDock } from '../components/planner/PlannerAtRiskDock';
+import { PLANNER_PREFERRED_REFERENCE } from '../components/planner/plannerShell';
 import { PlannerPageShell } from '../components/planner/PlannerPageShell';
 import { useCollapsedPlayReveal } from '../components/planner/useCollapsedPlayReveal';
 import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
@@ -109,36 +110,41 @@ import { downloadPlanProjectionCsv } from '../components/planner/plannerCsv';
 
 export function PlannerPage() {
   const t = useT();
+  const navigate = useNavigate();
   const processResult = useUiStore((state) => state.processResult);
   const planMutation = usePlan();
 
   const draftPlan = usePlannerScenarioStore((s) => s.draftPlan);
   const approvedPlan = usePlannerScenarioStore((s) => s.approvedPlan);
-  const selectedStoreId = usePlannerScenarioStore((s) => s.selectedStoreId);
   const setDraftFromRun = usePlannerScenarioStore((s) => s.setDraftFromRun);
   const patchDraftPlan = usePlannerScenarioStore((s) => s.patchDraftPlan);
   const isDirty = usePlannerScenarioStore((s) => s.isDirty);
   const acceptDraftAsApproved = usePlannerScenarioStore((s) => s.acceptDraftAsApproved);
   const discardDraft = usePlannerScenarioStore((s) => s.discardDraft);
   const clearAll = usePlannerScenarioStore((s) => s.clearAll);
-  const selectStore = usePlannerScenarioStore((s) => s.selectStore);
   const activePlanVersionId = usePlannerScenarioStore((s) => s.activePlanVersionId);
   const setActivePlanVersionId = usePlannerScenarioStore((s) => s.setActivePlanVersionId);
+  const slopeSimulation = usePlannerRuntimeStore((s) => s.slopeSimulation);
+  const setSlopeSimulation = usePlannerRuntimeStore((s) => s.setSlopeSimulation);
+  const setMaxMonthlyImprove = usePlannerRuntimeStore((s) => s.setMaxMonthlyImprove);
+  const setImpliedAdjustments = usePlannerRuntimeStore((s) => s.setImpliedAdjustments);
+  const clearSlopeRuntime = usePlannerRuntimeStore((s) => s.clear);
 
   const simulationMutation = useRunSimulation();
-  const adjustSimulationMutation = useAdjustSimulation();
   const savePlanMutation = useSavePlanVersion();
 
   const [controlsOpen, setControlsOpen] = useControlsRailOpen(CONTROLS_RAIL_ROUTE.planner);
   const showCollapsedPlay = useCollapsedPlayReveal(controlsOpen);
-  const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+  /** Onboarding still toggles this; At-risk is a full second viewport (no accordion). */
+  const [, setAtRiskExpanded] = useState(false);
+  const atRiskScreenRef = useRef<HTMLDivElement | null>(null);
   const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
-  const [slopeSimulation, setSlopeSimulation] = useState<SimulationResponse | null>(null);
-  /** Session overrides from Apply suggestion — sent together on each /simulation/adjust. */
-  const [impliedAdjustments, setImpliedAdjustments] = useState<ImpliedAdjustment[]>([]);
+  const slopeLayers = useMemo(
+    () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
+    [slopeSimulation],
+  );
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
-  const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
 
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
   usePlannerOnboardingShell({ prefix: 'planner', setControlsOpen, setAtRiskExpanded });
@@ -221,15 +227,17 @@ export function PlannerPage() {
   const canRun = runBlock == null;
   const runTooltip = runBlock ? t(PLANNER_RUN_BLOCK_MESSAGE_KEYS[runBlock]) : '';
 
+  const planForMonitoring = draftPlan;
+
   const monitoring = useMemo(() => {
-    if (!draftPlan || !panel) {
+    if (!planForMonitoring || !panel) {
       return null;
     }
-    const fallback = defaultAsOf(draftPlan, panel);
+    const fallback = defaultAsOf(planForMonitoring, panel);
     const year = asOfYear ?? fallback.year;
     const month = asOfMonth ?? fallback.month;
-    return buildPlanMonitoringInsights(draftPlan, panel, { year, month });
-  }, [draftPlan, panel, asOfYear, asOfMonth]);
+    return buildPlanMonitoringInsights(planForMonitoring, panel, { year, month });
+  }, [planForMonitoring, panel, asOfYear, asOfMonth]);
 
   const canApplyStoreMix =
     draftPlan != null &&
@@ -308,9 +316,15 @@ export function PlannerPage() {
           // Fresh /simulation has no overrides — drop session Apply stack.
           setImpliedAdjustments([]);
           setSlopeSimulation(response);
+          setMaxMonthlyImprove(params.max_monthly_improve);
         },
       },
     );
+  };
+
+  const openStoreInspect = (storeId: number) => {
+    setMaxMonthlyImprove(params.max_monthly_improve);
+    navigate(`/planner/store/${storeId}`);
   };
 
   const handleRun = () => {
@@ -412,70 +426,8 @@ export function PlannerPage() {
     );
   };
 
-  const buildSimulationRequestBase = (opts?: {
-    networkTarget?: number;
-    asOf?: { year: number; month: number };
-    planVersionId?: string | null;
-  }) => {
-    if (!panel) {
-      return null;
-    }
-    const facts = panelToSimulationFacts(panel);
-    if (facts.length === 0) {
-      return null;
-    }
-    const asOf = opts?.asOf ?? {
-      year:
-        asOfYear ??
-        draftPlan?.chain_trajectory[0]?.year ??
-        effectiveYear ??
-        new Date().getFullYear(),
-      month:
-        asOfMonth ??
-        draftPlan?.chain_trajectory[0]?.month ??
-        effectiveMonth ??
-        1,
-    };
-    return {
-      network_target: opts?.networkTarget ?? target,
-      as_of: asOf,
-      planning_year: asOf.year,
-      cumulative_start: { year: 2025, month: 1 } as const,
-      solver: 'cumulative_slope' as const,
-      active_plan_version_id: opts?.planVersionId ?? activePlanVersionId,
-      facts,
-    };
-  };
-
-  const handleApplyUnreachableSuggestion = (hint: UnreachableHint) => {
-    const base = buildSimulationRequestBase();
-    if (base == null || adjustSimulationMutation.isPending) {
-      return;
-    }
-    setAdjustSuggestionError(false);
-    const nextAdjustments = mergeImpliedAdjustment(impliedAdjustments, {
-      store_id: hint.store_id,
-      new_implied_target: hint.suggested_implied_target,
-    });
-    adjustSimulationMutation.mutate(
-      {
-        ...base,
-        adjustments: nextAdjustments,
-      },
-      {
-        onSuccess: (response) => {
-          setImpliedAdjustments(nextAdjustments);
-          setSlopeSimulation(response);
-        },
-        onError: () => {
-          setAdjustSuggestionError(true);
-        },
-      },
-    );
-  };
-
   const handleSavePlan = () => {
-    if (!panel || !draftPlan) {
+    if (!panel || !draftPlan || !canSavePlan) {
       return;
     }
     const facts = panelToSimulationFacts(panel);
@@ -527,10 +479,6 @@ export function PlannerPage() {
   const canExportExcel = canExportPlanExcel(draftPlan, panel);
   const canSavePlan =
     draftPlan != null && panel != null && panelToSimulationFacts(panel).length > 0;
-  const slopeLayers = useMemo(
-    () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
-    [slopeSimulation],
-  );
   const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
   const unreachableStoreIds = useMemo(() => {
     if (!slopeSimulation?.unreachable.length) {
@@ -538,20 +486,6 @@ export function PlannerPage() {
     }
     return new Set(slopeSimulation.unreachable.map((h) => h.store_id));
   }, [slopeSimulation]);
-  const selectedUnreachableHint = useMemo(() => {
-    if (selectedStoreId == null || !slopeSimulation?.unreachable.length) {
-      return null;
-    }
-    return (
-      slopeSimulation.unreachable.find((h) => h.store_id === selectedStoreId) ?? null
-    );
-  }, [selectedStoreId, slopeSimulation]);
-  const selectedBoostGlance = useMemo(() => {
-    if (selectedStoreId == null || slopeSimulation == null) {
-      return null;
-    }
-    return getStoreBoostGlance(slopeSimulation, selectedStoreId);
-  }, [selectedStoreId, slopeSimulation]);
 
   const handleExportExcel = () => {
     if (!draftPlan || !panel) {
@@ -628,11 +562,17 @@ export function PlannerPage() {
         >
           <CardHeader
             title={t('planner.leversTitle')}
-            sx={{ flexShrink: 0, pb: 0.5 }}
+            sx={{
+              flexShrink: 0,
+              pb: 0.5,
+              px: `${FIGMA_CONTROLS_PADDING_PX}px`,
+              pt: `${FIGMA_CONTROLS_PADDING_PX}px`,
+            }}
           />
           <CardContent
             sx={{
               pt: 1,
+              px: `${FIGMA_CONTROLS_PADDING_PX}px`,
               flex: 1,
               minHeight: 0,
               overflowY: 'auto',
@@ -640,7 +580,8 @@ export function PlannerPage() {
               '&:last-child': { pb: 2 },
             }}
           >
-            <Stack spacing={1.25}>
+            <Stack spacing={`${FIGMA_CONTROLS_SECTION_GAP_PX}px`}>
+              <Stack spacing={1}>
               <Typography
                 variant="overline"
                 color="text.secondary"
@@ -648,28 +589,40 @@ export function PlannerPage() {
               >
                 {t('planner.section.goalTime')}
               </Typography>
+              <Stack direction="row" spacing={`${FIGMA_CONTROLS_FIELD_GAP_PX}px`}>
               <TextField
                 label={t('planner.target')}
                 type="text"
                 size="small"
+                fullWidth
                 value={targetText}
                 disabled={!baselineReady}
                 onChange={(e) => onTargetChange(e.target.value)}
                 onBlur={onTargetBlur}
-                inputProps={{ inputMode: 'decimal', 'aria-label': t('planner.target') }}
+                inputProps={{
+                  inputMode: 'decimal',
+                  'aria-label': t('planner.target'),
+                  style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                }}
                 helperText={t('planner.targetHint')}
               />
               <TextField
                 label={t('planner.horizon')}
                 type="text"
                 size="small"
+                fullWidth
                 value={horizonText}
                 disabled={!baselineReady}
                 onChange={(e) => onHorizonChange(e.target.value)}
                 onBlur={onHorizonBlur}
-                inputProps={{ inputMode: 'numeric', 'aria-label': t('planner.horizon') }}
+                inputProps={{
+                  inputMode: 'numeric',
+                  'aria-label': t('planner.horizon'),
+                  style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                }}
                 helperText={t('planner.horizonHint')}
               />
+              </Stack>
               <FormControl fullWidth size="small" disabled={!baselineReady || refs.length === 0}>
                 <InputLabel id="ref-period-label">{t('planner.referenceMonth')}</InputLabel>
                 <Select
@@ -690,8 +643,7 @@ export function PlannerPage() {
                     resetAnswerState();
                     setAsOfYear(null);
                     setAsOfMonth(null);
-                    setSlopeSimulation(null);
-                    setImpliedAdjustments([]);
+                    clearSlopeRuntime();
                   }}
                 >
                   {refs.map((ref) => (
@@ -718,11 +670,16 @@ export function PlannerPage() {
                 <Typography
                   variant="body2"
                   data-testid="planner-current-chain"
-                  sx={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}
+                  sx={{
+                    fontFamily: FIGMA_FONT_MONO,
+                    fontVariantNumeric: 'tabular-nums',
+                    flexShrink: 0,
+                  }}
                 >
                   {t('planner.current')}{' '}
                   <strong>{currentChain == null ? '—' : `${currentChain.toFixed(2)}%`}</strong>
                 </Typography>
+              </Stack>
               </Stack>
 
               <Box
@@ -771,102 +728,163 @@ export function PlannerPage() {
                 </Alert>
               ) : null}
 
-              <Typography
-                variant="overline"
-                color="text.secondary"
-                sx={{ letterSpacing: 0.8, pt: 0.5 }}
-              >
-                {t('planner.section.allocator')}
-              </Typography>
-              <TextField
-                label={t('planner.maxMonthly')}
-                type="number"
-                size="small"
-                value={params.max_monthly_improve}
-                disabled={!baselineReady}
-                onChange={(e) =>
-                  setParams((p) => ({
-                    ...p,
-                    max_monthly_improve: Number(e.target.value),
-                  }))
-                }
-                inputProps={{ min: 0.01, step: 0.1 }}
-              />
-              <TextField
-                label={t('planner.priorityPower')}
-                type="number"
-                size="small"
-                value={params.priority_power}
-                disabled={!baselineReady}
-                onChange={(e) =>
-                  setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
-                }
-                inputProps={{ min: 0.1, step: 0.1 }}
-              />
-              <FormControl fullWidth size="small" disabled={!baselineReady}>
-                <InputLabel id="traj-label">{t('planner.trajectory')}</InputLabel>
-                <Select
-                  labelId="traj-label"
-                  label={t('planner.trajectory')}
-                  value={params.trajectory}
-                  onChange={(e) =>
-                    setParams((p) => ({
-                      ...p,
-                      trajectory: e.target.value as PlanParams['trajectory'],
-                    }))
-                  }
-                >
-                  <MenuItem value="uniform">{t('planner.traj.uniform')}</MenuItem>
-                  <MenuItem value="front_loaded">{t('planner.traj.front')}</MenuItem>
-                  <MenuItem value="accelerated">{t('planner.traj.accel')}</MenuItem>
-                </Select>
-              </FormControl>
-
               <Accordion
                 disableGutters
                 elevation={0}
                 defaultExpanded={false}
                 sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                data-testid="planner-advanced-controls"
               >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 32 }}>
                   <Typography variant="caption" fontWeight={600}>
-                    {t('planner.advanced')}
+                    {t('planner.section.advancedControls')}
                   </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={1.25}>
-                    <TextField
-                      label={t('planner.trajPower')}
-                      type="number"
-                      size="small"
-                      value={params.trajectory_power}
-                      disabled={!baselineReady || params.trajectory === 'uniform'}
-                      onChange={(e) =>
-                        setParams((p) => ({ ...p, trajectory_power: Number(e.target.value) }))
-                      }
-                      inputProps={{ min: 0.1, step: 0.1 }}
-                    />
-                    <TextField
-                      label={t('planner.growthFactor')}
-                      type="number"
-                      size="small"
-                      value={params.growth_factor}
-                      disabled={!baselineReady}
-                      onChange={(e) =>
-                        setParams((p) => ({ ...p, growth_factor: Number(e.target.value) }))
-                      }
-                      inputProps={{ min: 0, max: 1, step: 0.1 }}
-                    />
+                    <Typography
+                      variant="overline"
+                      color="text.secondary"
+                      sx={{ letterSpacing: 0.8 }}
+                    >
+                      {t('planner.section.allocator')}
+                    </Typography>
+                    <Stack direction="row" spacing={`${FIGMA_CONTROLS_FIELD_GAP_PX}px`}>
+                      <TextField
+                        label={t('planner.maxMonthly')}
+                        type="number"
+                        size="small"
+                        fullWidth
+                        value={params.max_monthly_improve}
+                        disabled={!baselineReady}
+                        onChange={(e) =>
+                          setParams((p) => ({
+                            ...p,
+                            max_monthly_improve: Number(e.target.value),
+                          }))
+                        }
+                        inputProps={{
+                          min: 0.01,
+                          step: 0.1,
+                          style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                        }}
+                      />
+                      <TextField
+                        label={t('planner.priorityPower')}
+                        type="number"
+                        size="small"
+                        fullWidth
+                        value={params.priority_power}
+                        disabled={!baselineReady}
+                        onChange={(e) =>
+                          setParams((p) => ({ ...p, priority_power: Number(e.target.value) }))
+                        }
+                        inputProps={{
+                          min: 0.1,
+                          step: 0.1,
+                          style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                        }}
+                      />
+                    </Stack>
+                    <FormControl fullWidth size="small" disabled={!baselineReady}>
+                      <InputLabel id="traj-label">{t('planner.trajectory')}</InputLabel>
+                      <Select
+                        labelId="traj-label"
+                        label={t('planner.trajectory')}
+                        value={params.trajectory}
+                        onChange={(e) =>
+                          setParams((p) => ({
+                            ...p,
+                            trajectory: e.target.value as PlanParams['trajectory'],
+                          }))
+                        }
+                      >
+                        <MenuItem value="uniform">{t('planner.traj.uniform')}</MenuItem>
+                        <MenuItem value="front_loaded">{t('planner.traj.front')}</MenuItem>
+                        <MenuItem value="accelerated">{t('planner.traj.accel')}</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <Accordion
+                      disableGutters
+                      elevation={0}
+                      defaultExpanded={false}
+                      sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="caption" fontWeight={600}>
+                          {t('planner.advanced')}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Stack spacing={1.25}>
+                          <TextField
+                            label={t('planner.trajPower')}
+                            type="number"
+                            size="small"
+                            value={params.trajectory_power}
+                            disabled={!baselineReady || params.trajectory === 'uniform'}
+                            onChange={(e) =>
+                              setParams((p) => ({
+                                ...p,
+                                trajectory_power: Number(e.target.value),
+                              }))
+                            }
+                            inputProps={{
+                              min: 0.1,
+                              step: 0.1,
+                              style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                            }}
+                          />
+                          <TextField
+                            label={t('planner.growthFactor')}
+                            type="number"
+                            size="small"
+                            value={params.growth_factor}
+                            disabled={!baselineReady}
+                            onChange={(e) =>
+                              setParams((p) => ({
+                                ...p,
+                                growth_factor: Number(e.target.value),
+                              }))
+                            }
+                            inputProps={{
+                              min: 0,
+                              max: 1,
+                              step: 0.1,
+                              style: { fontFamily: FIGMA_FONT_MONO, textAlign: 'right' },
+                            }}
+                          />
+                        </Stack>
+                      </AccordionDetails>
+                    </Accordion>
                   </Stack>
                 </AccordionDetails>
               </Accordion>
+            </Stack>
+          </CardContent>
 
+          {/* Figma §2.3 — bottom-anchored action footer */}
+          <Box
+            data-testid="planner-controls-footer"
+            sx={{
+              flexShrink: 0,
+              px: `${FIGMA_CONTROLS_PADDING_PX}px`,
+              pt: 1.5,
+              pb: `${FIGMA_CONTROLS_PADDING_PX}px`,
+              borderTop: 1,
+              borderColor: 'divider',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: `${FIGMA_CONTROLS_FIELD_GAP_PX}px`,
+            }}
+          >
               <Tooltip title={canRun ? '' : runTooltip}>
                 <span>
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     color="primary"
                     fullWidth
+                    sx={{ height: FIGMA_RUN_BUTTON_HEIGHT_PX }}
                     startIcon={
                       planMutation.isPending ? (
                         <CircularProgress size={16} color="inherit" />
@@ -881,16 +899,19 @@ export function PlannerPage() {
                   </Button>
                 </span>
               </Tooltip>
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={`${FIGMA_CONTROLS_FIELD_GAP_PX}px`}>
                 <Tooltip
-                  title={canSavePlan ? t('planner.savePlanTip') : t('planner.savePlanDisabledTip')}
+                  title={
+                    canSavePlan ? t('planner.savePlanTip') : t('planner.savePlanDisabledTip')
+                  }
                 >
                   <span style={{ flex: 1 }}>
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       color="secondary"
                       fullWidth
                       size="small"
+                      sx={{ height: FIGMA_SECONDARY_BUTTON_HEIGHT_PX }}
                       startIcon={
                         savePlanMutation.isPending ? (
                           <CircularProgress size={16} color="inherit" />
@@ -906,66 +927,86 @@ export function PlannerPage() {
                     </Button>
                   </span>
                 </Tooltip>
-                <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
+                <Tooltip
+                  title={
+                    isDirty && approvedPlan
+                      ? t('planner.revertDraftTip')
+                      : t('planner.revertDraftDisabledTip')
+                  }
+                >
                   <span style={{ flex: 1 }}>
                     <Button
                       variant="outlined"
+                      color="warning"
                       fullWidth
                       size="small"
-                      startIcon={<DownloadRoundedIcon />}
-                      disabled={!draftPlan}
-                      onClick={handleExportCsv}
+                      sx={{ height: FIGMA_SECONDARY_BUTTON_HEIGHT_PX }}
+                      disabled={!isDirty || approvedPlan == null}
+                      onClick={() => {
+                        discardDraft();
+                        resetAnswerState();
+                      }}
+                      data-testid="planner-revert-draft"
                     >
-                      {t('planner.exportCsv')}
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip title={canExportExcel ? '' : t('planner.exportExcelDisabledTip')}>
-                  <span style={{ flex: 1 }}>
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      size="small"
-                      startIcon={
-                        excelExporting ? (
-                          <CircularProgress size={16} color="inherit" />
-                        ) : (
-                          <DownloadRoundedIcon />
-                        )
-                      }
-                      disabled={!canExportExcel || excelExporting}
-                      onClick={handleExportExcel}
-                      data-testid="planner-export-excel"
-                    >
-                      {t('planner.exportExcel')}
+                      {t('planner.revertDraft')}
                     </Button>
                   </span>
                 </Tooltip>
               </Stack>
-              <Tooltip
-                title={
-                  isDirty && approvedPlan
-                    ? t('planner.revertDraftTip')
-                    : t('planner.revertDraftDisabledTip')
-                }
+              <Accordion
+                disableGutters
+                elevation={0}
+                defaultExpanded={false}
+                sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                data-testid="planner-export-disclosure"
               >
-                <span>
-                  <Button
-                    variant="text"
-                    color="warning"
-                    fullWidth
-                    size="small"
-                    disabled={!isDirty || approvedPlan == null}
-                    onClick={() => {
-                      discardDraft();
-                      resetAnswerState();
-                    }}
-                    data-testid="planner-revert-draft"
-                  >
-                    {t('planner.revertDraft')}
-                  </Button>
-                </span>
-              </Tooltip>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 32 }}>
+                  <Typography variant="caption" fontWeight={600}>
+                    {t('planner.exportDisclosure')}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ pt: 0 }}>
+                  <Stack direction="row" spacing={`${FIGMA_CONTROLS_FIELD_GAP_PX}px`}>
+                    <Tooltip title={draftPlan ? '' : t('planner.exportDisabledTip')}>
+                      <span style={{ flex: 1 }}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="small"
+                          sx={{ height: FIGMA_SECONDARY_BUTTON_HEIGHT_PX }}
+                          startIcon={<DownloadRoundedIcon />}
+                          disabled={!draftPlan}
+                          onClick={handleExportCsv}
+                        >
+                          {t('planner.exportCsv')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                    <Tooltip title={canExportExcel ? '' : t('planner.exportExcelDisabledTip')}>
+                      <span style={{ flex: 1 }}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          size="small"
+                          sx={{ height: FIGMA_SECONDARY_BUTTON_HEIGHT_PX }}
+                          startIcon={
+                            excelExporting ? (
+                              <CircularProgress size={16} color="inherit" />
+                            ) : (
+                              <DownloadRoundedIcon />
+                            )
+                          }
+                          disabled={!canExportExcel || excelExporting}
+                          onClick={handleExportExcel}
+                          data-testid="planner-export-excel"
+                        >
+                          {t('planner.exportExcel')}
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
               {savePlanOk ? (
                 <Alert severity="success" sx={{ py: 0.5 }} onClose={() => setSavePlanOk(false)}>
                   {t('planner.savePlanSaved')}
@@ -977,11 +1018,6 @@ export function PlannerPage() {
               {savePlanError ? (
                 <Alert severity="error" sx={{ py: 0.5 }}>
                   {t('planner.savePlanFailed')}
-                </Alert>
-              ) : null}
-              {adjustSuggestionError ? (
-                <Alert severity="error" sx={{ py: 0.5 }}>
-                  {t('planner.unreachable.applyFailed')}
                 </Alert>
               ) : null}
               {excelExportError ? (
@@ -1010,8 +1046,7 @@ export function PlannerPage() {
                   {t(PLANNER_RUN_BLOCK_MESSAGE_KEYS.target_out_of_range)}
                 </Typography>
               )}
-            </Stack>
-          </CardContent>
+          </Box>
         </Card>
         </>
       }
@@ -1026,230 +1061,377 @@ export function PlannerPage() {
 
         {draftPlan ? (
           <Box
+            data-testid="planner-analytics"
             sx={{
               flex: 1,
               minHeight: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: 1.5,
-              overflow: { md: 'hidden' },
+              px: { md: 1.5 },
+              // Two full-viewport screens: charts, then At-risk — normal scroll.
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              scrollbarGutter: 'stable',
             }}
           >
+            {/* Screen 1 — toolbar + dual Slope charts = one monitor */}
             <Box
-              data-testid="planner-glance-row"
-              role="region"
-              aria-label={t('planner.strip.aria')}
+              data-testid="planner-screen-charts"
               sx={{
-                flexShrink: 0,
-                display: 'flex',
-                flexWrap: { xs: 'wrap', md: 'nowrap' },
-                alignItems: 'stretch',
-                justifyContent: 'flex-start',
-                gap: 0.75,
-                width: '100%',
-                overflowX: { md: 'auto' },
-              }}
-            >
-              {activeAnswer || answerUndo ? (
-                <Stack
-                  direction="row"
-                  spacing={0.5}
-                  alignItems="center"
-                  sx={{ alignSelf: 'center', flexShrink: 0 }}
-                >
-                  {activeAnswer ? (
-                    <Chip
-                      color="primary"
-                      variant="outlined"
-                      size="small"
-                      data-testid="planner-active-answer"
-                      label={t('planner.answer.chip', {
-                        label: t(activeAnswerLabelKey(activeAnswer)),
-                      })}
-                      sx={{
-                        fontWeight: 600,
-                        maxWidth: { xs: '100%', md: 240 },
-                        '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
-                      }}
-                    />
-                  ) : null}
-                  {answerUndo ? (
-                    <Tooltip title={t('planner.answer.undoTip')}>
-                      <Button
-                        size="small"
-                        variant="text"
-                        startIcon={<UndoRoundedIcon fontSize="small" />}
-                        onClick={handleUndoAnswer}
-                        data-testid="planner-undo-answer"
-                        sx={{ flexShrink: 0, minWidth: 0, px: 1 }}
-                      >
-                        {t('planner.answer.undo')}
-                      </Button>
-                    </Tooltip>
-                  ) : null}
-                </Stack>
-              ) : null}
-              <PlannerContextStrip
-                panel={panel}
-                processResult={processResult}
-                baselineReady={baselineReady}
-                draftPlan={draftPlan}
-                horizonMonths={horizon}
-              />
-
-              <SimulationSummaryKpis draftPlan={draftPlan} monitoring={monitoring} />
-            </Box>
-
-            <Box
-              data-testid="planner-explore-stack"
-              sx={{
-                position: 'relative',
-                flex: 1,
-                minHeight: 0,
+                flex: '0 0 auto',
+                height: { md: '100%' },
+                minHeight: { xs: 'auto', md: '100%' },
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden',
+                gap: 1,
+                pt: { md: 0.75 },
+                pb: 1,
+                boxSizing: 'border-box',
               }}
             >
               <Box
+                data-testid="planner-glance-row"
+                role="region"
+                aria-label={t('planner.strip.aria')}
                 sx={{
-                  flex: 1,
-                  minHeight: 320,
+                  flexShrink: 0,
                   display: 'flex',
-                  overflow: 'hidden',
-                  pb:
-                    panel && monitoring
-                      ? { md: `${PLANNER_AT_RISK_SUMMARY_RESERVE_PX + PLANNER_AT_RISK_GAP_PX}px` }
-                      : 0,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 0.75,
+                  width: '100%',
+                  overflowX: { md: 'auto' },
                 }}
               >
-                <Card
+                {activeAnswer || answerUndo ? (
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="center"
+                    sx={{ alignSelf: 'center', flexShrink: 0 }}
+                  >
+                    {activeAnswer ? (
+                      <Chip
+                        color="primary"
+                        variant="outlined"
+                        size="small"
+                        data-testid="planner-active-answer"
+                        label={t('planner.answer.chip', {
+                          label: t(activeAnswerLabelKey(activeAnswer)),
+                        })}
+                        sx={{
+                          fontWeight: 600,
+                          maxWidth: { xs: '100%', md: 240 },
+                          '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' },
+                        }}
+                      />
+                    ) : null}
+                    {answerUndo ? (
+                      <Tooltip title={t('planner.answer.undoTip')}>
+                        <Button
+                          size="small"
+                          variant="text"
+                          startIcon={<UndoRoundedIcon fontSize="small" />}
+                          onClick={handleUndoAnswer}
+                          data-testid="planner-undo-answer"
+                          sx={{ flexShrink: 0, minWidth: 0, px: 1, height: 28 }}
+                        >
+                          {t('planner.answer.undo')}
+                        </Button>
+                      </Tooltip>
+                    ) : null}
+                  </Stack>
+                ) : null}
+                <PlannerContextStrip
+                  panel={panel}
+                  processResult={processResult}
+                  baselineReady={baselineReady}
+                  draftPlan={draftPlan}
+                  horizonMonths={horizon}
+                />
+                <SimulationSummaryKpis
+                  draftPlan={draftPlan}
+                  monitoring={monitoring}
+                  horizonMonths={horizon}
+                />
+                {unreachableCount > 0 && slopeSimulation ? (
+                  <Tooltip title={t('planner.unreachableChipTip')}>
+                    <Chip
+                      size="small"
+                      color="warning"
+                      clickable
+                      onClick={() => {
+                        const first = slopeSimulation.unreachable[0];
+                        atRiskScreenRef.current?.scrollIntoView({
+                          block: 'start',
+                          behavior: 'smooth',
+                        });
+                        if (first) {
+                          openStoreInspect(first.store_id);
+                        }
+                      }}
+                      sx={{ flexShrink: 0 }}
+                      label={t('planner.unreachableChip', { count: unreachableCount })}
+                      data-testid="planner-unreachable-chip"
+                    />
+                  </Tooltip>
+                ) : null}
+                <Button
+                  size="small"
                   variant="outlined"
-                  data-onboarding="planner-hero"
+                  data-testid="planner-inspect-store"
+                  disabled={draftPlan.projections.length === 0}
+                  onClick={() => {
+                    const behindId = monitoring?.stores.find(
+                      (row) => row.signal === 'behind_plan',
+                    )?.store_id;
+                    const storeId =
+                      behindId ??
+                      slopeSimulation?.unreachable[0]?.store_id ??
+                      draftPlan.projections[0]?.store_id;
+                    if (storeId != null) {
+                      openStoreInspect(storeId);
+                    }
+                  }}
+                  sx={{
+                    ml: 'auto',
+                    flexShrink: 0,
+                    height: 28,
+                    textTransform: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t('planner.inspect.openStore')}
+                </Button>
+              </Box>
+
+              <Box
+                data-testid="planner-explore-stack"
+                sx={{
+                  position: 'relative',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  data-testid="planner-slope-chart-stack"
                   sx={{
                     flex: 1,
-                    width: '100%',
-                    minWidth: 0,
                     minHeight: 0,
                     display: 'flex',
                     flexDirection: 'column',
-                    borderWidth: 2,
-                    borderColor: 'primary.light',
-                    overflow: 'hidden',
+                    gap: `${NETWORK_SLOPE_CHART_GAP_PX}px`,
+                    width: '100%',
                   }}
                 >
-                  <CardHeader
-                    title={t('planner.heroTitle')}
-                    subheader={t('planner.heroSubSlope')}
-                    sx={{ flexShrink: 0, pb: 0 }}
-                  />
-                  <CardContent
+                  <Card
+                    variant="outlined"
+                    data-onboarding="planner-hero"
+                    data-testid="planner-slope-cumulative"
+                    data-density="viewport"
                     sx={{
                       flex: 1,
                       minHeight: 0,
-                      pt: 1,
+                      width: '100%',
+                      minWidth: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      borderWidth: 2,
+                      borderColor: 'primary.light',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <CardContent
+                      sx={{
+                        flex: 1,
+                        minHeight: 0,
+                        pt: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        '&:last-child': { pb: 1.5 },
+                      }}
+                    >
+                      {slopeLayers ? (
+                        <SlopeCumulativePanel layers={slopeLayers} />
+                      ) : (
+                        <Stack
+                          spacing={0.5}
+                          sx={{ flex: 1, px: 0.5 }}
+                          data-testid="slope-cumulative-placeholder"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {t('planner.slope.panelCumulative')}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                            {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card
+                    variant="outlined"
+                    data-testid="planner-slope-monthly"
+                    data-density="viewport"
+                    sx={{
+                      flex: 1,
+                      minHeight: 0,
+                      width: '100%',
+                      minWidth: 0,
                       display: 'flex',
                       flexDirection: 'column',
                       overflow: 'hidden',
-                      '&:last-child': { pb: 1.5 },
                     }}
                   >
-                    {unreachableCount > 0 && slopeSimulation ? (
-                      <Tooltip title={t('planner.unreachableChipTip')}>
-                        <Chip
-                          size="small"
-                          color="warning"
-                          clickable
-                          onClick={() => {
-                            const first = slopeSimulation.unreachable[0];
-                            if (first) {
-                              setAtRiskExpanded(true);
-                              selectStore(first.store_id);
-                            }
-                          }}
-                          sx={{ alignSelf: 'flex-start', mb: 1 }}
-                          label={t('planner.unreachableChip', { count: unreachableCount })}
-                          data-testid="planner-unreachable-chip"
-                        />
-                      </Tooltip>
-                    ) : null}
-                    {panel && slopeLayers ? (
-                      <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-                        <CumulativeSlopeHeroChart layers={slopeLayers} />
-                      </Box>
-                    ) : panel ? (
-                      <Typography variant="body2" color="text.secondary">
-                        {t('planner.heroNeedSimulation')}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        {t('planner.heroNeedPanel')}
-                      </Typography>
-                    )}
-                  </CardContent>
-                </Card>
+                    <CardContent
+                      sx={{
+                        flex: 1,
+                        minHeight: 0,
+                        pt: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        '&:last-child': { pb: 1.5 },
+                      }}
+                    >
+                      {slopeLayers ? (
+                        <SlopeMonthlyPanel layers={slopeLayers} />
+                      ) : (
+                        <Stack
+                          spacing={0.5}
+                          sx={{ flex: 1, px: 0.5 }}
+                          data-testid="slope-monthly-placeholder"
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            {t('planner.slope.panelMonthly')}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                            {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                          </Typography>
+                        </Stack>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Box>
               </Box>
-
-              {panel && monitoring && (
-                <PlannerAtRiskDock
-                  testId="planner-at-risk-sheet"
-                  onboardingId="planner-at-risk"
-                  expanded={atRiskExpanded}
-                  onExpandedChange={setAtRiskExpanded}
-                  behindCount={monitoring.summary.behind}
-                  aheadCount={monitoring.summary.ahead}
-                  stableScrollbar
-                >
-                      <AtRiskDeltaTable
-                        plan={draftPlan}
-                        approvedPlan={approvedPlan}
-                        baselineRows={baselineRows}
-                        panel={panel}
-                        insights={monitoring}
-                        asOfOptions={draftPlan.chain_trajectory.map((m) => ({
-                          year: m.year,
-                          month: m.month,
-                        }))}
-                        onAsOfChange={(year, month) => {
-                          setAsOfYear(year);
-                          setAsOfMonth(month);
-                        }}
-                        onInspect={(storeId) => selectStore(storeId)}
-                        unreachableStoreIds={unreachableStoreIds}
-                      />
-                </PlannerAtRiskDock>
-              )}
             </Box>
 
-            {panel && monitoring && selectedStoreId != null && (
-              <StoreAuditDrawer
-                open
-                storeId={selectedStoreId}
-                plan={draftPlan}
-                panel={panel}
-                insights={monitoring}
-                processResult={processResult}
-                maxMonthlyImprove={params.max_monthly_improve}
-                baselineRows={baselineRows}
-                onClose={() => selectStore(null)}
-                onStoreChange={(id) => selectStore(id)}
-                onApplyPlan={(next) => patchDraftPlan(next)}
-                unreachableHint={selectedUnreachableHint}
-                onApplyUnreachableSuggestion={
-                  selectedUnreachableHint
-                    ? () => handleApplyUnreachableSuggestion(selectedUnreachableHint)
-                    : undefined
-                }
-                unreachableApplyPending={adjustSimulationMutation.isPending}
-                boostGlance={selectedBoostGlance}
-                slopeSimulation={slopeSimulation}
-              />
-            )}
+            {/* Screen 2 — At-risk panels = second full monitor */}
+            {panel && monitoring && planForMonitoring ? (
+              <Box
+                ref={atRiskScreenRef}
+                data-testid="planner-screen-atrisk"
+                sx={{
+                  flex: '0 0 auto',
+                  height: { md: '100%' },
+                  minHeight: { xs: 360, md: '100%' },
+                  boxSizing: 'border-box',
+                  pb: 1,
+                }}
+              >
+                <AtRiskPanelsSection
+                  testId="planner-at-risk-sheet"
+                  onboardingId="planner-at-risk"
+                  plan={planForMonitoring}
+                  approvedPlan={approvedPlan}
+                  baselineRows={baselineRows}
+                  panel={panel}
+                  insights={monitoring}
+                  asOfOptions={planForMonitoring.chain_trajectory.map((m) => ({
+                    year: m.year,
+                    month: m.month,
+                  }))}
+                  onAsOfChange={(year, month) => {
+                    setAsOfYear(year);
+                    setAsOfMonth(month);
+                  }}
+                  onInspect={openStoreInspect}
+                  unreachableStoreIds={unreachableStoreIds}
+                />
+              </Box>
+            ) : null}
           </Box>
         ) : (
-          <Alert severity="info" sx={{ flexShrink: 0 }}>
-            {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
-          </Alert>
+          <Box
+            data-testid="planner-analytics-empty"
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: `${PLANNER_ANALYTICS_SECTION_GAP_PX}px`,
+              px: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
+              pt: { md: `${PLANNER_ANALYTICS_PADDING_PX}px` },
+              overflow: 'auto',
+              pb: `${PLANNER_ANALYTICS_PADDING_PX}px`,
+            }}
+          >
+            <Alert severity="info" sx={{ flexShrink: 0 }}>
+              {baselineReady ? t('planner.emptyReady') : t('planner.emptyWaiting')}
+            </Alert>
+            <Box
+              data-testid="planner-slope-chart-stack"
+              sx={{
+                flex: '0 0 auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: `${NETWORK_SLOPE_CHART_GAP_PX}px`,
+                width: '100%',
+              }}
+            >
+              <Card
+                variant="outlined"
+                data-onboarding="planner-hero"
+                data-testid="planner-slope-cumulative"
+                sx={{
+                  flex: '0 0 auto',
+                  height: NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+                  borderWidth: 2,
+                  borderColor: 'primary.light',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Stack spacing={0.5} sx={{ flex: 1 }} data-testid="slope-cumulative-placeholder">
+                    <Typography variant="caption" color="text.secondary">
+                      {t('planner.slope.panelCumulative')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                      {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+              <Card
+                variant="outlined"
+                data-testid="planner-slope-monthly"
+                sx={{
+                  flex: '0 0 auto',
+                  height: NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Stack spacing={0.5} sx={{ flex: 1 }} data-testid="slope-monthly-placeholder">
+                    <Typography variant="caption" color="text.secondary">
+                      {t('planner.slope.panelMonthly')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ m: 'auto' }}>
+                      {panel ? t('planner.heroNeedSimulation') : t('planner.heroNeedPanel')}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
         )}
     </PlannerPageShell>
   );

@@ -65,9 +65,9 @@ describe('InspectStoreGlance', () => {
     );
 
     expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
-    expect(screen.getByText(/Fact As-Of \(2025-04\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Plan As-Of \(2025-04\)/i)).toBeInTheDocument();
-    expect(screen.getByTestId('inspect-fact-as-of-hint')).toBeInTheDocument();
+    expect(screen.getByText(/Fact \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Plan \(2025-04\)/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('inspect-fact-as-of-hint')).not.toBeInTheDocument();
     expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
     expect(screen.getByText('+6.0 pp')).toBeInTheDocument();
 
@@ -110,15 +110,15 @@ describe('InspectStoreGlance', () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByText('Fact As-Of (2025-12)')).toBeInTheDocument();
-    expect(screen.getByText('Plan As-Of (2025-12)')).toBeInTheDocument();
+    expect(screen.getByText('Fact (2025-12)')).toBeInTheDocument();
+    expect(screen.getByText('Plan (2025-12)')).toBeInTheDocument();
     expect(screen.getByText('58.0%')).toBeInTheDocument();
-    expect(screen.getByText('Baseline → Plan end (monthly)')).toBeInTheDocument();
+    expect(screen.getByText('Baseline → End')).toBeInTheDocument();
     expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
-    expect(screen.getByText('EOY plan (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('EOY plan')).toBeInTheDocument();
     expect(screen.getByText('68.0%')).toBeInTheDocument();
-    expect(screen.getByText('EOY forecast (cum.)')).toBeInTheDocument();
+    expect(screen.getByText('EOY forecast')).toBeInTheDocument();
     expect(screen.getByText('64.2%')).toBeInTheDocument();
-    expect(screen.getByText(/last plotted fact 2025-12/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Store snapshot/i)).not.toBeInTheDocument();
   });
 });

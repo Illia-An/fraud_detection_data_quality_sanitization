@@ -140,23 +140,25 @@ describe('AtRiskDeltaTable', () => {
     expect(screen.getByText('Store #10')).toBeInTheDocument();
     expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
 
+    expect(screen.getByTestId('atrisk-exception-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-path-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-ai-chat-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-mix-donut')).toBeInTheDocument();
+    expect(screen.getByText(/As-of exceptions/i)).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-path-panel')).toHaveTextContent(/Store mix/i);
     expect(screen.getByText('Fact As-Of')).toBeInTheDocument();
     expect(screen.getByText('Plan As-Of')).toBeInTheDocument();
     expect(screen.getByText('Volume')).toBeInTheDocument();
     expect(screen.getByText('MoM (pp)')).toBeInTheDocument();
-    expect(screen.getByText('Baseline → End')).toBeInTheDocument();
-    expect(screen.getByText('Behind streak')).toBeInTheDocument();
-    expect(screen.getByText('Gap share')).toBeInTheDocument();
-    expect(screen.getByText('Lift to end')).toBeInTheDocument();
-    expect(screen.getByText('Error Budget Deficit')).toBeInTheDocument();
+    expect(screen.queryByText('Baseline → End')).not.toBeInTheDocument();
+    expect(screen.queryByText('Error Budget Deficit')).not.toBeInTheDocument();
     expect(screen.getByText('66.0%')).toBeInTheDocument();
     expect(screen.getByText('68.0%')).toBeInTheDocument();
     expect(screen.getByText('−2.0 pp')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
-    expect(screen.getByText('+2.0 pp')).toBeInTheDocument();
-    expect(screen.getByText('65.0% → 72.0%')).toBeInTheDocument();
-    expect(screen.getByText('100%')).toBeInTheDocument();
-    expect(screen.getByText('+6.0 pp')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-donut-total')).toHaveTextContent('2');
+    expect(screen.getByTestId('atrisk-donut-legend-behind_plan')).toBeInTheDocument();
+    expect(screen.getByTestId('atrisk-donut-legend-ahead_of_plan')).toBeInTheDocument();
     expect(screen.getByText('Store #10')).toBeInTheDocument();
     expect(screen.queryByText('Store #20')).not.toBeInTheDocument();
 

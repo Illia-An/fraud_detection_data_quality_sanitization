@@ -4,6 +4,13 @@ import { lazy } from 'react';
 
 import type { EvaluationLegendItem } from './EvaluationLegend';
 import {
+  FIGMA_ANALYTICS_PADDING_PX,
+  FIGMA_ANALYTICS_SECTION_GAP_PX,
+  FIGMA_CHART_CARD_COMPACT_PX,
+  FIGMA_CHART_CARD_OVERVIEW_PX,
+  FIGMA_CHART_GAP_PX,
+} from './figmaPlannerLayout';
+import {
   HERO_HOVERLABEL,
   HERO_HOVERMODE,
   HERO_X_SPIKES,
@@ -14,10 +21,28 @@ export const SlopePlot = lazy(async () => {
   return { default: module.default };
 });
 
-/** Minimum plot height inside a panel. */
+/** Minimum plot height inside a panel (stacked / Inspect). */
 export const SLOPE_PANEL_MIN_HEIGHT_PX = 140;
 /** @deprecated alias — prefer SLOPE_PANEL_MIN_HEIGHT_PX. */
 export const SLOPE_PANEL_HEIGHT_PX = SLOPE_PANEL_MIN_HEIGHT_PX;
+
+/**
+ * Figma `figm_res_v2` network chart density (1900×1280 desktop).
+ * Expanding At-risk compactifies both plots; collapsing restores overview.
+ */
+export const NETWORK_SLOPE_CARD_HEIGHT_OVERVIEW_PX = FIGMA_CHART_CARD_OVERVIEW_PX;
+export const NETWORK_SLOPE_CARD_HEIGHT_COMPACT_PX = FIGMA_CHART_CARD_COMPACT_PX;
+/** Gap between cumulative and monthly cards (Measured). */
+export const NETWORK_SLOPE_CHART_GAP_PX = FIGMA_CHART_GAP_PX;
+/** Analytics region outer padding / section rhythm (Measured). */
+export const PLANNER_ANALYTICS_PADDING_PX = FIGMA_ANALYTICS_PADDING_PX;
+export const PLANNER_ANALYTICS_SECTION_GAP_PX = FIGMA_ANALYTICS_SECTION_GAP_PX;
+
+/**
+ * Reserved height for Slope status alerts (dirty / allocating / error)
+ * so mount/unmount does not shift the charts (CLS).
+ */
+export const SLOPE_STATUS_SLOT_MIN_HEIGHT_PX = 44;
 
 export const SLOPE_CUMULATIVE_LEGEND: readonly EvaluationLegendItem[] = [
   {
@@ -227,27 +252,71 @@ export function buildSlopePlotLayout(opts: {
   /** Extra top margin when cutover / EOY labels are drawn. */
   topMargin?: number;
   rightMargin?: number;
+  /** Room for abbreviated ticks + year-band captions (Figma metadata row). */
+  bottomMargin?: number;
+  /** Category tick labels (same length as data x); defaults to raw categories. */
+  ticktext?: string[];
+  tickvals?: string[];
 }) {
   return {
     autosize: false as const,
     width: opts.plotWidth,
     height: opts.plotHeight,
+    /** Keep camera / axis interaction stable across data updates (drag preview). */
+    uirevision: 'slope-plan-stable',
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: '#ffffff',
     margin: {
-      l: 48,
-      r: opts.rightMargin ?? 72,
-      t: opts.topMargin ?? 28,
-      b: 36,
+      l: 52,
+      r: opts.rightMargin ?? 16,
+      t: opts.topMargin ?? 12,
+      b: opts.bottomMargin ?? 48,
     },
     showlegend: false,
     hovermode: HERO_HOVERMODE,
     xaxis: {
       type: 'category' as const,
-      tickangle: -45,
-      automargin: true,
+      tickangle: 0,
+      automargin: false,
+      tickfont: { size: 10, color: '#757575' },
+      showgrid: false,
+      zeroline: false,
+      ...(opts.tickvals != null && opts.ticktext != null
+        ? { tickmode: 'array' as const, tickvals: opts.tickvals, ticktext: opts.ticktext }
+        : {}),
       ...HERO_X_SPIKES,
     },
     shapes: opts.shapes,
     annotations: opts.annotations ?? [],
     hoverlabel: HERO_HOVERLABEL,
+  };
+}
+
+/** Emphasize the last finite Plan point (Figma endpoint node). */
+export function planEndMarkerTrace(
+  labels: string[],
+  values: (number | null)[],
+  color = '#1565c0',
+): {
+  x: string[];
+  y: number[];
+  type: 'scatter';
+  mode: 'markers';
+  marker: { size: number; color: string; line: { width: number; color: string } };
+  hoverinfo: 'skip';
+  showlegend: false;
+} | null {
+  const pt = lastFinitePoint(labels, values);
+  if (!pt) {
+    return null;
+  }
+  return {
+    x: [pt.label],
+    y: [pt.value],
+    type: 'scatter',
+    mode: 'markers',
+    marker: { size: 11, color, line: { width: 2, color: '#ffffff' } },
+    hoverinfo: 'skip',
+    showlegend: false,
   };
 }

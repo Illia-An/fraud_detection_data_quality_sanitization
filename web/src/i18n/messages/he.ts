@@ -236,6 +236,8 @@ export const he: Record<MessageKey, string> = {
   'planner.leversTitle': 'בקרי תוכנית',
   'planner.leversSub': 'Q10012 top-box · ממוצע שווה של סניפים בחודש הייחוס',
   'planner.section.goalTime': 'יעד וזמן',
+  'planner.section.advancedControls': 'בקרות מתקדמות',
+  'planner.exportDisclosure': 'ייצוא והורדה',
   'planner.section.allocator': 'מנופים ידניים',
   'planner.current': 'נוכחי:',
   'planner.currentHint':
@@ -269,6 +271,10 @@ export const he: Record<MessageKey, string> = {
   'planner.savePlanTip':
     'הקפאת קו הבסיס כגרסה חדשה בשרת (קו כחול). הסימולציה ממשיכה להתעדכן בזמן אמת.',
   'planner.savePlanDisabledTip': 'הרץ סימולציה ואז שמור גרסת תוכנית.',
+  'planner.savePlanBlockedByPinsTip':
+    'סיימו את גרירת הנקודה (שחרור), ואז Save יקפיא את מסלול Slope הערוך.',
+  'planner.savePlanWithPinsTip':
+    'Save מקפיא את מסלול תוכנית Slope הערוך (חודשיים לפי חבילת ה־pin), לא את תחזית הסימולציה החיה.',
   'planner.savePlanFailed': 'לא ניתן לשמור את גרסת התוכנית.',
   'planner.savePlanSaved': 'גרסת התוכנית נשמרה.',
   'planner.unreachableChip': '{count} סניפים: יעדים מרומזים לא ריאליים',
@@ -289,7 +295,7 @@ export const he: Record<MessageKey, string> = {
   'planner.slope.simulation': 'תחזית סימולציה',
   'planner.slope.cumActualSimYtd': 'עובדה + תחזית בשנת תכנון (מצטבר)',
   'planner.slope.cumActualSimYtdForecast': 'תחזית שנת תכנון (אחרי חיתוך)',
-  'planner.slope.cumActualSim': 'מצטבר היסטורי (מתחילת הנתונים)',
+  'planner.slope.cumActualSim': 'מצטבר היסטורי',
   'planner.slope.requiredMonthly': 'חודשי נדרש (ליעד הרשת)',
   'planner.slope.requiredCumulative': 'מצטבר נדרש (ליעד הרשת)',
   'planner.slope.tip.actual':
@@ -308,8 +314,11 @@ export const he: Record<MessageKey, string> = {
     'לא עובדה, לא סימולציה, ולא היעד המרומז של הסניף: ציונים חודשיים אחרי העובדה האחרונה שיישאו את הממוצע הרץ מתחילת הנתונים ליעד הרשת עד דצמבר שנת התכנון. לעיתים מעל קצב ריאלי — מוסתר כברירת מחדל.',
   'planner.slope.tip.requiredCumulative':
     'ממוצע רץ של עובדה מתחילת הנתונים עד העובדה האחרונה, ואז חודשיים נדרשים ליעד הרשת (לא יעד מרומז של סניף). מוסתר כברירת מחדל.',
-  'planner.slope.panelCumulative': 'מסלול מצטבר (תוכנית מול עובדה / תחזית בשנת תכנון)',
-  'planner.slope.panelMonthly': 'רמות חודשיות (עובדה · תוכנית · תחזית סימולציה)',
+  'planner.slope.panelCumulative': 'מסלול מצטבר',
+  'planner.slope.panelMonthly': 'רמות חודשיות',
+  'planner.slope.panelCumulativeMeta':
+    '{metric} · תוכנית מצטברת לשנת תכנון / היסטוריה מתחילת הנתונים',
+  'planner.slope.panelMonthlyMeta': '{metric} · עובדה / תוכנית חודשית / תחזית סימולציה',
   'planner.slope.legendShow': 'הצג מקרא',
   'planner.slope.legendHide': 'הסתר מקרא',
   'planner.slope.legendToggleAria': 'הצגה או הסתרה של מקרא Slope',
@@ -319,33 +328,45 @@ export const he: Record<MessageKey, string> = {
     'חיתוך: עובדה מצוירת עד {factEnd} · תחזית מ־{forecastStart} · as-of מוצהר {declaredAsOf}',
   'planner.slope.cutoverCaptionNoFact':
     'חיתוך: אין עובדה מצוירת · תחזית מ־{forecastStart} · as-of מוצהר {declaredAsOf}',
-  'planner.slope.cutoverLine': 'עובדה→תוכנית/תחזית',
+  'planner.slope.cutoverLine': 'חיתוך {month}',
   'planner.slope.cutoverLegend': 'חיתוך',
   'planner.slope.tip.cutover':
     'גבול אנכי אחרי חודש העובדה המצויר האחרון (עלול להיות שונה מ־as-of המוצהר אם אין עדיין עובדה): משמאל = עובדה, מימין = תוכנית / תחזית סימולציה.',
-  'planner.slope.eoyPlan': 'תוכנית EOY (שנת תכנון): {value}%',
-  'planner.slope.eoySim': 'תחזית EOY (שנת תכנון): {value}%',
-  'planner.slope.eoyTarget': 'יעד רשת: {value}%',
+  'planner.slope.eoyPlan': 'תוכנית EOY {value}%',
+  'planner.slope.eoySim': 'תחזית EOY {value}%',
+  'planner.slope.eoyTarget': 'יעד {value}%',
+  'planner.slope.endPlan': 'סוף תוכנית {value}%',
+  'planner.slope.yearHistory': 'היסטוריה {year}',
+  'planner.slope.yearPlanning': 'שנת תכנון {year}',
   'planner.slope.statusHint':
     'שלוש קריאות שונות — (1) Ahead/Behind = עובדה מול תוכנית בחיתוך · (2) תוצאת השנה = תחזית EOY של שנת התכנון מול יעד {target}% · (3) שבב צהוב = יעדים מרומזים לא ריאליים לסניפים. לא אותו פסק דין.',
+  'planner.slope.dragHint':
+    'גררו נקודות תוכנית כחולות אחרי החיתוך (מצטבר או חודשי). הגרפים מתעדכנים תוך כדי גרירה; הקצאת סניפים ו-At-risk מתרעננים בשחרור. הסימולציה אינה ניתנת לגרירה.',
+  'planner.slope.pinsDirty':
+    'מסלול תוכנית Slope נערך. Save יקפיא מסלול זה; איפוס מבטל עריכות pin.',
+  'planner.slope.allocating': 'מעדכן תוכניות סניפים ממסלול הרשת…',
+  'planner.slope.atRiskPending':
+    'At-risk עדיין מציג את מסלול Slope האחרון שאושר — ציוני הסניפים יתעדכנו בשחרור הסמן.',
+  'planner.slope.resetPins': 'אפס מסלול תוכנית',
+  'planner.slope.pinError': 'עריכת תוכנית נדחתה ({code}): {reason}',
   'planner.heroSubSlope':
     'פסק דין מצטבר לשנת תכנון · קצב חודשי · היסטוריה אופציונלית · חיתוך = עובדה מצוירת אחרונה',
   'planner.inspect.boostTitle': 'בוסט / שיפוע',
-  'planner.inspect.boostGap': 'פער מממוצע הרשת: {gap} pp',
-  'planner.inspect.boostSlope': 'שיפוע חודשי: {slope} pp',
+  'planner.inspect.boostGap': 'פער מממוצע {gap} pp',
+  'planner.inspect.boostSlope': 'שיפוע {slope} pp/חודש',
   'planner.inspect.boostHint':
     'פער חיובי = מתחת לממוצע → בוסט תלול יותר. מתון/פלטו כשמקדימים.',
-  'planner.inspect.factAsOfMonth': 'Fact As-Of ({month})',
-  'planner.inspect.planAsOfMonth': 'Plan As-Of ({month})',
+  'planner.inspect.factAsOfMonth': 'Fact ({month})',
+  'planner.inspect.planAsOfMonth': 'Plan ({month})',
   'planner.inspect.factAsOfHint':
     'עובדה מנוקה לחודש as-of של הניטור — לא הנקודה הכחולה של התוכנית בגרף.',
   'planner.inspect.factAsOfHintAligned':
     'Fact As-Of = העובדה המצוירת האחרונה בגרף. Gap = עובדה מול תוכנית באותו חודש (Ahead/Behind). סוף תוכנית (חודשי) ≠ תוכנית/תחזית EOY (מצטבר בגרף העליון). קווי Required (אם מוצגים) מכוונים ליעד הרשת, לא ליעד המרומז של הסניף.',
   'planner.inspect.glanceSubAligned':
     'תמונת סניף · עובדה מצוירת אחרונה {factMonth} · as-of מוצהר {declaredAsOf} · Lift לפי סוף תוכנית חודשי (Estimate דורס את End)',
-  'planner.inspect.baselinePlanEnd': 'Baseline → סוף תוכנית (חודשי)',
-  'planner.inspect.eoyPlanCum': 'תוכנית EOY (מצטבר)',
-  'planner.inspect.eoyForecast': 'תחזית EOY (מצטבר)',
+  'planner.inspect.baselinePlanEnd': 'Baseline → End',
+  'planner.inspect.eoyPlanCum': 'תוכנית EOY',
+  'planner.inspect.eoyForecast': 'תחזית EOY',
   'planner.slope.lastFact': 'עובדה אחרונה',
   'planner.revertDraft': 'שחזר טיוטה',
   'planner.revertDraftTip':
@@ -406,6 +427,16 @@ export const he: Record<MessageKey, string> = {
   'planner.heroNeedSimulation': 'הרץ סימולציה כדי להציג את גרפי Slope.',
   'planner.atRiskTitle': 'רשימת חריגים בסיכון',
   'planner.atRiskSub': 'Management by Exception · מאחור / מובילים / הכל · Inspect פותח sandbox',
+  'planner.atRisk.panel.exception': 'חריגים as-of · מי ופער עכשיו',
+  'planner.atRisk.panel.path': 'תמהיל סניפים · מאחור / לפני / במסלול',
+  'planner.atRisk.donut.stores': 'סניפים',
+  'planner.atRisk.chat.title': 'עוזר AI',
+  'planner.atRisk.chat.empty':
+    'שאלו על התוכנית, תמהיל הסניפים או סניפים מאחור. חברו מודל כשמוכנים.',
+  'planner.atRisk.chat.placeholder': 'שאלה על התוכנית…',
+  'planner.atRisk.chat.send': 'שלח',
+  'planner.atRisk.chat.stubReply':
+    'AI עדיין לא מחובר — חברו כאן את המודל לתשובות בהקשר הפרויקט.',
 
   'planner.block.noBaseline': 'הרץ סניטציה קודם לבניית בסיס Q10012 מנוקה.',
   'planner.block.noStores': 'אין סניפים בחודש הייחוס שנבחר — בחר תקופה אחרת.',
@@ -436,6 +467,11 @@ export const he: Record<MessageKey, string> = {
   'planner.kpi.projected': 'KPI רשת צפוי',
   'planner.kpi.acceptedDraft': 'מאושר → טיוטה',
   'planner.kpi.currentDraft': 'נוכחי → סופי טיוטה',
+  'planner.kpi.horizon': 'אופק',
+  'planner.kpi.horizonMonths': '{count} חוד׳',
+  'planner.kpi.horizonDetail': 'חודשי תוכנית אחרי as-of',
+  'planner.kpi.target': 'יעד',
+  'planner.kpi.targetDetail': 'יעד רשת',
   'planner.kpi.behind': 'סניפים מאחורי התוכנית',
   'planner.kpi.asOf': 'נכון ל־{label}',
   'planner.kpi.feasibility': 'היתכנות',
@@ -466,10 +502,15 @@ export const he: Record<MessageKey, string> = {
   'planner.atRisk.filter': 'תצוגה',
   'planner.atRisk.storeId': 'סניף #{id}',
   'planner.atRisk.footer':
-    'Management by exception · פער = fact − plan ב־as-of ({asOf}). נפח / MoM / רצף / חלק / הרמה לעדיפות. מאחור לפי הפער הגרוע ביותר.',
+    'שמאל: triage as-of. ימין: דונאט תמהיל + צ׳אט AI. פער = fact − plan ב־as-of ({asOf}).',
   'planner.atRisk.empty': 'אין סניפים שתואמים למסנן.',
   'planner.atRisk.inspect': 'בדיקה',
 
+  'planner.storePage.back': 'חזרה למתכנן',
+  'planner.storePage.title': 'סניף #{id}',
+  'planner.storePage.needSimulation':
+    'הרץ סימולציה במתכנן קודם — גרפי Slope של הסניף דורשים את חבילת allocate.',
+  'planner.inspect.openStore': 'בדיקת סניף',
   'planner.inspect.titlePrefix': 'בדיקה ·',
   'planner.inspect.storeSelect': 'בחירת סניף',
   'planner.inspect.glanceSub':

@@ -1,15 +1,18 @@
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Box,
+  IconButton,
   Typography,
 } from '@mui/material';
 import type { ReactNode } from 'react';
 
 import { useT } from '../../i18n';
 import {
+  PLANNER_AT_RISK_EXPANDED_HEIGHT_PX,
   PLANNER_AT_RISK_GAP_PX,
   PLANNER_AT_RISK_OVERLAY_MAX_HEIGHT,
   PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
@@ -26,13 +29,35 @@ interface PlannerAtRiskDockProps {
   onboardingId: string;
   /** Planner reserves the scrollbar gutter; TTS planner never did. */
   stableScrollbar?: boolean;
+  /**
+   * `overlay` — md+ absolute over hero (TTS / legacy).
+   * `flow` — fixed-height in-page section under Slope charts (own scroll).
+   */
+  placement?: 'overlay' | 'flow';
   /** At-risk table. */
   children: ReactNode;
 }
 
+function DockTitle({ behindCount, aheadCount }: { behindCount: number; aheadCount: number }) {
+  const t = useT();
+  return (
+    <Box sx={{ minWidth: 0, pr: 1, flex: 1 }}>
+      <Typography variant="body2" fontWeight={600} noWrap>
+        {t('planner.atRiskTitle')}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" noWrap display="block">
+        {t('planner.atRisk.behindChip', { count: behindCount })}
+        {' · '}
+        {t('planner.atRisk.aheadChip', { count: aheadCount })}
+      </Typography>
+    </Box>
+  );
+}
+
 /**
- * At-risk accordion docked at the bottom of the hero pane (md+: overlay, xs: in flow).
- * Geometry only; the table and its data come from the page.
+ * At-risk dock.
+ * - `flow`: no MUI Accordion/Collapse — fixed 300px + internal scroll (avoids clip-without-scrollbar).
+ * - `overlay`: Accordion over the hero (TTS).
  */
 export function PlannerAtRiskDock({
   expanded,
@@ -42,16 +67,103 @@ export function PlannerAtRiskDock({
   testId,
   onboardingId,
   stableScrollbar = false,
+  placement = 'overlay',
   children,
 }: PlannerAtRiskDockProps) {
   const t = useT();
+
+  if (placement === 'flow') {
+    return (
+      <Box
+        data-testid={testId}
+        data-onboarding={onboardingId}
+        data-placement="flow"
+        data-expanded={expanded ? 'true' : 'false'}
+        sx={{
+          position: 'relative',
+          flexShrink: 0,
+          width: '100%',
+          height: expanded
+            ? PLANNER_AT_RISK_EXPANDED_HEIGHT_PX
+            : PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+          transition: 'height 180ms ease',
+          bgcolor: 'background.paper',
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          boxShadow: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          ...(stableScrollbar ? { scrollbarGutter: 'stable' } : {}),
+        }}
+      >
+        <Box
+          role="button"
+          tabIndex={0}
+          aria-expanded={expanded}
+          aria-controls={`${testId}-scroll`}
+          data-testid={`${testId}-toggle`}
+          onClick={() => onExpandedChange(!expanded)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onExpandedChange(!expanded);
+            }
+          }}
+          sx={{
+            flexShrink: 0,
+            height: PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+            minHeight: PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+            px: 2,
+            display: 'flex',
+            alignItems: 'center',
+            cursor: 'pointer',
+            userSelect: 'none',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
+        >
+          <DockTitle behindCount={behindCount} aheadCount={aheadCount} />
+          <IconButton
+            size="small"
+            edge="end"
+            tabIndex={-1}
+            aria-label={expanded ? t('planner.atRiskTitle') : t('planner.atRiskTitle')}
+            sx={{ pointerEvents: 'none' }}
+          >
+            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          </IconButton>
+        </Box>
+
+        {expanded ? (
+          <Box
+            id={`${testId}-scroll`}
+            data-testid={`${testId}-scroll`}
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              px: 1.5,
+              pb: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              // Bound height here; AtRiskDeltaTable's table box owns overflow:auto.
+              overflow: 'hidden',
+            }}
+          >
+            {children}
+          </Box>
+        ) : null}
+      </Box>
+    );
+  }
 
   return (
     <Box
       data-testid={testId}
       data-onboarding={onboardingId}
+      data-placement="overlay"
+      data-expanded={expanded ? 'true' : 'false'}
       sx={{
-        // xs: normal flow under Hero. md: bottom overlay over the pane.
         position: { xs: 'relative', md: 'absolute' },
         left: { md: 0 },
         right: { md: 0 },
@@ -79,19 +191,22 @@ export function PlannerAtRiskDock({
           bgcolor: 'transparent',
         }}
       >
-        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 48, py: 0.5 }}>
-          <Box sx={{ minWidth: 0, pr: 1 }}>
-            <Typography variant="body2" fontWeight={600} noWrap>
-              {t('planner.atRiskTitle')}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap display="block">
-              {t('planner.atRisk.behindChip', { count: behindCount })}
-              {' · '}
-              {t('planner.atRisk.aheadChip', { count: aheadCount })}
-            </Typography>
-          </Box>
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={{
+            minHeight: PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+            height: PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+            flexShrink: 0,
+            py: 0,
+            '&.Mui-expanded': {
+              minHeight: PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
+            },
+          }}
+        >
+          <DockTitle behindCount={behindCount} aheadCount={aheadCount} />
         </AccordionSummary>
         <AccordionDetails
+          data-testid={`${testId}-scroll`}
           sx={{
             px: 1.5,
             pt: 0,

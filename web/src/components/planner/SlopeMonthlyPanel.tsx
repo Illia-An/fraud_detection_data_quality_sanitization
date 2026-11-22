@@ -1,6 +1,6 @@
 /** Monthly levels panel — fact · plan · simulation forecast. */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, ToggleButton, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
@@ -10,13 +10,22 @@ import { EvaluationLegend } from './EvaluationLegend';
 import { HERO_HOVER_TEMPLATE, HERO_Y_SPIKES } from './heroChartCrosshair';
 import { HERO_PX_PER_PERIOD } from './HeroSimulationChart';
 import {
+  buildYearBandAnnotations,
+  formatSlopeTickLabels,
+  inferPlanningYear,
+} from './slopeAxisFormat';
+import {
   asOfShapes,
   buildSlopePlotLayout,
+  lastFinitePoint,
+  planEndMarkerTrace,
   SLOPE_MONTHLY_DEFAULT_HIDDEN,
   SLOPE_MONTHLY_LEGEND,
   SLOPE_PANEL_MIN_HEIGHT_PX,
   SlopePlot,
+  type PlotlyAnnotation,
 } from './slopeHeroShared';
+import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeMonthlyPanelProps {
   layers: CumulativeSlopePlotLayers;
@@ -28,10 +37,8 @@ export function SlopeMonthlyPanel({
   yAxisTitle = '5% Score',
 }: SlopeMonthlyPanelProps) {
   const t = useT();
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [plotWidth, setPlotWidth] = useState(0);
-  const [hostHeight, setHostHeight] = useState(0);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_MONTHLY_DEFAULT_HIDDEN),
   );
@@ -46,19 +53,6 @@ export function SlopeMonthlyPanel({
   }, []);
 
   const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
-
-  useEffect(() => {
-    const node = hostRef.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (!rect) return;
-      setPlotWidth(Math.max(0, Math.floor(rect.width)));
-      setHostHeight(Math.max(0, Math.floor(rect.height)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   const { labels, planYs, actualYs, simYs, requiredMonthlyYs, target, cutover } = layers;
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
@@ -95,11 +89,32 @@ export function SlopeMonthlyPanel({
     [isVisible, actualYs, planYs, simYs, requiredMonthlyYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
-  const { shapes, annotations } = asOfShapes(
+  const yRange = useFrozenYRange(false, fitY.range as [number, number] | undefined);
+  const cutoverMonth = cutover.factEndLabel ?? cutover.lineLabel;
+  const { shapes, annotations: cutoverAnnotations } = asOfShapes(
     cutover.lineLabel,
     isVisible('asOf'),
-    t('planner.slope.cutoverLine'),
+    t('planner.slope.cutoverLine', { month: cutoverMonth }),
   );
+
+  const endOutcome = useMemo(() => {
+    const pt = lastFinitePoint(labels, planYs);
+    return pt != null ? pt.value.toFixed(1) : null;
+  }, [labels, planYs]);
+
+  const ticktext = useMemo(() => formatSlopeTickLabels(labels), [labels]);
+  const planningYear = useMemo(() => inferPlanningYear(labels), [labels]);
+  const yearBands = useMemo(() => {
+    if (planningYear == null) {
+      return [] as PlotlyAnnotation[];
+    }
+    return buildYearBandAnnotations(labels, planningYear, {
+      history: (year) => t('planner.slope.yearHistory', { year: String(year) }),
+      planning: (year) => t('planner.slope.yearPlanning', { year: String(year) }),
+    });
+  }, [labels, planningYear, t]);
+
+  const endMarker = isVisible('plan') ? planEndMarkerTrace(labels, planYs) : null;
 
   // Fact = black; plan future = blue; sim = grey dash + diamond (readable when values overlap).
   const data = [
@@ -161,7 +176,11 @@ export function SlopeMonthlyPanel({
             name: t('planner.slope.plan'),
             legendgroup: 'plan',
             line: { color: '#1565c0', width: 2 },
-            marker: { size: 8, color: '#1565c0', symbol: 'circle' as const },
+            marker: {
+              size: 8,
+              color: '#1565c0',
+              symbol: 'circle' as const,
+            },
             connectgaps: false,
             hovertemplate: HERO_HOVER_TEMPLATE,
           },
@@ -215,6 +234,7 @@ export function SlopeMonthlyPanel({
           },
         ]
       : []),
+    ...(endMarker != null ? [endMarker] : []),
   ];
 
   return (
@@ -223,10 +243,51 @@ export function SlopeMonthlyPanel({
       sx={{ flex: '1 1 0', minHeight: 0, height: '100%', width: '100%' }}
       data-testid="slope-panel-monthly"
     >
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0, px: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flex: 1, minWidth: 0 }} noWrap>
-          {t('planner.slope.panelMonthly')}
-        </Typography>
+      <Stack
+        direction="row"
+        alignItems="baseline"
+        spacing={1}
+        sx={{ flexShrink: 0, px: 0.5, minHeight: 28 }}
+      >
+        <Stack
+          direction="row"
+          alignItems="baseline"
+          spacing={0.75}
+          useFlexGap
+          sx={{ flex: 1, minWidth: 0 }}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ flexShrink: 0, fontWeight: 700, lineHeight: 1.2 }}
+            noWrap
+          >
+            {t('planner.slope.panelMonthly')}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid="slope-monthly-meta"
+            sx={{ minWidth: 0, fontSize: '0.7rem', lineHeight: 1.2 }}
+            noWrap
+          >
+            {t('planner.slope.panelMonthlyMeta', { metric: yAxisTitle })}
+          </Typography>
+        </Stack>
+        {endOutcome != null ? (
+          <Typography
+            variant="caption"
+            data-testid="slope-monthly-outcome"
+            sx={{
+              flexShrink: 0,
+              fontWeight: 700,
+              color: '#1565c0',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.2,
+            }}
+          >
+            {t('planner.slope.endPlan', { value: endOutcome })}
+          </Typography>
+        ) : null}
         <ToggleButton
           size="small"
           value="legend"
@@ -240,7 +301,7 @@ export function SlopeMonthlyPanel({
         </ToggleButton>
       </Stack>
       {legendOpen ? (
-        <Box sx={{ flexShrink: 0 }}>
+        <Box sx={{ flexShrink: 0, minHeight: 16 }}>
           <EvaluationLegend
             items={SLOPE_MONTHLY_LEGEND}
             testId="slope-monthly-legend"
@@ -275,12 +336,18 @@ export function SlopeMonthlyPanel({
                 plotWidth: plotMinWidth,
                 plotHeight,
                 shapes,
-                annotations,
+                annotations: [...cutoverAnnotations, ...yearBands],
+                tickvals: labels,
+                ticktext,
+                bottomMargin: 36,
               }),
+              dragmode: 'zoom',
               yaxis: {
-                title: { text: yAxisTitle },
-                range: fitY.range,
+                range: yRange,
                 ticksuffix: '%',
+                tickfont: { size: 10, color: '#757575' },
+                gridcolor: 'rgba(0,0,0,0.08)',
+                zeroline: false,
                 ...HERO_Y_SPIKES,
               },
             }}

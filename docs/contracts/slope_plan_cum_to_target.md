@@ -30,6 +30,9 @@
 
 ## Non-goals (this experiment)
 
-- Changing backend `monthly_target` / Save Plan freeze payload
 - Smooth / trajectory_power variants (linear only)
 - TTS planner parity
+
+## Follow-up
+
+- Save of edited pin paths: see [`slope_plan_point_drag.md`](slope_plan_point_drag.md) Phase 2 (Option A client monthlies).

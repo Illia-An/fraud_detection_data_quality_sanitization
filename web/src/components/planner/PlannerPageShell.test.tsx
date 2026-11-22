@@ -102,7 +102,7 @@ describe('PlannerAtRiskDock', () => {
     expect(dock).toContainElement(screen.getByTestId('table-slot'));
   });
 
-  it('reports expand changes from the summary', () => {
+  it('reports expand changes from the overlay summary', () => {
     const onExpandedChange = vi.fn();
     renderWithTheme(
       <PlannerAtRiskDock
@@ -117,6 +117,66 @@ describe('PlannerAtRiskDock', () => {
       </PlannerAtRiskDock>,
     );
     fireEvent.click(screen.getByRole('button'));
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+  });
+
+  it('marks flow placement for in-page At-risk section', () => {
+    renderWithTheme(
+      <PlannerAtRiskDock
+        placement="flow"
+        testId="dock"
+        onboardingId="dock-onboarding"
+        expanded
+        onExpandedChange={() => {}}
+        behindCount={0}
+        aheadCount={0}
+      >
+        <div data-testid="table-slot">table</div>
+      </PlannerAtRiskDock>,
+    );
+    const dock = screen.getByTestId('dock');
+    expect(dock).toHaveAttribute('data-placement', 'flow');
+    expect(dock).toHaveAttribute('data-expanded', 'true');
+    expect(dock).toHaveStyle({ height: '300px' });
+    expect(screen.getByTestId('dock-scroll')).toBeInTheDocument();
+  });
+
+  it('collapses flow At-risk to the summary bar height', () => {
+    renderWithTheme(
+      <PlannerAtRiskDock
+        placement="flow"
+        testId="dock"
+        onboardingId="dock-onboarding"
+        expanded={false}
+        onExpandedChange={() => {}}
+        behindCount={0}
+        aheadCount={0}
+      >
+        <div>table</div>
+      </PlannerAtRiskDock>,
+    );
+    const dock = screen.getByTestId('dock');
+    expect(dock).toHaveAttribute('data-expanded', 'false');
+    expect(dock).toHaveStyle({ height: '52px' });
+    expect(screen.queryByTestId('dock-scroll')).not.toBeInTheDocument();
+  });
+
+  it('toggles flow At-risk from the header button', () => {
+    const onExpandedChange = vi.fn();
+    renderWithTheme(
+      <PlannerAtRiskDock
+        placement="flow"
+        testId="dock"
+        onboardingId="dock-onboarding"
+        expanded={false}
+        onExpandedChange={onExpandedChange}
+        behindCount={1}
+        aheadCount={2}
+      >
+        <div>table</div>
+      </PlannerAtRiskDock>,
+    );
+    fireEvent.click(screen.getByTestId('dock-toggle'));
     expect(onExpandedChange).toHaveBeenCalledWith(true);
   });
 });

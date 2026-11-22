@@ -44,50 +44,59 @@ test.describe('Planner alt-UI smoke', () => {
     });
 
     await expect(page.getByTestId('planner-save-plan')).toBeVisible();
+    // Excel lives under collapsed Export & download disclosure (Figma footer).
+    await page.getByTestId('planner-export-disclosure').click();
     await expect(page.getByTestId('planner-export-excel')).toBeVisible();
 
     await page.getByRole('button', { name: /Run simulation/i }).click();
 
     await expect(page.getByTestId('planner-glance-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Projected network KPI/i)).toBeVisible();
-    await expect(page.getByText(/Hero evaluation/i)).toBeVisible();
-    // Slope is the only network Hero (Legacy toggle removed).
-    await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
+    // Network Slope is two stacked panels (not CumulativeSlopeHeroChart wrapper).
+    await expect(page.getByTestId('planner-slope-cumulative')).toBeVisible({
       timeout: 60_000,
     });
+    await expect(page.getByTestId('planner-slope-monthly')).toBeVisible();
     await expect(page.getByTestId('planner-save-plan')).toBeEnabled({ timeout: 60_000 });
     await expect(page.getByTestId('planner-hero-view-mode')).toHaveCount(0);
 
-    // At-risk is a collapsed bottom overlay — expand before asserting the table.
-    await page.getByText(/At-Risk Exception List/i).click();
+    // At-risk is a second full viewport (no accordion expand).
+    await page.getByTestId('planner-screen-atrisk').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('planner-at-risk-sheet')).toBeVisible();
-    await expect(page.getByTestId('atrisk-exception-table')).toBeVisible();
+    // Exception table lives in atrisk-exception-panel (section root is planner-at-risk-sheet).
+    await expect(page.getByTestId('atrisk-exception-panel')).toBeVisible();
 
     // Default filter is Behind Plan Only — may be empty on synthetic; open All Stores.
     await page.locator('#atrisk-filter-select').click();
     await page.getByRole('option', { name: /All Stores/i }).click();
     const inspect = page
-      .getByTestId('atrisk-exception-table')
+      .getByTestId('atrisk-exception-panel')
       .getByRole('button', { name: /^Inspect$/i })
       .first();
     await expect(inspect).toBeVisible({ timeout: 15_000 });
-    // Native DOM click — force:true did not open the drawer in CI Linux Chromium.
+    // Native DOM click — force:true did not navigate in CI Linux Chromium.
     // Cast avoids HTMLElement (tsconfig.node has no DOM lib).
     await inspect.evaluate((el) => (el as { click: () => void }).click());
 
-    const dialog = page.getByTestId('store-inspect-dialog');
-    await expect(dialog).toBeVisible({ timeout: 15_000 });
-    await expect(dialog.getByText(/Inspect/i).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/planner\/store\/\d+/, { timeout: 15_000 });
+    const inspectPage = page.getByTestId('store-inspect-page');
+    await expect(inspectPage).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('inspect-store-select')).toBeVisible();
     await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
-    // After Run, Inspect uses Slope store layers (not legacy store-hero-evaluation-chart).
-    await expect(dialog.getByTestId('cumulative-slope-hero-chart')).toBeVisible();
+    await expect(page.getByTestId('inspect-open-sandbox')).toBeVisible();
+    // After Run, Inspect uses Slope store layers (same charts as network screen 1).
+    await expect(page.getByTestId('store-inspect-slope-cumulative')).toBeVisible();
+    await page.getByTestId('inspect-open-sandbox').click();
+    await expect(page.getByTestId('inspect-sandbox-dialog')).toBeVisible();
+    await expect(page.getByTestId('inspect-sandbox-panel')).toBeVisible();
+    await expect(page.getByTestId('inspect-recalculate')).toBeVisible();
 
-    // Estimate funnel is collapsed by default.
-    await dialog.getByRole('button', { name: /Estimate vs actual/i }).click();
-    await expect(dialog.getByTestId('inspect-recalculate')).toBeVisible();
+    // Dialog modal intercepts clicks on the page chrome — close first.
+    await page.getByTestId('inspect-sandbox-dialog-close').click();
+    await expect(page.getByTestId('inspect-sandbox-dialog')).toHaveCount(0);
 
-    await dialog.locator('.MuiDialogActions-root').getByRole('button', { name: 'Close' }).click();
-    await expect(page.getByTestId('store-inspect-dialog')).toHaveCount(0);
+    await page.getByTestId('store-inspect-back').click();
+    await expect(page).toHaveURL(/\/planner$/);
+    await expect(page.getByTestId('store-inspect-page')).toHaveCount(0);
   });
 });

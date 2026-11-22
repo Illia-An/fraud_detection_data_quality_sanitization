@@ -1,11 +1,10 @@
 import {
-  Alert,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   Stack,
-  Typography,
 } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -43,6 +42,12 @@ import {
   formatScore as formatScoreValue,
   scoreDisplayForUnit,
 } from './storeAudit/storeAuditFormat';
+import {
+  FIGMA_INSPECT_PADDING_PX,
+  FIGMA_INSPECT_SECTION_GAP_PX,
+  FIGMA_INSPECT_SIDE_GUTTER_PX,
+  FIGMA_INSPECT_VERTICAL_GUTTER_PX,
+} from './figmaPlannerLayout';
 import { INSPECT_DIALOG_PAPER_MAX_PX } from './storeAudit/storeAuditLayout';
 
 type InspectPanel = MetricScorePanel & {
@@ -73,6 +78,11 @@ interface StoreAuditDrawerProps<T extends DirectedPlan = DirectedPlan> {
   boostGlance?: StoreBoostGlance | null;
   /** Live Slope simulation — when present, Inspect uses dual-panel Slope chart. */
   slopeSimulation?: SimulationResponse | null;
+  /**
+   * Atomic Slope pin-draft store plan (same package as network Hero).
+   * When set, Inspect Plan must use this — never stale allocate beside new network.
+   */
+  slopeStorePlanOverride?: { planYs: (number | null)[]; planCumYs: (number | null)[] } | null;
   /** Store evaluation Y-axis title. Default keeps the 5% planner label. */
   yAxisTitle?: string;
   /** Appended to store evaluation tick labels. Default `%`. */
@@ -100,6 +110,7 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   unreachableApplyPending = false,
   boostGlance = null,
   slopeSimulation = null,
+  slopeStorePlanOverride = null,
   yAxisTitle,
   tickSuffix,
 }: StoreAuditDrawerProps<T>) {
@@ -112,9 +123,13 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
   const slopeLayers = useMemo(
     () =>
       slopeSimulation != null
-        ? buildStoreCumulativeSlopeLayers(slopeSimulation, storeId)
+        ? buildStoreCumulativeSlopeLayers(
+            slopeSimulation,
+            storeId,
+            slopeStorePlanOverride,
+          )
         : null,
-    [slopeSimulation, storeId],
+    [slopeSimulation, storeId, slopeStorePlanOverride],
   );
   const slopeAlign = useMemo(
     () => (slopeLayers != null ? buildInspectSlopeAlign(slopeLayers) : null),
@@ -273,12 +288,22 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
       maxWidth={false}
       scroll="paper"
       data-testid="store-inspect-dialog"
+      slotProps={{
+        backdrop: { sx: { bgcolor: 'rgba(0,0,0,0.35)' } },
+      }}
       PaperProps={{
         sx: {
-          height: { xs: '100%', md: '90vh' },
-          maxHeight: { xs: '100%', md: '90vh' },
-          m: { xs: 0, md: 2 },
-          width: { xs: '100%', md: 'calc(100% - 32px)' },
+          // Figma §4.1 / §5.2 — centered, capped 1600, gutters from viewport.
+          height: { xs: '100%', md: 'auto' },
+          maxHeight: {
+            xs: '100%',
+            md: `calc(100dvh - ${FIGMA_INSPECT_VERTICAL_GUTTER_PX * 2}px)`,
+          },
+          m: { xs: 0, md: `${FIGMA_INSPECT_VERTICAL_GUTTER_PX}px auto` },
+          width: {
+            xs: '100%',
+            md: `min(${INSPECT_DIALOG_PAPER_MAX_PX}px, calc(100vw - ${FIGMA_INSPECT_SIDE_GUTTER_PX * 2}px))`,
+          },
           maxWidth: { md: INSPECT_DIALOG_PAPER_MAX_PX },
           display: 'flex',
           flexDirection: 'column',
@@ -301,12 +326,12 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          gap: 0,
-          py: 1.5,
-          px: 2,
+          gap: `${FIGMA_INSPECT_SECTION_GAP_PX}px`,
+          py: `${FIGMA_INSPECT_PADDING_PX}px`,
+          px: `${FIGMA_INSPECT_PADDING_PX}px`,
           flex: 1,
           minHeight: 0,
-          overflow: 'hidden',
+          overflow: 'auto',
         }}
       >
         <InspectStoreGlance
@@ -318,31 +343,33 @@ export function StoreAuditDrawer<T extends DirectedPlan>({
           slopeAlign={slopeAlign}
         />
         {boostGlance != null ? (
-          <Alert
-            severity="info"
-            variant="outlined"
+          <Stack
+            direction="row"
+            spacing={1}
+            flexWrap="wrap"
+            useFlexGap
             data-testid="inspect-boost-glance"
-            sx={{ flexShrink: 0, mb: 1, py: 0.5 }}
+            sx={{ flexShrink: 0, mb: 1 }}
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-              {t('planner.inspect.boostTitle')}
-            </Typography>
-            <Stack direction="row" spacing={1.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.25 }}>
-              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {t('planner.inspect.boostGap', {
-                  gap: boostGlance.gapToMean.toFixed(1),
-                })}
-              </Typography>
-              <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {t('planner.inspect.boostSlope', {
-                  slope: boostGlance.slope.toFixed(2),
-                })}
-              </Typography>
-            </Stack>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-              {t('planner.inspect.boostHint')}
-            </Typography>
-          </Alert>
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('planner.inspect.boostGap', {
+                gap: boostGlance.gapToMean.toFixed(1),
+              })}
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            />
+            <Chip
+              size="small"
+              variant="outlined"
+              color="info"
+              label={t('planner.inspect.boostSlope', {
+                slope: boostGlance.slope.toFixed(2),
+              })}
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            />
+          </Stack>
         ) : null}
         {unreachableHint != null && onApplyUnreachableSuggestion != null ? (
           <UnreachableRecommendationCard

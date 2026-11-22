@@ -65,6 +65,24 @@ class NetworkPlanParamsIn(BaseModel):
         )
 
 
+class MonthScoreIn(BaseModel):
+    year: int = Field(ge=2000, le=2100)
+    month: int = Field(ge=1, le=12)
+    score: float = Field(ge=0.0, le=100.0)
+
+    def to_domain(self):
+        from planner.cumulative_slope.types import MonthScore
+
+        return MonthScore(year=self.year, month=self.month, score=self.score)
+
+
+class StoreMonthlyTargetIn(BaseModel):
+    """Client-edited store plan monthlies (Phase 2 pin Save — Option A)."""
+
+    store_id: int
+    monthly_target: list[MonthScoreIn] = Field(min_length=1)
+
+
 class PlanVersionCreateRequest(BaseModel):
     label: str | None = None
     network_target: float = Field(default=75.0, ge=0.0, le=100.0)
@@ -74,6 +92,8 @@ class PlanVersionCreateRequest(BaseModel):
     solver: Literal["cumulative_slope"] = "cumulative_slope"
     params: NetworkPlanParamsIn = Field(default_factory=NetworkPlanParamsIn)
     facts: list[StoreMonthFactIn] = Field(min_length=1)
+    """When set, freeze these monthlies instead of simulator slopes (pin draft Save)."""
+    store_monthly_targets: list[StoreMonthlyTargetIn] | None = None
 
     @model_validator(mode="after")
     def _reject_empty_label_whitespace(self) -> PlanVersionCreateRequest:

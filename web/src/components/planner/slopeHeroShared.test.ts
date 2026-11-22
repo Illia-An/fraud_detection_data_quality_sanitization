@@ -37,11 +37,11 @@ describe('splitSeriesAtAsOf', () => {
 
 describe('asOfShapes', () => {
   it('returns a vertical line and optional annotation at the cutover label', () => {
-    const { shapes, annotations } = asOfShapes('2026-01', true, 'fact→plan/forecast');
+    const { shapes, annotations } = asOfShapes('2026-01', true, '2026-01 cutover');
     expect(shapes).toHaveLength(1);
     expect(shapes[0].x0).toBe('2026-01');
     expect(annotations).toHaveLength(1);
-    expect(annotations[0].text).toBe('fact→plan/forecast');
+    expect(annotations[0].text).toBe('2026-01 cutover');
   });
 
   it('hides shapes when not visible', () => {

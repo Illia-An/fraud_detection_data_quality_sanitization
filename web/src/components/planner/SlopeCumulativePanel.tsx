@@ -1,6 +1,6 @@
 /** Cumulative path panel — planning-year plan vs actual/sim (fair compare). */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, ToggleButton, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
@@ -10,9 +10,15 @@ import { EvaluationLegend } from './EvaluationLegend';
 import { HERO_HOVER_TEMPLATE, HERO_Y_SPIKES } from './heroChartCrosshair';
 import { HERO_PX_PER_PERIOD } from './HeroSimulationChart';
 import {
+  buildYearBandAnnotations,
+  formatSlopeTickLabels,
+  inferPlanningYear,
+} from './slopeAxisFormat';
+import {
   asOfShapes,
   buildSlopePlotLayout,
   lastFinitePoint,
+  planEndMarkerTrace,
   SLOPE_CUMULATIVE_DEFAULT_HIDDEN,
   SLOPE_CUMULATIVE_LEGEND,
   SLOPE_PANEL_MIN_HEIGHT_PX,
@@ -20,6 +26,7 @@ import {
   splitSeriesAtAsOf,
   type PlotlyAnnotation,
 } from './slopeHeroShared';
+import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeCumulativePanelProps {
   layers: CumulativeSlopePlotLayers;
@@ -31,10 +38,8 @@ export function SlopeCumulativePanel({
   yAxisTitle = '5% Score',
 }: SlopeCumulativePanelProps) {
   const t = useT();
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [plotWidth, setPlotWidth] = useState(0);
-  const [hostHeight, setHostHeight] = useState(0);
-  const [legendOpen, setLegendOpen] = useState(true);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_CUMULATIVE_DEFAULT_HIDDEN),
   );
@@ -49,19 +54,6 @@ export function SlopeCumulativePanel({
   }, []);
 
   const isVisible = useCallback((id: string) => !hiddenIds.has(id), [hiddenIds]);
-
-  useEffect(() => {
-    const node = hostRef.current;
-    if (!node || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect;
-      if (!rect) return;
-      setPlotWidth(Math.max(0, Math.floor(rect.width)));
-      setHostHeight(Math.max(0, Math.floor(rect.height)));
-    });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   const {
     labels,
@@ -93,7 +85,9 @@ export function SlopeCumulativePanel({
     [isVisible, planCumYs, cumActualSimYtdYs, cumActualSimYs, requiredCumulativeYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
-  const cutoverAnn = t('planner.slope.cutoverLine');
+  const yRange = useFrozenYRange(false, fitY.range as [number, number] | undefined);
+  const cutoverMonth = cutover.factEndLabel ?? cutover.lineLabel;
+  const cutoverAnn = t('planner.slope.cutoverLine', { month: cutoverMonth });
   const { shapes, annotations: cutoverAnnotations } = asOfShapes(
     cutover.lineLabel,
     isVisible('asOf'),
@@ -110,54 +104,24 @@ export function SlopeCumulativePanel({
     [cumActualSimYs, splitIdx],
   );
 
-  const eoyAnnotations = useMemo(() => {
-    const out: PlotlyAnnotation[] = [];
-    const fmt = (n: number) => n.toFixed(1);
-    if (isVisible('planCum')) {
-      const pt = lastFinitePoint(labels, planCumYs);
-      if (pt) {
-        out.push({
-          x: pt.label,
-          y: pt.value,
-          text: t('planner.slope.eoyPlan', { value: fmt(pt.value) }),
-          showarrow: false,
-          xanchor: 'left',
-          yanchor: 'middle',
-          xshift: 6,
-          font: { size: 10, color: '#1565c0' },
-        });
-      }
+  const eoyOutcome = useMemo(() => {
+    const pt = lastFinitePoint(labels, planCumYs);
+    return pt != null ? pt.value.toFixed(1) : null;
+  }, [labels, planCumYs]);
+
+  const ticktext = useMemo(() => formatSlopeTickLabels(labels), [labels]);
+  const planningYear = useMemo(() => inferPlanningYear(labels), [labels]);
+  const yearBands = useMemo(() => {
+    if (planningYear == null) {
+      return [] as PlotlyAnnotation[];
     }
-    if (isVisible('cumActualSimYtd')) {
-      const pt = lastFinitePoint(labels, cumActualSimYtdYs);
-      if (pt) {
-        out.push({
-          x: pt.label,
-          y: pt.value,
-          text: t('planner.slope.eoySim', { value: fmt(pt.value) }),
-          showarrow: false,
-          xanchor: 'left',
-          yanchor: 'top',
-          xshift: 6,
-          yshift: -2,
-          font: { size: 10, color: '#455a64' },
-        });
-      }
-    }
-    if (isVisible('target') && labels.length > 0) {
-      out.push({
-        x: labels[labels.length - 1],
-        y: target,
-        text: t('planner.slope.eoyTarget', { value: fmt(target) }),
-        showarrow: false,
-        xanchor: 'left',
-        yanchor: 'bottom',
-        xshift: 6,
-        font: { size: 10, color: '#c62828' },
-      });
-    }
-    return out;
-  }, [isVisible, labels, planCumYs, cumActualSimYtdYs, target, t]);
+    return buildYearBandAnnotations(labels, planningYear, {
+      history: (year) => t('planner.slope.yearHistory', { year: String(year) }),
+      planning: (year) => t('planner.slope.yearPlanning', { year: String(year) }),
+    });
+  }, [labels, planningYear, t]);
+
+  const endMarker = isVisible('planCum') ? planEndMarkerTrace(labels, planCumYs) : null;
 
   const data = [
     ...(isVisible('planCum')
@@ -175,6 +139,7 @@ export function SlopeCumulativePanel({
           },
         ]
       : []),
+    ...(endMarker != null ? [endMarker] : []),
     ...(isVisible('cumActualSimYtd')
       ? [
           {
@@ -269,10 +234,51 @@ export function SlopeCumulativePanel({
       sx={{ flex: '1 1 0', minHeight: 0, height: '100%', width: '100%' }}
       data-testid="slope-panel-cumulative"
     >
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0, px: 0.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ flex: 1, minWidth: 0 }} noWrap>
-          {t('planner.slope.panelCumulative')}
-        </Typography>
+      <Stack
+        direction="row"
+        alignItems="baseline"
+        spacing={1}
+        sx={{ flexShrink: 0, px: 0.5, minHeight: 28 }}
+      >
+        <Stack
+          direction="row"
+          alignItems="baseline"
+          spacing={0.75}
+          useFlexGap
+          sx={{ flex: 1, minWidth: 0 }}
+        >
+          <Typography
+            variant="subtitle2"
+            sx={{ flexShrink: 0, fontWeight: 700, lineHeight: 1.2 }}
+            noWrap
+          >
+            {t('planner.slope.panelCumulative')}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            data-testid="slope-cumulative-meta"
+            sx={{ minWidth: 0, fontSize: '0.7rem', lineHeight: 1.2 }}
+            noWrap
+          >
+            {t('planner.slope.panelCumulativeMeta', { metric: yAxisTitle })}
+          </Typography>
+        </Stack>
+        {eoyOutcome != null ? (
+          <Typography
+            variant="caption"
+            data-testid="slope-cumulative-outcome"
+            sx={{
+              flexShrink: 0,
+              fontWeight: 700,
+              color: '#1565c0',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.2,
+            }}
+          >
+            {t('planner.slope.eoyPlan', { value: eoyOutcome })}
+          </Typography>
+        ) : null}
         <ToggleButton
           size="small"
           value="legend"
@@ -286,7 +292,7 @@ export function SlopeCumulativePanel({
         </ToggleButton>
       </Stack>
       {legendOpen ? (
-        <Box sx={{ flexShrink: 0 }}>
+        <Box sx={{ flexShrink: 0, minHeight: 16 }}>
           <EvaluationLegend
             items={SLOPE_CUMULATIVE_LEGEND}
             testId="slope-cumulative-legend"
@@ -321,12 +327,18 @@ export function SlopeCumulativePanel({
                 plotWidth: plotMinWidth,
                 plotHeight,
                 shapes,
-                annotations: [...cutoverAnnotations, ...eoyAnnotations],
+                annotations: [...cutoverAnnotations, ...yearBands],
+                tickvals: labels,
+                ticktext,
+                bottomMargin: 36,
               }),
+              dragmode: 'zoom',
               yaxis: {
-                title: { text: yAxisTitle },
-                range: fitY.range,
+                range: yRange,
                 ticksuffix: '%',
+                tickfont: { size: 10, color: '#757575' },
+                gridcolor: 'rgba(0,0,0,0.08)',
+                zeroline: false,
                 ...HERO_Y_SPIKES,
               },
             }}

@@ -27,7 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useLoadTtsKpiFromAp, useTtsPlan } from '../api/hooks';
 import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
-import { AtRiskDeltaTable } from '../components/planner/AtRiskDeltaTable';
+import { AtRiskPanelsSection } from '../components/planner/AtRiskPanelsSection';
 import { HeroSimulationChart } from '../components/planner/HeroSimulationChart';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
 import { ScenarioPackCards } from '../components/planner/ScenarioPackCards';
@@ -57,11 +57,6 @@ import {
   TTS_PLAN_TARGET_MAX,
   TTS_PLAN_TARGET_MIN,
 } from '../schemas/ttsPlan';
-import {
-  PLANNER_AT_RISK_GAP_PX,
-  PLANNER_AT_RISK_SUMMARY_RESERVE_PX,
-} from '../components/planner/plannerShell';
-import { PlannerAtRiskDock } from '../components/planner/PlannerAtRiskDock';
 import { PlannerPageShell } from '../components/planner/PlannerPageShell';
 import { useAnswerShell } from '../components/planner/useAnswerShell';
 import { usePlannerOnboardingShell } from '../components/planner/usePlannerOnboardingShell';
@@ -145,7 +140,8 @@ export function TtsPlannerPage() {
   } = useAnswerShell<TtsPlan, TtsPlanParams>();
   const [asOfYear, setAsOfYear] = useState<number | null>(null);
   const [asOfMonth, setAsOfMonth] = useState<number | null>(null);
-  const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+  /** Onboarding still toggles this; panels are always visible (no accordion). */
+  const [, setAtRiskExpanded] = useState(false);
   const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
 
   // Expand/collapse rail & At-risk so tour targets stay visible without covering Hero on Back.
@@ -812,10 +808,6 @@ export function TtsPlannerPage() {
                   minHeight: 320,
                   display: 'flex',
                   overflow: 'hidden',
-                  pb:
-                    monitoring != null
-                      ? { md: `${PLANNER_AT_RISK_SUMMARY_RESERVE_PX + PLANNER_AT_RISK_GAP_PX}px` }
-                      : 0,
                 }}
               >
                 <Card
@@ -878,37 +870,30 @@ export function TtsPlannerPage() {
                 </Card>
               </Box>
 
-              {monitoring && (
-                <PlannerAtRiskDock
+              {monitoring ? (
+                <AtRiskPanelsSection
                   testId="tts-planner-at-risk"
                   onboardingId="tts-planner-at-risk"
-                  expanded={atRiskExpanded}
-                  onExpandedChange={setAtRiskExpanded}
-                  behindCount={monitoring.summary.behind}
-                  aheadCount={monitoring.summary.ahead}
-                >
-                      <AtRiskDeltaTable
-                        plan={draftPlan}
-                        approvedPlan={approvedPlan}
-                        baselineRows={baselineRows.map((row) => ({
-                          store_id: row.store_id,
-                          tts: row.tts,
-                        }))}
-                        panel={panel}
-                        insights={monitoring}
-                        asOfOptions={draftPlan.chain_trajectory.map((point) => ({
-                          year: point.year,
-                          month: point.month,
-                        }))}
-                        onAsOfChange={(year, month) => {
-                          setAsOfYear(year);
-                          setAsOfMonth(month);
-                        }}
-                        onInspect={(storeId) => selectStore(storeId)}
-                        inspectOnboardingId="tts-planner-inspect"
-                      />
-                </PlannerAtRiskDock>
-              )}
+                  plan={draftPlan}
+                  approvedPlan={approvedPlan}
+                  baselineRows={baselineRows.map((row) => ({
+                    store_id: row.store_id,
+                    tts: row.tts,
+                  }))}
+                  panel={panel}
+                  insights={monitoring}
+                  asOfOptions={draftPlan.chain_trajectory.map((point) => ({
+                    year: point.year,
+                    month: point.month,
+                  }))}
+                  onAsOfChange={(year, month) => {
+                    setAsOfYear(year);
+                    setAsOfMonth(month);
+                  }}
+                  onInspect={(storeId) => selectStore(storeId)}
+                  inspectOnboardingId="tts-planner-inspect"
+                />
+              ) : null}
             </Box>
           </Box>
         ) : (
