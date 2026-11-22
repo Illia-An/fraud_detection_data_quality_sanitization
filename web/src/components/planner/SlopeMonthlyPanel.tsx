@@ -1,6 +1,6 @@
 /** Monthly levels panel — fact · plan · simulation forecast. */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, ToggleButton, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
@@ -25,45 +25,19 @@ import {
   SlopePlot,
   type PlotlyAnnotation,
 } from './slopeHeroShared';
-import { attachSlopePlanDrag } from './slopePlanDrag';
 import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeMonthlyPanelProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
-  planDragEnabled?: boolean;
-  /** Freeze plot size + Y-range (drag preview / allocate) to avoid layout jitter. */
-  layoutFrozen?: boolean;
-  onPlanDragPreview?: (monthIndex: number, value: number) => void;
-  onPlanDragCommit?: (monthIndex: number, value: number) => void;
-  onPlanDragCancel?: () => void;
-  getPlanDragGeneration?: () => number;
 }
 
 export function SlopeMonthlyPanel({
   layers,
   yAxisTitle = '5% Score',
-  planDragEnabled = false,
-  layoutFrozen = false,
-  onPlanDragPreview,
-  onPlanDragCommit,
-  onPlanDragCancel,
-  getPlanDragGeneration,
 }: SlopeMonthlyPanelProps) {
   const t = useT();
-  const graphDivRef = useRef<HTMLElement | null>(null);
-  const dragDisposerRef = useRef<(() => void) | null>(null);
-  const dragHandlersRef = useRef({
-    planDragEnabled,
-    onPlanDragPreview,
-    onPlanDragCommit,
-    onPlanDragCancel,
-    getPlanDragGeneration,
-    labels: [] as string[],
-    planYs: [] as (number | null)[],
-    editableFromIndex: 0,
-  });
-  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(layoutFrozen);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(false);
   const [legendOpen, setLegendOpen] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_MONTHLY_DEFAULT_HIDDEN),
@@ -85,50 +59,6 @@ export function SlopeMonthlyPanel({
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
   const plotHeight = Math.max(SLOPE_PANEL_MIN_HEIGHT_PX, hostHeight || SLOPE_PANEL_MIN_HEIGHT_PX);
   const factEndIdx = cutover.factEndIndex;
-  const editableFromIndex = factEndIdx + 1;
-
-  dragHandlersRef.current = {
-    planDragEnabled,
-    onPlanDragPreview,
-    onPlanDragCommit,
-    onPlanDragCancel,
-    getPlanDragGeneration,
-    labels,
-    planYs,
-    editableFromIndex,
-  };
-
-  const bindPlanDrag = useCallback((gd: HTMLElement) => {
-    graphDivRef.current = gd;
-    if (dragDisposerRef.current) return;
-    dragDisposerRef.current = attachSlopePlanDrag(gd, () => {
-      const h = dragHandlersRef.current;
-      return {
-        labels: h.labels,
-        editableFromIndex: h.editableFromIndex,
-        planYs: h.planYs,
-        onPreview: (monthIndex, value) => h.onPlanDragPreview?.(monthIndex, value),
-        onCommit: (monthIndex, value) => h.onPlanDragCommit?.(monthIndex, value),
-        onCancel: () => h.onPlanDragCancel?.(),
-        getGeneration: h.getPlanDragGeneration,
-      };
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!planDragEnabled) {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-      return;
-    }
-    if (graphDivRef.current && !dragDisposerRef.current) {
-      bindPlanDrag(graphDivRef.current);
-    }
-    return () => {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-    };
-  }, [planDragEnabled, bindPlanDrag]);
 
   // Past plan muted (context); future plan full blue from last fact handoff.
   const planPastYs = useMemo(
@@ -159,10 +89,7 @@ export function SlopeMonthlyPanel({
     [isVisible, actualYs, planYs, simYs, requiredMonthlyYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
-  const yRange = useFrozenYRange(
-    layoutFrozen,
-    fitY.range as [number, number] | undefined,
-  );
+  const yRange = useFrozenYRange(false, fitY.range as [number, number] | undefined);
   const cutoverMonth = cutover.factEndLabel ?? cutover.lineLabel;
   const { shapes, annotations: cutoverAnnotations } = asOfShapes(
     cutover.lineLabel,
@@ -250,13 +177,12 @@ export function SlopeMonthlyPanel({
             legendgroup: 'plan',
             line: { color: '#1565c0', width: 2 },
             marker: {
-              size: planDragEnabled ? 13 : 8,
+              size: 8,
               color: '#1565c0',
               symbol: 'circle' as const,
             },
             connectgaps: false,
             hovertemplate: HERO_HOVER_TEMPLATE,
-            meta: planDragEnabled ? { slopePlanDrag: true } : undefined,
           },
         ]
       : []),
@@ -415,7 +341,7 @@ export function SlopeMonthlyPanel({
                 ticktext,
                 bottomMargin: 36,
               }),
-              dragmode: planDragEnabled ? false : 'zoom',
+              dragmode: 'zoom',
               yaxis: {
                 range: yRange,
                 ticksuffix: '%',
@@ -428,7 +354,6 @@ export function SlopeMonthlyPanel({
             config={{ displayModeBar: false, responsive: true }}
             style={{ width: plotMinWidth, height: plotHeight }}
             useResizeHandler={false}
-            onInitialized={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
           />
         </Suspense>
       </Box>

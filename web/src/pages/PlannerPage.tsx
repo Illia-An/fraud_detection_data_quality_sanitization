@@ -26,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import {
@@ -34,10 +34,7 @@ import {
   useRunSimulation,
   useSavePlanVersion,
 } from '../api/hooks';
-import {
-  AtRiskPanelsSection,
-  AtRiskPendingBanner,
-} from '../components/planner/AtRiskPanelsSection';
+import { AtRiskPanelsSection } from '../components/planner/AtRiskPanelsSection';
 import { activeAnswerLabelKey } from '../components/planner/activeAnswer';
 import { buildNetworkCumulativeSlopeLayers } from '../components/planner/cumulativeSlopeLayers';
 import { SlopeCumulativePanel } from '../components/planner/SlopeCumulativePanel';
@@ -55,7 +52,6 @@ import {
   NETWORK_SLOPE_CHART_GAP_PX,
   PLANNER_ANALYTICS_PADDING_PX,
   PLANNER_ANALYTICS_SECTION_GAP_PX,
-  SLOPE_STATUS_SLOT_MIN_HEIGHT_PX,
 } from '../components/planner/slopeHeroShared';
 import { panelToSimulationFacts } from '../components/planner/panelToSimulationFacts';
 import { PlannerContextStrip } from '../components/planner/PlannerContextStrip';
@@ -103,11 +99,6 @@ import {
   canExportPlanExcel,
   usePlannerExcelExport,
 } from '../components/planner/usePlannerExcelExport';
-import { useSlopePlanDraft } from '../components/planner/useSlopePlanDraft';
-import {
-  overlayDirectedPlanWithSlopePackage,
-  storeMonthlyTargetsFromPackage,
-} from '../components/planner/slopePlanRecompute';
 import { useReferenceSelection } from '../components/planner/useReferenceSelection';
 import { CONTROLS_RAIL_ROUTE, useControlsRailOpen, useUiStore } from '../store/uiStore';
 import {
@@ -148,11 +139,10 @@ export function PlannerPage() {
   const [, setAtRiskExpanded] = useState(false);
   const atRiskScreenRef = useRef<HTMLDivElement | null>(null);
   const { excelExporting, excelExportError, exportExcel } = usePlannerExcelExport();
-  const baselineSlopeLayers = useMemo(
+  const slopeLayers = useMemo(
     () => (slopeSimulation ? buildNetworkCumulativeSlopeLayers(slopeSimulation) : null),
     [slopeSimulation],
   );
-  const slopePlanDraft = useSlopePlanDraft(baselineSlopeLayers, slopeSimulation);
   const [savePlanError, setSavePlanError] = useState(false);
   const [savePlanOk, setSavePlanOk] = useState(false);
 
@@ -237,18 +227,7 @@ export function PlannerPage() {
   const canRun = runBlock == null;
   const runTooltip = runBlock ? t(PLANNER_RUN_BLOCK_MESSAGE_KEYS[runBlock]) : '';
 
-  /** At-risk / monitoring follow Slope allocate package when pins are committed. */
-  const planForMonitoring = useMemo(() => {
-    if (!draftPlan) return null;
-    if (slopePlanDraft.lastGood?.byStore && baselineSlopeLayers) {
-      return overlayDirectedPlanWithSlopePackage(
-        draftPlan,
-        slopePlanDraft.lastGood,
-        baselineSlopeLayers.labels,
-      );
-    }
-    return draftPlan;
-  }, [draftPlan, slopePlanDraft.lastGood, baselineSlopeLayers]);
+  const planForMonitoring = draftPlan;
 
   const monitoring = useMemo(() => {
     if (!planForMonitoring || !panel) {
@@ -259,9 +238,6 @@ export function PlannerPage() {
     const month = asOfMonth ?? fallback.month;
     return buildPlanMonitoringInsights(planForMonitoring, panel, { year, month });
   }, [planForMonitoring, panel, asOfYear, asOfMonth]);
-
-  const atRiskPending =
-    slopePlanDraft.status === 'previewing' || slopePlanDraft.status === 'allocating';
 
   const canApplyStoreMix =
     draftPlan != null &&
@@ -377,7 +353,6 @@ export function PlannerPage() {
       },
       {
         onSuccess: (response) => {
-          slopePlanDraft.resetPins();
           const next = response.metrics.five_percent;
           setDraftFromRun(next);
           setMixNote(null);
@@ -463,21 +438,6 @@ export function PlannerPage() {
       year: asOfYear ?? draftPlan.chain_trajectory[0]?.year ?? effectiveYear ?? new Date().getFullYear(),
       month: asOfMonth ?? draftPlan.chain_trajectory[0]?.month ?? effectiveMonth ?? 1,
     };
-    let storeMonthlyTargets:
-      | { store_id: number; monthly_target: { year: number; month: number; score: number }[] }[]
-      | undefined;
-    if (slopePlanDraft.dirty && slopePlanDraft.lastGood && slopeLayers) {
-      try {
-        storeMonthlyTargets = storeMonthlyTargetsFromPackage(
-          slopePlanDraft.lastGood,
-          slopeLayers.labels,
-          asOf.year,
-        );
-      } catch {
-        setSavePlanError(true);
-        return;
-      }
-    }
     setSavePlanError(false);
     setSavePlanOk(false);
     savePlanMutation.mutate(
@@ -489,16 +449,12 @@ export function PlannerPage() {
         cumulative_start: { year: 2025, month: 1 },
         solver: 'cumulative_slope',
         facts,
-        ...(storeMonthlyTargets != null && storeMonthlyTargets.length > 0
-          ? { store_monthly_targets: storeMonthlyTargets }
-          : {}),
       },
       {
         onSuccess: (version) => {
           setActivePlanVersionId(version.meta.id);
           setSavePlanOk(true);
           acceptDraftAsApproved();
-          slopePlanDraft.resetPins();
           refreshSlopeSimulation({
             networkTarget: target,
             asOf,
@@ -521,23 +477,8 @@ export function PlannerPage() {
   };
 
   const canExportExcel = canExportPlanExcel(draftPlan, panel);
-  const slopeLayers = slopePlanDraft.displayLayers;
-  const getPlanDragGeneration = useCallback(
-    () => slopePlanDraft.generation,
-    [slopePlanDraft.generation],
-  );
   const canSavePlan =
-    draftPlan != null &&
-    panel != null &&
-    panelToSimulationFacts(panel).length > 0 &&
-    slopePlanDraft.status !== 'previewing' &&
-    slopePlanDraft.status !== 'allocating';
-
-  // Spec L4: UI target change cancels unfinished pin draft (sim target updates on Run).
-  useEffect(() => {
-    slopePlanDraft.resetPins();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when target number changes
-  }, [target]);
+    draftPlan != null && panel != null && panelToSimulationFacts(panel).length > 0;
   const unreachableCount = slopeSimulation?.unreachable.length ?? 0;
   const unreachableStoreIds = useMemo(() => {
     if (!slopeSimulation?.unreachable.length) {
@@ -961,11 +902,7 @@ export function PlannerPage() {
               <Stack direction="row" spacing={`${FIGMA_CONTROLS_FIELD_GAP_PX}px`}>
                 <Tooltip
                   title={
-                    slopePlanDraft.dirty
-                      ? t('planner.savePlanWithPinsTip')
-                      : canSavePlan
-                        ? t('planner.savePlanTip')
-                        : t('planner.savePlanDisabledTip')
+                    canSavePlan ? t('planner.savePlanTip') : t('planner.savePlanDisabledTip')
                   }
                 >
                   <span style={{ flex: 1 }}>
@@ -1281,63 +1218,6 @@ export function PlannerPage() {
                 }}
               >
                 <Box
-                  data-testid="slope-plan-status-slot"
-                  sx={{
-                    flexShrink: 0,
-                    minHeight:
-                      slopeLayers &&
-                      (slopePlanDraft.error ||
-                        slopePlanDraft.status === 'allocating' ||
-                        slopePlanDraft.dirty)
-                        ? SLOPE_STATUS_SLOT_MIN_HEIGHT_PX
-                        : 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'flex-end',
-                  }}
-                >
-                  {slopeLayers && slopePlanDraft.error ? (
-                    <Alert
-                      severity="warning"
-                      sx={{ py: 0.25 }}
-                      data-testid="slope-plan-error-banner"
-                    >
-                      {t('planner.slope.pinError', {
-                        code: slopePlanDraft.error.code,
-                        reason: slopePlanDraft.error.reason,
-                      })}
-                    </Alert>
-                  ) : slopeLayers && slopePlanDraft.status === 'allocating' ? (
-                    <Alert
-                      severity="info"
-                      sx={{ py: 0.25 }}
-                      icon={<CircularProgress size={16} />}
-                      data-testid="slope-plan-allocating-banner"
-                    >
-                      {t('planner.slope.allocating')}
-                    </Alert>
-                  ) : slopeLayers && slopePlanDraft.dirty ? (
-                    <Alert
-                      severity="info"
-                      sx={{ py: 0.25 }}
-                      action={
-                        <Button
-                          color="inherit"
-                          size="small"
-                          onClick={() => slopePlanDraft.resetPins()}
-                          data-testid="slope-plan-reset"
-                        >
-                          {t('planner.slope.resetPins')}
-                        </Button>
-                      }
-                      data-testid="slope-plan-dirty-banner"
-                    >
-                      {t('planner.slope.pinsDirty')}
-                    </Alert>
-                  ) : null}
-                </Box>
-
-                <Box
                   data-testid="planner-slope-chart-stack"
                   sx={{
                     flex: 1,
@@ -1377,22 +1257,7 @@ export function PlannerPage() {
                       }}
                     >
                       {slopeLayers ? (
-                        <SlopeCumulativePanel
-                          layers={slopeLayers}
-                          planDragEnabled
-                          layoutFrozen={
-                            slopePlanDraft.status === 'previewing' ||
-                            slopePlanDraft.status === 'allocating'
-                          }
-                          onPlanDragPreview={(monthIndex, value) =>
-                            slopePlanDraft.previewDrag('cumulative', monthIndex, value)
-                          }
-                          onPlanDragCommit={(monthIndex, value) =>
-                            slopePlanDraft.endDrag('cumulative', monthIndex, value)
-                          }
-                          onPlanDragCancel={() => slopePlanDraft.cancelDrag()}
-                          getPlanDragGeneration={getPlanDragGeneration}
-                        />
+                        <SlopeCumulativePanel layers={slopeLayers} />
                       ) : (
                         <Stack
                           spacing={0.5}
@@ -1436,22 +1301,7 @@ export function PlannerPage() {
                       }}
                     >
                       {slopeLayers ? (
-                        <SlopeMonthlyPanel
-                          layers={slopeLayers}
-                          planDragEnabled
-                          layoutFrozen={
-                            slopePlanDraft.status === 'previewing' ||
-                            slopePlanDraft.status === 'allocating'
-                          }
-                          onPlanDragPreview={(monthIndex, value) =>
-                            slopePlanDraft.previewDrag('monthly', monthIndex, value)
-                          }
-                          onPlanDragCommit={(monthIndex, value) =>
-                            slopePlanDraft.endDrag('monthly', monthIndex, value)
-                          }
-                          onPlanDragCancel={() => slopePlanDraft.cancelDrag()}
-                          getPlanDragGeneration={getPlanDragGeneration}
-                        />
+                        <SlopeMonthlyPanel layers={slopeLayers} />
                       ) : (
                         <Stack
                           spacing={0.5}
@@ -1503,11 +1353,6 @@ export function PlannerPage() {
                   }}
                   onInspect={openStoreInspect}
                   unreachableStoreIds={unreachableStoreIds}
-                  pendingBanner={
-                    atRiskPending ? (
-                      <AtRiskPendingBanner message={t('planner.slope.atRiskPending')} />
-                    ) : null
-                  }
                 />
               </Box>
             ) : null}

@@ -80,9 +80,12 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(inspectPage).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('inspect-store-select')).toBeVisible();
     await expect(page.getByTestId('inspect-sandbox-warn')).toBeVisible();
-    await expect(page.getByTestId('inspect-sandbox-panel')).toBeVisible();
+    await expect(page.getByTestId('inspect-open-sandbox')).toBeVisible();
     // After Run, Inspect uses Slope store layers (same charts as network screen 1).
     await expect(page.getByTestId('store-inspect-slope-cumulative')).toBeVisible();
+    await page.getByTestId('inspect-open-sandbox').click();
+    await expect(page.getByTestId('inspect-sandbox-dialog')).toBeVisible();
+    await expect(page.getByTestId('inspect-sandbox-panel')).toBeVisible();
     await expect(page.getByTestId('inspect-recalculate')).toBeVisible();
 
     await page.getByTestId('store-inspect-back').click();

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ThemeProvider } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -91,13 +91,18 @@ describe('StoreInspectPage', () => {
     useUiStore.setState({ processResult: sampleResult });
   });
 
-  it('renders store inspect with glance and estimate sandbox', () => {
+  it('renders store inspect with glance and opens estimate sandbox dialog', () => {
     renderAt('/planner/store/10');
     expect(screen.getByTestId('store-inspect-page')).toBeInTheDocument();
     expect(screen.getByTestId('store-inspect-back')).toBeInTheDocument();
     expect(screen.getByTestId('inspect-store-glance')).toBeInTheDocument();
-    expect(screen.getByTestId('inspect-sandbox-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('inspect-open-sandbox')).toBeInTheDocument();
+    expect(screen.queryByTestId('inspect-sandbox-panel')).not.toBeInTheDocument();
     expect(screen.getByTestId('store-inspect-need-sim')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('inspect-open-sandbox'));
+    expect(screen.getByTestId('inspect-sandbox-dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('inspect-sandbox-panel')).toBeInTheDocument();
   });
 
   it('redirects to planner when there is no draft', () => {

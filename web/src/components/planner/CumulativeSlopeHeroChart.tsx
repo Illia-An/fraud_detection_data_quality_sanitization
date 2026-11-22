@@ -21,26 +21,11 @@ export {
 interface CumulativeSlopeHeroChartProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
-  /** Phase-1: drag Plan points (live recompute via parent draft). */
-  planDragEnabled?: boolean;
-  onCumulativePlanDragPreview?: (monthIndex: number, value: number) => void;
-  onCumulativePlanDragCommit?: (monthIndex: number, value: number) => void;
-  onMonthlyPlanDragPreview?: (monthIndex: number, value: number) => void;
-  onMonthlyPlanDragCommit?: (monthIndex: number, value: number) => void;
-  onPlanDragCancel?: () => void;
-  getPlanDragGeneration?: () => number;
 }
 
 export function CumulativeSlopeHeroChart({
   layers,
   yAxisTitle = '5% Score',
-  planDragEnabled = false,
-  onCumulativePlanDragPreview,
-  onCumulativePlanDragCommit,
-  onMonthlyPlanDragPreview,
-  onMonthlyPlanDragCommit,
-  onPlanDragCancel,
-  getPlanDragGeneration,
 }: CumulativeSlopeHeroChartProps) {
   const t = useT();
   const { cutover, target } = layers;
@@ -78,16 +63,6 @@ export function CumulativeSlopeHeroChart({
       >
         {t('planner.slope.statusHint', { target: String(target) })}
       </Typography>
-      {planDragEnabled ? (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ flexShrink: 0, px: 0.5 }}
-          data-testid="slope-plan-drag-hint"
-        >
-          {t('planner.slope.dragHint')}
-        </Typography>
-      ) : null}
       <Stack
         spacing={1}
         sx={{
@@ -96,24 +71,8 @@ export function CumulativeSlopeHeroChart({
           overflow: 'hidden',
         }}
       >
-        <SlopeCumulativePanel
-          layers={layers}
-          yAxisTitle={yAxisTitle}
-          planDragEnabled={planDragEnabled}
-          onPlanDragPreview={onCumulativePlanDragPreview}
-          onPlanDragCommit={onCumulativePlanDragCommit}
-          onPlanDragCancel={onPlanDragCancel}
-          getPlanDragGeneration={getPlanDragGeneration}
-        />
-        <SlopeMonthlyPanel
-          layers={layers}
-          yAxisTitle={yAxisTitle}
-          planDragEnabled={planDragEnabled}
-          onPlanDragPreview={onMonthlyPlanDragPreview}
-          onPlanDragCommit={onMonthlyPlanDragCommit}
-          onPlanDragCancel={onPlanDragCancel}
-          getPlanDragGeneration={getPlanDragGeneration}
-        />
+        <SlopeCumulativePanel layers={layers} yAxisTitle={yAxisTitle} />
+        <SlopeMonthlyPanel layers={layers} yAxisTitle={yAxisTitle} />
       </Stack>
     </Stack>
   );

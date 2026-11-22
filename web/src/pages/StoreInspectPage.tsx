@@ -1,4 +1,6 @@
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import CloseIcon from '@mui/icons-material/Close';
+import TuneIcon from '@mui/icons-material/Tune';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import {
   Alert,
@@ -7,6 +9,9 @@ import {
   Card,
   CardContent,
   Chip,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   FormControl,
   IconButton,
   MenuItem,
@@ -35,7 +40,8 @@ import { StoreAuditSandboxPanel } from '../components/planner/storeAudit/StoreAu
 import { UnreachableRecommendationCard } from '../components/planner/UnreachableRecommendationCard';
 import { useStoreAuditSandbox } from '../components/planner/useStoreAuditSandbox';
 import { useT } from '../i18n';
-import type { DirectedPlan, MetricScorePanel } from '../schemas/metricScore';
+import type { MetricScorePanel } from '../schemas/metricScore';
+import type { FivePercentPlan } from '../schemas/plan';
 import {
   buildPlanMonitoringInsights,
   defaultAsOf,
@@ -49,9 +55,7 @@ import { usePlannerScenarioStore } from '../store/plannerScenarioStore';
 import { useUiStore } from '../store/uiStore';
 
 /**
- * Full-page store Inspect:
- * screen 1 — glance + dual Slope charts (Planner network layout, store-scoped);
- * screen 2 — Estimate vs actual sandbox (+ boost).
+ * Full-page store Inspect: glance + dual Slope charts; Estimate vs actual opens in a dialog.
  */
 export function StoreInspectPage() {
   const { storeId: storeIdParam } = useParams();
@@ -102,7 +106,7 @@ function StoreInspectPageBody({
   insights,
 }: {
   storeId: number;
-  plan: DirectedPlan;
+  plan: FivePercentPlan;
   panel: MetricScorePanel;
   insights: PlanMonitoringInsights;
 }) {
@@ -117,6 +121,7 @@ function StoreInspectPageBody({
   const setImpliedAdjustments = usePlannerRuntimeStore((s) => s.setImpliedAdjustments);
   const adjustSimulationMutation = useAdjustSimulation();
   const [adjustSuggestionError, setAdjustSuggestionError] = useState(false);
+  const [sandboxOpen, setSandboxOpen] = useState(false);
 
   const baselineRows = useMemo(() => {
     const ref = plan.chain_trajectory[0];
@@ -168,6 +173,11 @@ function StoreInspectPageBody({
     onApplyPlan: (next) => patchDraftPlan(next),
     active: true,
   });
+
+  const openSandbox = () => {
+    sandbox.setSandboxExpanded(true);
+    setSandboxOpen(true);
+  };
 
   const handleApplyUnreachableSuggestion = () => {
     if (unreachableHint == null || adjustSimulationMutation.isPending) {
@@ -223,13 +233,12 @@ function StoreInspectPageBody({
         scrollbarGutter: 'stable',
       }}
     >
-      {/* Screen 1 — store charts */}
       <Box
         data-testid="store-inspect-screen-charts"
         sx={{
-          flex: '0 0 auto',
+          flex: 1,
+          minHeight: 0,
           height: { md: '100%' },
-          minHeight: { xs: 'auto', md: '100%' },
           display: 'flex',
           flexDirection: 'column',
           gap: 1,
@@ -308,6 +317,16 @@ function StoreInspectPageBody({
               slopeAlign={slopeAlign}
             />
           </Box>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<TuneIcon />}
+            onClick={openSandbox}
+            sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', md: 'center' } }}
+            data-testid="inspect-open-sandbox"
+          >
+            {t('planner.inspect.estimateTitle')}
+          </Button>
         </Stack>
 
         {boostGlance != null ? (
@@ -424,44 +443,73 @@ function StoreInspectPageBody({
         )}
       </Box>
 
-      {/* Screen 2 — Estimate vs actual */}
-      <Box
-        data-testid="store-inspect-screen-sandbox"
-        sx={{
-          flex: '0 0 auto',
-          height: { md: '100%' },
-          minHeight: { xs: 320, md: '100%' },
-          boxSizing: 'border-box',
-          pb: 1.5,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+      <Dialog
+        open={sandboxOpen}
+        onClose={() => setSandboxOpen(false)}
+        maxWidth="md"
+        fullWidth
+        aria-labelledby="inspect-sandbox-dialog-title"
+        data-testid="inspect-sandbox-dialog"
       >
-        <StoreAuditSandboxPanel
-          layout="inline"
-          storeId={storeId}
-          scoreDigits={sandbox.scoreDigits}
-          sandboxExpanded={sandbox.sandboxExpanded}
-          onSandboxExpandedChange={sandbox.setSandboxExpanded}
-          preview={sandbox.preview}
-          originalLast={sandbox.originalLast}
-          displayTable={sandbox.displayTable}
-          editableCol={sandbox.editableCol}
-          inputValue={sandbox.inputValue}
-          onInputValueChange={sandbox.setInputValue}
-          error={sandbox.error}
-          bounds={sandbox.bounds}
-          lastPeriod={sandbox.lastPeriod}
-          appliedDraft={sandbox.appliedDraft}
-          onRecalculate={sandbox.handleRecalculate}
-          onApply={sandbox.handleApply}
-          onReset={sandbox.handleReset}
-          poolDialogOpen={sandbox.poolDialogOpen}
-          onPoolDialogOpenChange={sandbox.setPoolDialogOpen}
-          applyToastOpen={sandbox.applyToastOpen}
-          onApplyToastClose={() => sandbox.setApplyToastOpen(false)}
-        />
-      </Box>
+        <DialogTitle
+          id="inspect-sandbox-dialog-title"
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1,
+            py: 1.25,
+            pr: 1,
+          }}
+        >
+          <Typography component="span" variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
+            {t('planner.inspect.estimateTitle')}
+          </Typography>
+          <Tooltip title={t('planner.inspect.sandboxWarn')} arrow>
+            <IconButton
+              size="small"
+              aria-label={t('planner.inspect.sandboxWarn')}
+              sx={{ color: 'warning.main' }}
+              data-testid="inspect-sandbox-dialog-warn"
+            >
+              <WarningAmberIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <IconButton
+            aria-label={t('planner.inspect.done')}
+            onClick={() => setSandboxOpen(false)}
+            size="small"
+            data-testid="inspect-sandbox-dialog-close"
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ px: 2, py: 1.5 }}>
+          <StoreAuditSandboxPanel
+            layout="inline"
+            storeId={storeId}
+            scoreDigits={sandbox.scoreDigits}
+            sandboxExpanded={sandbox.sandboxExpanded}
+            onSandboxExpandedChange={sandbox.setSandboxExpanded}
+            preview={sandbox.preview}
+            originalLast={sandbox.originalLast}
+            displayTable={sandbox.displayTable}
+            editableCol={sandbox.editableCol}
+            inputValue={sandbox.inputValue}
+            onInputValueChange={sandbox.setInputValue}
+            error={sandbox.error}
+            bounds={sandbox.bounds}
+            lastPeriod={sandbox.lastPeriod}
+            appliedDraft={sandbox.appliedDraft}
+            onRecalculate={sandbox.handleRecalculate}
+            onApply={sandbox.handleApply}
+            onReset={sandbox.handleReset}
+            poolDialogOpen={sandbox.poolDialogOpen}
+            onPoolDialogOpenChange={sandbox.setPoolDialogOpen}
+            applyToastOpen={sandbox.applyToastOpen}
+            onApplyToastClose={() => sandbox.setApplyToastOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

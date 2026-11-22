@@ -1,6 +1,6 @@
 /** Cumulative path panel — planning-year plan vs actual/sim (fair compare). */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { Box, CircularProgress, Stack, ToggleButton, Typography } from '@mui/material';
 
 import { useT } from '../../i18n';
@@ -26,46 +26,19 @@ import {
   splitSeriesAtAsOf,
   type PlotlyAnnotation,
 } from './slopeHeroShared';
-import { attachSlopePlanDrag } from './slopePlanDrag';
 import { useFrozenYRange, useSlopePlotBoxSize } from './useSlopePlotStableLayout';
 
 interface SlopeCumulativePanelProps {
   layers: CumulativeSlopePlotLayers;
   yAxisTitle?: string;
-  /** Enable Y-drag on future Plan (cumulative) markers. */
-  planDragEnabled?: boolean;
-  /** Freeze plot size + Y-range (drag preview / allocate) to avoid layout jitter. */
-  layoutFrozen?: boolean;
-  onPlanDragPreview?: (monthIndex: number, value: number) => void;
-  onPlanDragCommit?: (monthIndex: number, value: number) => void;
-  onPlanDragCancel?: () => void;
-  getPlanDragGeneration?: () => number;
 }
 
 export function SlopeCumulativePanel({
   layers,
   yAxisTitle = '5% Score',
-  planDragEnabled = false,
-  layoutFrozen = false,
-  onPlanDragPreview,
-  onPlanDragCommit,
-  onPlanDragCancel,
-  getPlanDragGeneration,
 }: SlopeCumulativePanelProps) {
   const t = useT();
-  const graphDivRef = useRef<HTMLElement | null>(null);
-  const dragDisposerRef = useRef<(() => void) | null>(null);
-  const dragHandlersRef = useRef({
-    planDragEnabled,
-    onPlanDragPreview,
-    onPlanDragCommit,
-    onPlanDragCancel,
-    getPlanDragGeneration,
-    labels: [] as string[],
-    planYs: [] as (number | null)[],
-    editableFromIndex: 0,
-  });
-  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(layoutFrozen);
+  const { hostRef, plotWidth, hostHeight } = useSlopePlotBoxSize(false);
   const [legendOpen, setLegendOpen] = useState(false);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(
     () => new Set(SLOPE_CUMULATIVE_DEFAULT_HIDDEN),
@@ -91,52 +64,6 @@ export function SlopeCumulativePanel({
     target,
     cutover,
   } = layers;
-  const editableFromIndex = cutover.factEndIndex + 1;
-
-  dragHandlersRef.current = {
-    planDragEnabled,
-    onPlanDragPreview,
-    onPlanDragCommit,
-    onPlanDragCancel,
-    getPlanDragGeneration,
-    labels,
-    planYs: planCumYs,
-    editableFromIndex,
-  };
-
-  const bindPlanDrag = useCallback((gd: HTMLElement) => {
-    graphDivRef.current = gd;
-    // Do not dispose/recreate while a drag may be active — getters read latest props.
-    if (dragDisposerRef.current) return;
-    dragDisposerRef.current = attachSlopePlanDrag(gd, () => {
-      const h = dragHandlersRef.current;
-      return {
-        labels: h.labels,
-        editableFromIndex: h.editableFromIndex,
-        planYs: h.planYs,
-        onPreview: (monthIndex, value) => h.onPlanDragPreview?.(monthIndex, value),
-        onCommit: (monthIndex, value) => h.onPlanDragCommit?.(monthIndex, value),
-        onCancel: () => h.onPlanDragCancel?.(),
-        getGeneration: h.getPlanDragGeneration,
-      };
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!planDragEnabled) {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-      return;
-    }
-    if (graphDivRef.current && !dragDisposerRef.current) {
-      bindPlanDrag(graphDivRef.current);
-    }
-    return () => {
-      dragDisposerRef.current?.();
-      dragDisposerRef.current = null;
-    };
-    // Attach once while enabled — handlers read via ref (preview must not tear down drag).
-  }, [planDragEnabled, bindPlanDrag]);
   const contentMinWidth = Math.max(labels.length, 1) * HERO_PX_PER_PERIOD;
   const plotMinWidth = Math.max(contentMinWidth, plotWidth || contentMinWidth);
   const plotHeight = Math.max(SLOPE_PANEL_MIN_HEIGHT_PX, hostHeight || SLOPE_PANEL_MIN_HEIGHT_PX);
@@ -158,10 +85,7 @@ export function SlopeCumulativePanel({
     [isVisible, planCumYs, cumActualSimYtdYs, cumActualSimYs, requiredCumulativeYs, target],
   );
   const fitY = buildStoreImpactYAxis('fit', yValues.length > 0 ? yValues : [target]);
-  const yRange = useFrozenYRange(
-    layoutFrozen,
-    fitY.range as [number, number] | undefined,
-  );
+  const yRange = useFrozenYRange(false, fitY.range as [number, number] | undefined);
   const cutoverMonth = cutover.factEndLabel ?? cutover.lineLabel;
   const cutoverAnn = t('planner.slope.cutoverLine', { month: cutoverMonth });
   const { shapes, annotations: cutoverAnnotations } = asOfShapes(
@@ -209,10 +133,9 @@ export function SlopeCumulativePanel({
             mode: 'lines+markers' as const,
             name: t('planner.slope.planCum'),
             line: { color: '#1565c0', width: 3 },
-            marker: { size: planDragEnabled ? 12 : 6, color: '#1565c0' },
+            marker: { size: 6, color: '#1565c0' },
             connectgaps: false,
             hovertemplate: HERO_HOVER_TEMPLATE,
-            meta: planDragEnabled ? { slopePlanDrag: true } : undefined,
           },
         ]
       : []),
@@ -409,7 +332,7 @@ export function SlopeCumulativePanel({
                 ticktext,
                 bottomMargin: 36,
               }),
-              dragmode: planDragEnabled ? false : 'zoom',
+              dragmode: 'zoom',
               yaxis: {
                 range: yRange,
                 ticksuffix: '%',
@@ -422,7 +345,6 @@ export function SlopeCumulativePanel({
             config={{ displayModeBar: false, responsive: true }}
             style={{ width: plotMinWidth, height: plotHeight }}
             useResizeHandler={false}
-            onInitialized={(_fig: unknown, gd: HTMLElement) => bindPlanDrag(gd)}
           />
         </Suspense>
       </Box>
