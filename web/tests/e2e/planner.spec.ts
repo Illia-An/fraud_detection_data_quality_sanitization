@@ -63,13 +63,14 @@ test.describe('Planner alt-UI smoke', () => {
     // At-risk is a second full viewport (no accordion expand).
     await page.getByTestId('planner-screen-atrisk').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('planner-at-risk-sheet')).toBeVisible();
-    await expect(page.getByTestId('atrisk-exception-table')).toBeVisible();
+    // Exception table lives in atrisk-exception-panel (section root is planner-at-risk-sheet).
+    await expect(page.getByTestId('atrisk-exception-panel')).toBeVisible();
 
     // Default filter is Behind Plan Only — may be empty on synthetic; open All Stores.
     await page.locator('#atrisk-filter-select').click();
     await page.getByRole('option', { name: /All Stores/i }).click();
     const inspect = page
-      .getByTestId('atrisk-exception-table')
+      .getByTestId('atrisk-exception-panel')
       .getByRole('button', { name: /^Inspect$/i })
       .first();
     await expect(inspect).toBeVisible({ timeout: 15_000 });
