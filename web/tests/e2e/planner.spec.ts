@@ -91,6 +91,10 @@ test.describe('Planner alt-UI smoke', () => {
     await expect(page.getByTestId('inspect-sandbox-panel')).toBeVisible();
     await expect(page.getByTestId('inspect-recalculate')).toBeVisible();
 
+    // Dialog modal intercepts clicks on the page chrome — close first.
+    await page.getByTestId('inspect-sandbox-dialog-close').click();
+    await expect(page.getByTestId('inspect-sandbox-dialog')).toHaveCount(0);
+
     await page.getByTestId('store-inspect-back').click();
     await expect(page).toHaveURL(/\/planner$/);
     await expect(page.getByTestId('store-inspect-page')).toHaveCount(0);
