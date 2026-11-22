@@ -44,22 +44,24 @@ test.describe('Planner alt-UI smoke', () => {
     });
 
     await expect(page.getByTestId('planner-save-plan')).toBeVisible();
+    // Excel lives under collapsed Export & download disclosure (Figma footer).
+    await page.getByTestId('planner-export-disclosure').click();
     await expect(page.getByTestId('planner-export-excel')).toBeVisible();
 
     await page.getByRole('button', { name: /Run simulation/i }).click();
 
     await expect(page.getByTestId('planner-glance-row')).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Projected network KPI/i)).toBeVisible();
-    await expect(page.getByText(/Hero evaluation/i)).toBeVisible();
-    // Slope is the only network Hero (Legacy toggle removed).
-    await expect(page.getByTestId('cumulative-slope-hero-chart')).toBeVisible({
+    // Network Slope is two stacked panels (not CumulativeSlopeHeroChart wrapper).
+    await expect(page.getByTestId('planner-slope-cumulative')).toBeVisible({
       timeout: 60_000,
     });
+    await expect(page.getByTestId('planner-slope-monthly')).toBeVisible();
     await expect(page.getByTestId('planner-save-plan')).toBeEnabled({ timeout: 60_000 });
     await expect(page.getByTestId('planner-hero-view-mode')).toHaveCount(0);
 
-    // At-risk is a collapsed bottom overlay — expand before asserting the table.
-    await page.getByText(/At-Risk Exception List/i).click();
+    // At-risk is a second full viewport (no accordion expand).
+    await page.getByTestId('planner-screen-atrisk').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('planner-at-risk-sheet')).toBeVisible();
     await expect(page.getByTestId('atrisk-exception-table')).toBeVisible();
 
